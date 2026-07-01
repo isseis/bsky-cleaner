@@ -1,0 +1,38 @@
+version: "2"
+
+run:
+  timeout: 10m
+
+linters:
+  enable:
+    # Default linters
+    - "errcheck"    # Detect unchecked errors
+    - "govet"       # Reports suspicious constructs
+    - "ineffassign" # Detects unused variable assignments
+    - "staticcheck" # go vet on steroids
+    - "unused"      # Detect unused constants, variables, functions and types
+
+    # Suggested additional linters
+    - "gocyclo"   # Detect cyclomatic complexity
+    - "goconst"   # Detect repeated values that can be made constants
+    - "gocritic"  # Provides diagnostics that check for bugs, performance and style issues.
+    - "gosec"     # Security linter
+    - "misspell"  # Fix spelling errors
+    - "revive"    # General purpose linter
+    - "unconvert" # Detect unnecessary type conversions
+    - "unparam"   # Detect unused function parameters
+
+  settings:
+    gocyclo:
+      min-complexity: 20
+
+  exclusions:
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - dupl
+          - gosec
+          - goconst
