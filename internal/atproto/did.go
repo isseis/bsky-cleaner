@@ -17,15 +17,27 @@ import (
 // bytes, so this is a generous ceiling against a misbehaving server.
 const maxDIDResponseBytes = 8 << 10
 
+// maxDIDDocumentResponseBytes bounds how much of a DID document response
+// body this package will decode; real DID documents are a few KB at most,
+// so this is a generous ceiling against a misbehaving or malicious server.
+const maxDIDDocumentResponseBytes = 64 << 10
+
 // atprotoPDSServiceType is the DID document service "type" value that
 // identifies the entry describing an account's PDS.
 const atprotoPDSServiceType = "AtprotoPersonalDataServer"
 
 // resolveHandleToDID resolves handle to a DID using the HTTPS well-known
 // method (GET https://{handle}/.well-known/atproto-did), the resolution
-// mechanism that requires no separate directory service.
+// mechanism that requires no separate directory service. The DNS TXT
+// record method (_atproto.<handle> TXT "did=...") is not supported; an
+// account that only configured DNS-based handle verification will fail to
+// resolve here.
 func resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error) {
 	reqURL := "https://" + handle + "/.well-known/atproto-did"
+	if err := checkRequestHostSafety(ctx, reqURL); err != nil {
+		return "", err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("resolve handle to DID: build request: %w", err)
@@ -79,6 +91,9 @@ func resolveDIDDocument(ctx context.Context, httpDoer HTTPDoer, did string) (ser
 	if err != nil {
 		return "", err
 	}
+	if err := checkRequestHostSafety(ctx, docURL); err != nil {
+		return "", err
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL, nil)
 	if err != nil {
@@ -99,7 +114,7 @@ func resolveDIDDocument(ctx context.Context, httpDoer HTTPDoer, did string) (ser
 	}
 
 	var doc didDocument
-	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxDIDDocumentResponseBytes)).Decode(&doc); err != nil {
 		return "", fmt.Errorf("resolve DID document: decode response: %w: %w", ErrDIDResolutionFailed, err)
 	}
 
@@ -156,6 +171,44 @@ func didWebDocumentURL(did string) (string, error) {
 // private addresses" boundary case without real network I/O.
 var lookupIPAddr = net.DefaultResolver.LookupIPAddr
 
+// isUnsafeIP reports whether ip is a destination this package must never
+// connect (or send a request) to: private, loopback, link-local, or
+// unspecified. AT Protocol is federated, so there is no host allow-list to
+// fall back on -- this is the minimum guard against reaching internal
+// network / metadata-service addresses.
+func isUnsafeIP(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+}
+
+// checkRequestHostSafety resolves targetURL's host and rejects it if any
+// resolved address is unsafe per isUnsafeIP. It is applied to every host
+// this package sends an unauthenticated GET to during DID resolution
+// (handle resolution and DID document fetch), not only to the final
+// validated PDS endpoint: a malicious or compromised handle server, or a
+// did:web DID whose domain segment is itself untrusted response data, could
+// otherwise make this process issue requests to internal network addresses
+// (blind SSRF) even though no credentials are sent at this stage.
+func checkRequestHostSafety(ctx context.Context, targetURL string) error {
+	u, parseErr := url.Parse(targetURL)
+	if parseErr != nil || u.Scheme != "https" {
+		return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: ErrUntrustedPDSEndpoint}
+	}
+
+	addrs, lookupErr := lookupIPAddr(ctx, u.Hostname())
+	if lookupErr != nil {
+		return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: fmt.Errorf("%w: %w", ErrDIDResolutionFailed, lookupErr)}
+	}
+	if len(addrs) == 0 {
+		return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: ErrUntrustedPDSEndpoint}
+	}
+	for _, addr := range addrs {
+		if isUnsafeIP(addr.IP) {
+			return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: ErrUntrustedPDSEndpoint}
+		}
+	}
+	return nil
+}
+
 // validatePDSEndpoint checks that serviceEndpoint is safe to send
 // credentials to: its scheme must be https, and every address its host
 // resolves to must be public and routable. It resolves the host exactly
@@ -179,11 +232,10 @@ func validatePDSEndpoint(ctx context.Context, serviceEndpoint string) (verifiedA
 	}
 
 	for _, addr := range addrs {
-		ip := addr.IP
-		if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		if isUnsafeIP(addr.IP) {
 			return nil, "", &SSRFError{Endpoint: serviceEndpoint, Stage: SSRFStageInitialValidation, Err: ErrUntrustedPDSEndpoint}
 		}
-		verifiedAddrs = append(verifiedAddrs, ip)
+		verifiedAddrs = append(verifiedAddrs, addr.IP)
 	}
 
 	return verifiedAddrs, host, nil

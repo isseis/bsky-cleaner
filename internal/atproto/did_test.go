@@ -19,6 +19,25 @@ import (
 // locally without any real DNS query, so this test needs no network I/O.
 const publicIPLiteral = "203.0.113.5"
 
+// stubSymbolicHostLookup makes lookupIPAddr resolve any non-IP-literal
+// host (e.g. "alice.test", "plc.directory") to publicIPLiteral, so tests
+// that exercise resolveHandleToDID/resolveDIDDocument through NewClient
+// (both now gated by checkRequestHostSafety) don't perform a real DNS
+// query. Hosts that are already IP literals (used by the boundary-value
+// rejection tests) are passed through to the real resolver, which
+// resolves them locally without any network I/O either way.
+func stubSymbolicHostLookup(t *testing.T) {
+	t.Helper()
+	prev := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = prev })
+	lookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+		if net.ParseIP(host) != nil {
+			return prev(ctx, host)
+		}
+		return []net.IPAddr{{IP: net.ParseIP(publicIPLiteral)}}, nil
+	}
+}
+
 func handleResolutionHandler(t *testing.T, handle, did, plcHost, pdsEndpoint string) func(req *http.Request) (*http.Response, error) {
 	t.Helper()
 	return func(req *http.Request) (*http.Response, error) {
@@ -44,6 +63,7 @@ func TestValidatePDSEndpoint_Success(t *testing.T) {
 }
 
 func TestNewClient_ResolvesHandleToDIDAndPDSEndpoint(t *testing.T) {
+	stubSymbolicHostLookup(t)
 	const handle = "alice.test"
 	const did = "did:plc:test123"
 	pdsEndpoint := "https://" + publicIPLiteral
@@ -112,6 +132,7 @@ func TestValidatePDSEndpoint_RejectsUntrustedHost(t *testing.T) {
 }
 
 func TestNewClient_DIDResolutionFailure(t *testing.T) {
+	stubSymbolicHostLookup(t)
 	mock := &atprototestutil.MockHTTPDoer{
 		Handler: func(_ *http.Request) (*http.Response, error) {
 			return atprototestutil.JSONResponse(http.StatusNotFound, ""), nil
@@ -126,6 +147,7 @@ func TestNewClient_DIDResolutionFailure(t *testing.T) {
 }
 
 func TestNewClient_RejectsUntrustedHost_NoFurtherRequest(t *testing.T) {
+	stubSymbolicHostLookup(t)
 	const handle = "alice.test"
 	const did = "did:plc:test123"
 
@@ -137,4 +159,53 @@ func TestNewClient_RejectsUntrustedHost_NoFurtherRequest(t *testing.T) {
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, ErrUntrustedPDSEndpoint)
 	assert.Equal(t, 2, mock.CallCount(), "expected exactly handle resolution + DID document requests, no further request after rejection")
+}
+
+func TestDIDWebDocumentURL(t *testing.T) {
+	tests := []struct {
+		name string
+		did  string
+		want string
+	}{
+		{name: "bare domain", did: "did:web:example.com", want: "https://example.com/.well-known/did.json"},
+		{name: "path segments", did: "did:web:example.com:user:alice", want: "https://example.com/user/alice/did.json"},
+		{name: "percent-encoded port", did: "did:web:example.com%3A3000", want: "https://example.com:3000/.well-known/did.json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := didWebDocumentURL(tt.did)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestResolveDIDDocument_RejectsUnsafeDidWebHost(t *testing.T) {
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request to untrusted did:web host: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	_, err := resolveDIDDocument(context.Background(), mock, "did:web:127.0.0.1")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrUntrustedPDSEndpoint)
+	assert.Equal(t, 0, mock.CallCount(), "must not send a request to an unsafe did:web host")
+}
+
+func TestResolveHandleToDID_RejectsNonDIDResponse(t *testing.T) {
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(_ *http.Request) (*http.Response, error) {
+			return atprototestutil.JSONResponse(http.StatusOK, "not-a-did"), nil
+		},
+	}
+
+	_, err := resolveHandleToDID(context.Background(), mock, publicIPLiteral)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
 }

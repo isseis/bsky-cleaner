@@ -2,9 +2,12 @@ package atproto
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,4 +60,71 @@ func TestCheckRedirect_AlwaysRejects(t *testing.T) {
 	ssrfErr, ok := errors.AsType[*SSRFError](err)
 	require.True(t, ok)
 	assert.Equal(t, SSRFStageDialRevalidation, ssrfErr.Stage)
+}
+
+// newTestRestrictedDoer builds a *restrictedDoer wired to trust server's
+// TLS certificate and, unlike newRestrictedDoer, lets the test pin a
+// server address independently of the DialContext's verifiedAddrs set, so
+// TestRestrictedDoer_Do can exercise the DialContext's own defense-in-depth
+// check even though restrictedDoer's own construction normally keeps the
+// two in sync.
+func newTestRestrictedDoer(t *testing.T, dialContextAddrs []net.IP, pinnedIP net.IP, host string, rootCAs *x509.CertPool) *restrictedDoer {
+	t.Helper()
+	doer := newRestrictedDoer(dialContextAddrs, host).(*restrictedDoer)
+	transport, ok := doer.client.Transport.(*http.Transport)
+	require.True(t, ok)
+	transport.TLSClientConfig.RootCAs = rootCAs
+	doer.pinnedIP = pinnedIP
+	return doer
+}
+
+func TestRestrictedDoer_Do(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	serverURL, err := url.Parse(server.URL)
+	require.NoError(t, err)
+	serverHost, _, err := net.SplitHostPort(serverURL.Host)
+	require.NoError(t, err)
+	serverIP := net.ParseIP(serverHost)
+	require.NotNil(t, serverIP)
+
+	transport, ok := server.Client().Transport.(*http.Transport)
+	require.True(t, ok)
+	rootCAs := transport.TLSClientConfig.RootCAs
+
+	t.Run("connects to the pinned verified address, rewriting host and TLS SNI", func(t *testing.T) {
+		doer := newTestRestrictedDoer(t, []net.IP{serverIP}, serverIP, serverHost, rootCAs)
+		req, err := http.NewRequest(http.MethodGet, server.URL+"/xrpc/test", nil)
+		require.NoError(t, err)
+
+		resp, err := doer.Do(req)
+
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("SSRFError from DialContext surfaces through Do when pinnedIP is not in verifiedAddrs", func(t *testing.T) {
+		// verifiedAddrs deliberately excludes serverIP, simulating an
+		// inconsistency between the doer's pinned dial target and its
+		// DialContext's verified set, to prove the DialContext check
+		// itself -- not just newRestrictedDoer's construction-time
+		// invariant -- is what blocks the connection, and that the
+		// resulting *SSRFError survives http.Client.Do's *url.Error
+		// wrapping and is still detectable by errors.AsType.
+		doer := newTestRestrictedDoer(t, []net.IP{net.ParseIP(publicIPLiteral)}, serverIP, serverHost, rootCAs)
+		req, err := http.NewRequest(http.MethodGet, server.URL+"/xrpc/test", nil)
+		require.NoError(t, err)
+
+		_, doErr := doer.Do(req)
+
+		require.Error(t, doErr)
+		assert.ErrorIs(t, doErr, ErrUntrustedPDSEndpoint)
+		ssrfErr, ok := errors.AsType[*SSRFError](doErr)
+		require.True(t, ok)
+		assert.Equal(t, SSRFStageDialRevalidation, ssrfErr.Stage)
+	})
 }

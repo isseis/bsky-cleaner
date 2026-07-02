@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"time"
 )
 
@@ -144,7 +145,7 @@ func newRestrictedDialContext(verifiedAddrs []net.IP, dialer *net.Dialer) func(c
 			return nil, fmt.Errorf("restricted dial: parse address %q: %w", addr, err)
 		}
 		ip := net.ParseIP(host)
-		if ip == nil || !containsIP(verifiedAddrs, ip) {
+		if ip == nil || !slices.ContainsFunc(verifiedAddrs, ip.Equal) {
 			return nil, &SSRFError{Endpoint: addr, Stage: SSRFStageDialRevalidation, Err: ErrUntrustedPDSEndpoint}
 		}
 		conn, err := dialer.DialContext(ctx, network, addr)
@@ -153,13 +154,4 @@ func newRestrictedDialContext(verifiedAddrs []net.IP, dialer *net.Dialer) func(c
 		}
 		return conn, nil
 	}
-}
-
-func containsIP(addrs []net.IP, ip net.IP) bool {
-	for _, a := range addrs {
-		if a.Equal(ip) {
-			return true
-		}
-	}
-	return false
 }
