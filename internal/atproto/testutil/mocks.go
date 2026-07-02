@@ -74,8 +74,9 @@ func (m *MockHTTPDoer) CallCount() int {
 	return len(m.requests)
 }
 
-// JSONResponse builds an *http.Response with the given status code and a
-// JSON-encoded body, for use inside a MockHTTPDoer.Handler.
+// JSONResponse builds an *http.Response with the given status code, writing
+// body verbatim (the caller is responsible for supplying valid JSON) and
+// setting a JSON Content-Type header, for use inside a MockHTTPDoer.Handler.
 func JSONResponse(statusCode int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: statusCode,

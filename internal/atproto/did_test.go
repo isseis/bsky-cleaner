@@ -182,6 +182,25 @@ func TestDIDWebDocumentURL(t *testing.T) {
 	}
 }
 
+func TestDIDWebDocumentURL_RejectsInvalidDomainSegment(t *testing.T) {
+	tests := []struct {
+		name string
+		did  string
+	}{
+		{name: "path injection via percent-encoding", did: "did:web:evil.com%2Fx"},
+		{name: "userinfo injection via percent-encoding", did: "did:web:x%40evil.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := didWebDocumentURL(tt.did)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+		})
+	}
+}
+
 func TestResolveDIDDocument_RejectsUnsafeDidWebHost(t *testing.T) {
 	mock := &atprototestutil.MockHTTPDoer{
 		Handler: func(req *http.Request) (*http.Response, error) {
@@ -195,6 +214,33 @@ func TestResolveDIDDocument_RejectsUnsafeDidWebHost(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrUntrustedPDSEndpoint)
 	assert.Equal(t, 0, mock.CallCount(), "must not send a request to an unsafe did:web host")
+}
+
+func TestResolveHandleToDID_RejectsMalformedHandle(t *testing.T) {
+	tests := []struct {
+		name   string
+		handle string
+	}{
+		{name: "userinfo injection", handle: "evil.com/x@attacker.com"},
+		{name: "path injection", handle: "evil.com/../secret"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &atprototestutil.MockHTTPDoer{
+				Handler: func(req *http.Request) (*http.Response, error) {
+					t.Fatalf("unexpected request for malformed handle: %s %s", req.Method, req.URL)
+					return nil, nil
+				},
+			}
+
+			_, err := resolveHandleToDID(context.Background(), mock, tt.handle)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+			assert.Equal(t, 0, mock.CallCount(), "must not send a request for a malformed handle")
+		})
+	}
 }
 
 func TestResolveHandleToDID_RejectsNonDIDResponse(t *testing.T) {

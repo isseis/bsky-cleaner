@@ -46,7 +46,7 @@ func doXRPC(ctx context.Context, doer HTTPDoer, base *url.URL, httpMethod, xrpcM
 	if reqBody != nil {
 		data, err := json.Marshal(reqBody)
 		if err != nil {
-			return fmt.Errorf("xrpc %s: encode request: %w", xrpcMethod, err)
+			return &HTTPError{Method: xrpcMethod, StatusCode: 0, Err: fmt.Errorf("encode request: %w", err)}
 		}
 		bodyReader = bytes.NewReader(data)
 	}

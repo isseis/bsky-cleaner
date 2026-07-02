@@ -26,6 +26,13 @@ const maxDIDDocumentResponseBytes = 64 << 10
 // identifies the entry describing an account's PDS.
 const atprotoPDSServiceType = "AtprotoPersonalDataServer"
 
+// invalidHandleChars are characters that have special meaning in a URL (or
+// are otherwise not valid in a DNS hostname) and must never appear in a
+// handle used to build the well-known resolution URL: allowing them would
+// let a malformed handle change the URL's structure (e.g. injecting a
+// path, query, fragment, or userinfo component).
+const invalidHandleChars = "/?#@ \t\r\n"
+
 // resolveHandleToDID resolves handle to a DID using the HTTPS well-known
 // method (GET https://{handle}/.well-known/atproto-did), the resolution
 // mechanism that requires no separate directory service. The DNS TXT
@@ -33,6 +40,9 @@ const atprotoPDSServiceType = "AtprotoPersonalDataServer"
 // account that only configured DNS-based handle verification will fail to
 // resolve here.
 func resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error) {
+	if strings.ContainsAny(handle, invalidHandleChars) {
+		return "", fmt.Errorf("resolve handle to DID: invalid handle %q: %w", handle, ErrDIDResolutionFailed)
+	}
 	reqURL := "https://" + handle + "/.well-known/atproto-did"
 	if err := checkRequestHostSafety(ctx, reqURL); err != nil {
 		return "", err
@@ -157,6 +167,9 @@ func didWebDocumentURL(did string) (string, error) {
 	}
 
 	domain := parts[0]
+	if strings.ContainsAny(domain, "/?#@") {
+		return "", fmt.Errorf("resolve did:web document URL: invalid domain segment %q: %w", domain, ErrDIDResolutionFailed)
+	}
 	pathParts := parts[1:]
 	if len(pathParts) == 0 {
 		return "https://" + domain + "/.well-known/did.json", nil
