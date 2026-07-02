@@ -144,15 +144,15 @@
 
 **ファイル**: `internal/config/app_config.go`, `internal/config/app_config_test.go`, `docs/design/configuration.md`, `docs/dev/developer_guide/package_reference.md`
 
-- [ ] `internal/config/app_config.go` に `AppConfig` 構造体（`Config` と `Credentials` を埋め込み）を定義する。
-- [ ] `internal/config/app_config.go` に `LoadAppConfig(path string) (*AppConfig, error)` を実装する: `Load(path)` と `LoadCredentials()` を呼び出し、いずれかがエラーを返した場合はそのエラーをそのまま返す。両方成功した場合は `Config` と `Credentials` を埋め込んだ `*AppConfig` を返す。
-- [ ] `internal/config/app_config_test.go` に統合テストを実装する（詳細は 4章参照）。
-- [ ] `docs/design/configuration.md` を新設し、以下を記載する（[02_architecture.md](02_architecture.md) 3.3 節の表のとおり）:
+- [x] `internal/config/app_config.go` に `AppConfig` 構造体（`Config` と `Credentials` を埋め込み）を定義する。
+- [x] `internal/config/app_config.go` に `LoadAppConfig(path string) (*AppConfig, error)` を実装する: `Load(path)` と `LoadCredentials()` を呼び出し、いずれかがエラーを返した場合はそのエラーをそのまま返す。両方成功した場合は `Config` と `Credentials` を埋め込んだ `*AppConfig` を返す。
+- [x] `internal/config/app_config_test.go` に統合テストを実装する（詳細は 4章参照）。
+- [x] `docs/design/configuration.md` を新設し、以下を記載する（[02_architecture.md](02_architecture.md) 3.3 節の表のとおり）:
   - TOML の各項目（`retention_days`, `schedule`, `execution_timeout_seconds`）について、項目名・型・必須/任意・書式や制約（`retention_days` は正の整数、`execution_timeout_seconds` は 1〜86400 の整数）・記述例。
-  - 環境変数の各項目（`BSKY_HANDLE`, `BSKY_APP_PASSWORD`, `BSKY_SLACK_WEBHOOK_URL_SUCCESS`, `BSKY_SLACK_WEBHOOK_URL_FAILURE`）について、変数名・必須/任意・書式や制約（Slack Webhook URL はスキームが `https` であることのみを要求し、パス・クエリパラメータの内容には制約を設けない旨を明記する）・記述例。
+  - 環境変数の各項目（`BSKY_HANDLE`, `BSKY_APP_PASSWORD`, `BSKY_SLACK_WEBHOOK_URL_SUCCESS`, `BSKY_SLACK_WEBHOOK_URL_FAILURE`）について、変数名・型・必須/任意・デフォルト値・書式や制約（Slack Webhook URL はスキームが `https` であることのみを要求し、パス・クエリパラメータの内容には制約を設けない旨を明記する）・記述例（AC-12 が TOML・環境変数の双方に要求する項目一式に揃える）。
   - `schedule` は本パッケージでは存在確認のみを行い、cron 構文としての妥当性検証は [0007_docker_distribution](../0007_docker_distribution/01_requirements.md) の `print-schedule` サブコマンドの責務であることを明記する（[02_architecture.md](02_architecture.md) 3.1 節）。
-- [ ] `docs/dev/developer_guide/package_reference.md` を更新し、「パッケージ未実装」の記述を、`internal/config` パッケージ（責務: TOML 設定ファイルと環境変数を読み込み、検証済みの設定値を返す）を含む実際のディレクトリ構成に置き換える（CLAUDE.md「Keep Package Reference in sync with `cmd/` and `internal/` as packages are actually added」に対応）。
-- [ ] `make fmt && make test && make lint` が green であることを確認する。
+- [x] `docs/dev/developer_guide/package_reference.md` を更新し、「パッケージ未実装」の記述を、`internal/config` パッケージ（責務: TOML 設定ファイルと環境変数を読み込み、検証済みの設定値を返す）を含む実際のディレクトリ構成に置き換える（CLAUDE.md「Keep Package Reference in sync with `cmd/` and `internal/` as packages are actually added」に対応）。
+- [x] `make fmt && make test && make lint` が green であることを確認する。
 
 ### PR-4 作成ポイント: AppConfig integration and documentation
 
@@ -162,7 +162,7 @@
 
 **レビュー観点**: `LoadAppConfig()` が `Load()`・`LoadCredentials()` のいずれのエラーもそのまま伝播しているか / `docs/design/configuration.md` の記載（TOML キー名・環境変数名・制約・記述例）が実装と一致しているか（AC-12） / `package_reference.md` 更新後に AC-12 の静的検証コマンド（`rg -c "internal/config"` 等）が実際にヒットするか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
 
