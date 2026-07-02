@@ -3,6 +3,9 @@ package config
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setAllCredentialEnv(t *testing.T, handle, appPassword, slackSuccessURL, slackFailureURL string) {
@@ -17,22 +20,12 @@ func TestLoadCredentials_Success(t *testing.T) {
 	setAllCredentialEnv(t, "alice.bsky.social", "app-password", "https://hooks.slack.com/services/success", "https://hooks.slack.com/services/failure")
 
 	creds, err := LoadCredentials()
-	if err != nil {
-		t.Fatalf("LoadCredentials() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if creds.Handle != "alice.bsky.social" {
-		t.Errorf("Handle = %q, want %q", creds.Handle, "alice.bsky.social")
-	}
-	if creds.AppPassword.Reveal() != "app-password" {
-		t.Errorf("AppPassword.Reveal() = %q, want %q", creds.AppPassword.Reveal(), "app-password")
-	}
-	if creds.SlackSuccessWebhookURL.Reveal() != "https://hooks.slack.com/services/success" {
-		t.Errorf("SlackSuccessWebhookURL.Reveal() = %q, want %q", creds.SlackSuccessWebhookURL.Reveal(), "https://hooks.slack.com/services/success")
-	}
-	if creds.SlackFailureWebhookURL.Reveal() != "https://hooks.slack.com/services/failure" {
-		t.Errorf("SlackFailureWebhookURL.Reveal() = %q, want %q", creds.SlackFailureWebhookURL.Reveal(), "https://hooks.slack.com/services/failure")
-	}
+	assert.Equal(t, "alice.bsky.social", creds.Handle)
+	assert.Equal(t, "app-password", creds.AppPassword.Reveal())
+	assert.Equal(t, "https://hooks.slack.com/services/success", creds.SlackSuccessWebhookURL.Reveal())
+	assert.Equal(t, "https://hooks.slack.com/services/failure", creds.SlackFailureWebhookURL.Reveal())
 }
 
 func TestLoadCredentials_MissingRequiredEnv(t *testing.T) {
@@ -51,20 +44,12 @@ func TestLoadCredentials_MissingRequiredEnv(t *testing.T) {
 			unsetEnv(t, tt.field)
 
 			_, err := LoadCredentials()
-			if !errors.Is(err, ErrMissingEnv) {
-				t.Fatalf("LoadCredentials() error = %v, want wrapping ErrMissingEnv", err)
-			}
+			require.ErrorIs(t, err, ErrMissingEnv)
 
 			fieldErr, ok := errors.AsType[*FieldError](err)
-			if !ok {
-				t.Fatalf("LoadCredentials() error = %v, want *FieldError", err)
-			}
-			if fieldErr.Field != tt.field {
-				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, tt.field)
-			}
-			if fieldErr.Value != "" {
-				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
-			}
+			require.Truef(t, ok, "LoadCredentials() error = %v, want *FieldError", err)
+			assert.Equal(t, tt.field, fieldErr.Field)
+			assert.Empty(t, fieldErr.Value)
 		})
 	}
 }
@@ -76,16 +61,10 @@ func TestLoadCredentials_SlackWebhookURLOptional(t *testing.T) {
 	unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_FAILURE")
 
 	creds, err := LoadCredentials()
-	if err != nil {
-		t.Fatalf("LoadCredentials() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if creds.SlackSuccessWebhookURL != (SecretString{}) {
-		t.Errorf("SlackSuccessWebhookURL = %#v, want zero value", creds.SlackSuccessWebhookURL)
-	}
-	if creds.SlackFailureWebhookURL != (SecretString{}) {
-		t.Errorf("SlackFailureWebhookURL = %#v, want zero value", creds.SlackFailureWebhookURL)
-	}
+	assert.Equal(t, SecretString{}, creds.SlackSuccessWebhookURL)
+	assert.Equal(t, SecretString{}, creds.SlackFailureWebhookURL)
 }
 
 func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
@@ -113,20 +92,12 @@ func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
 			t.Setenv(tt.envVar, tt.url)
 
 			_, err := LoadCredentials()
-			if !errors.Is(err, ErrInvalidValue) {
-				t.Fatalf("LoadCredentials() error = %v, want wrapping ErrInvalidValue", err)
-			}
+			require.ErrorIs(t, err, ErrInvalidValue)
 
 			fieldErr, ok := errors.AsType[*FieldError](err)
-			if !ok {
-				t.Fatalf("LoadCredentials() error = %v, want *FieldError", err)
-			}
-			if fieldErr.Field != tt.envVar {
-				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, tt.envVar)
-			}
-			if fieldErr.Value != "" {
-				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
-			}
+			require.Truef(t, ok, "LoadCredentials() error = %v, want *FieldError", err)
+			assert.Equal(t, tt.envVar, fieldErr.Field)
+			assert.Empty(t, fieldErr.Value)
 		})
 	}
 }
@@ -138,14 +109,8 @@ func TestLoadCredentials_SlackWebhookURLOnlyOneSet(t *testing.T) {
 	unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_FAILURE")
 
 	creds, err := LoadCredentials()
-	if err != nil {
-		t.Fatalf("LoadCredentials() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if creds.SlackSuccessWebhookURL.Reveal() != "https://hooks.slack.com/services/success" {
-		t.Errorf("SlackSuccessWebhookURL.Reveal() = %q, want %q", creds.SlackSuccessWebhookURL.Reveal(), "https://hooks.slack.com/services/success")
-	}
-	if creds.SlackFailureWebhookURL != (SecretString{}) {
-		t.Errorf("SlackFailureWebhookURL = %#v, want zero value", creds.SlackFailureWebhookURL)
-	}
+	assert.Equal(t, "https://hooks.slack.com/services/success", creds.SlackSuccessWebhookURL.Reveal())
+	assert.Equal(t, SecretString{}, creds.SlackFailureWebhookURL)
 }

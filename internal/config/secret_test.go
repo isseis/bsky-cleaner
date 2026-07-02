@@ -4,27 +4,22 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSecretString_StringRedacted(t *testing.T) {
 	s := SecretString{value: "super-secret"}
 
-	if got := fmt.Sprintf("%v", s); got != redacted {
-		t.Errorf("Sprintf(%%v) = %q, want %q", got, redacted)
-	}
-	if got := s.String(); got != redacted {
-		t.Errorf("String() = %q, want %q", got, redacted)
-	}
+	assert.Equal(t, redacted, fmt.Sprintf("%v", s))
+	assert.Equal(t, redacted, s.String())
 }
 
 func TestSecretString_GoStringRedacted(t *testing.T) {
 	s := SecretString{value: "super-secret"}
 
-	if got := fmt.Sprintf("%#v", s); got != redacted {
-		t.Errorf("Sprintf(%%#v) = %q, want %q", got, redacted)
-	}
+	assert.Equal(t, redacted, fmt.Sprintf("%#v", s))
 }
 
 func TestSecretString_LogValueRedacted(t *testing.T) {
@@ -35,18 +30,12 @@ func TestSecretString_LogValueRedacted(t *testing.T) {
 	logger.Info("msg", "secret", s)
 
 	out := buf.String()
-	if strings.Contains(out, "super-secret") {
-		t.Errorf("log output leaked the underlying value: %s", out)
-	}
-	if !strings.Contains(out, redacted) {
-		t.Errorf("log output = %q, want it to contain %q", out, redacted)
-	}
+	assert.NotContains(t, out, "super-secret", "log output leaked the underlying value")
+	assert.Contains(t, out, redacted)
 }
 
 func TestSecretString_Reveal(t *testing.T) {
 	s := SecretString{value: "super-secret"}
 
-	if got := s.Reveal(); got != "super-secret" {
-		t.Errorf("Reveal() = %q, want %q", got, "super-secret")
-	}
+	assert.Equal(t, "super-secret", s.Reveal())
 }
