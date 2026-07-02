@@ -164,7 +164,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/16）
-- [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
+- [x] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
 
 ## 3. 実装順序とマイルストーン
 
@@ -267,9 +267,10 @@ Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列�
 - [x] PR-1 マージ済み（対象ステップ: Phase 1）
 - [x] PR-2 マージ済み（対象ステップ: Phase 2）
 - [x] PR-3 マージ済み（対象ステップ: Phase 3）
-- [ ] PR-4 マージ済み（対象ステップ: Phase 4）
-- [ ] 全 PR マージ後、`make fmt && make test && make lint` が green
-- [ ] `make deadcode` を実行し、未使用コードが残っていないことを確認する
+- [x] PR-4 マージ済み（対象ステップ: Phase 4）
+- [x] 全 PR マージ後、`make fmt && make test && make lint` が green
+- [-] `make deadcode` を実行し、未使用コードが残っていないことを確認する
+  - CLI 統合は task 0004 なので、現在の deadcode 検出は想定通り
 
 ## 8. 完了基準
 
