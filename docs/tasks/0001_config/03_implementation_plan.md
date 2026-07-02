@@ -107,8 +107,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/13）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 3 — 検証（AC-08, AC-09, AC-10, AC-11）
 
@@ -265,7 +265,7 @@ Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列�
 （各 PR 作成ポイント（2章）のインラインチェックボックスと対応する。ここでは PR 単位の完了状況のみをまとめて確認する）
 
 - [x] PR-1 マージ済み（対象ステップ: Phase 1）
-- [ ] PR-2 マージ済み（対象ステップ: Phase 2）
+- [x] PR-2 マージ済み（対象ステップ: Phase 2）
 - [ ] PR-3 マージ済み（対象ステップ: Phase 3）
 - [ ] PR-4 マージ済み（対象ステップ: Phase 4）
 - [ ] 全 PR マージ後、`make fmt && make test && make lint` が green
