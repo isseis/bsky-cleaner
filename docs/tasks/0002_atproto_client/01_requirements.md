@@ -40,7 +40,7 @@ DID 解決・PDS エンドポイント決定ロジックは、実装を誤ると
 ### Out of Scope
 
 - リトライ・指数バックオフ（[0005_retry_timeout](../0005_retry_timeout/01_requirements.md) で扱う。クライアントの単一呼び出しの正しさとリトライ戦略は別関心事のため）
-- 投稿の年齢・種別によるフィルタリングロジック（[0003_cleanup_engine](../0003_cleanup_engine/01_requirements.md) で扱う。クライアントはデータ取得に専念し、ビジネスロジックとは分離する）
+- 投稿の経過日数・種別によるフィルタリングロジック（[0003_cleanup_engine](../0003_cleanup_engine/01_requirements.md) で扱う。クライアントはデータ取得に専念し、ビジネスロジックとは分離する）
 - CLI からの呼び出し・dry-run/apply の切り替え（[0004_cli_entrypoint](../0004_cli_entrypoint/01_requirements.md) で扱う）
 
 ## 3. 機能要件と受け入れ基準
