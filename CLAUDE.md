@@ -115,7 +115,7 @@ See [Test Organization Guide](docs/dev/developer_guide/test_organization.md)
 for the two-tier test-helper classification (`testutil/` vs package-level
 `test_helpers.go`).
 - **Error Testing**: Use `errors.Is()` / `errors.AsType[T]` to validate error types, not string matching on error messages.
-- **Assertions**: Prefer the `github.com/stretchr/testify/assert` and `github.com/stretchr/testify/require` subpackages over hand-written `if ... { t.Errorf(...) }` / `t.Fatalf(...)` checks in new tests — it cuts boilerplate and gives more readable failure output. Use `require` for a failure that should abort the test immediately (e.g. `require.NoError` before using its result), and `assert` for independent checks that should all run even if one fails. Still use `errors.Is` / `errors.AsType[T]` (not `testify`) to unwrap and type-assert errors, then assert on the extracted fields with `testify`.
+- **Assertions**: Prefer the `github.com/stretchr/testify/assert` and `github.com/stretchr/testify/require` subpackages over hand-written `if ... { t.Errorf(...) }` / `t.Fatalf(...)` checks in new tests — it cuts boilerplate and gives more readable failure output. Use `require` for a failure that should abort the test immediately (e.g. `require.NoError` before using its result), and `assert` for independent checks that should all run even if one fails. Use `assert.ErrorIs` / `require.ErrorIs` (which delegate to `errors.Is`) for error-identity checks; still use `errors.AsType[T]` (not `testify`) for typed extraction of error fields, then assert on the extracted fields with `testify`.
 
 ## Development Notes
 
