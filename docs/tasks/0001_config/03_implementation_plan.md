@@ -74,7 +74,7 @@
 **レビュー観点**: TOML デコードエラー（構文エラー / 未知キー）の分類が `ErrParseFailed` に正しく集約されているか / `rawConfig` のポインタ判定による必須項目欠落検知（AC-04）の網羅性 / `os.ReadFile` の `gosec` G304 対応（`//nolint:gosec` の適用範囲とコメント） / `test_helpers.go` 導入に伴う `Makefile`・CI の `-tags test` 変更がリポジトリ全体の `make test` に与える影響（`internal/config/test_helpers.go` が `-tags test` を要求する最初のファイルであるため、CI/Makefile 変更とパッケージ新設を1つの PR に含めることは不可避である点に留意する。CI/Makefile 変更単独では検証対象コードがなく独立した PR として意味を持たないため分割していない） / Phase 1 時点で未使用の `ErrInvalidValue`・`ErrMissingEnv` が `make lint` で指摘されていないか
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/11）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
