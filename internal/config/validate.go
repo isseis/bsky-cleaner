@@ -85,7 +85,7 @@ func validateWebhookURL(field, rawURL string) error {
 	}
 
 	u, err := url.Parse(rawURL)
-	if err != nil || u.Scheme != "https" {
+	if err != nil || u.Scheme != "https" || u.Opaque != "" || u.Host == "" {
 		return &FieldError{Field: field, Err: ErrInvalidValue}
 	}
 	return nil

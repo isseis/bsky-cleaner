@@ -98,6 +98,10 @@ func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
 		{name: "success syntactically invalid", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "://not-a-url"},
 		{name: "failure http scheme", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "http://hooks.slack.com/services/failure"},
 		{name: "failure syntactically invalid", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "://not-a-url"},
+		{name: "success opaque URL", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "https:example.com"},
+		{name: "success empty host", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "https:///path"},
+		{name: "failure opaque URL", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "https:example.com"},
+		{name: "failure empty host", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "https:///path"},
 	}
 
 	for _, tt := range tests {
