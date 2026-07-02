@@ -8,7 +8,7 @@
 | Created | 2026-07-02 |
 | Review date | 2026-07-02 |
 | Reviewer | isseis |
-| Comments | - |
+| Comments | 2026-07-02 に一度 `approved` となった後、TOML パーサーライブラリを `github.com/BurntSushi/toml` から `github.com/pelletier/go-toml/v2` に変更するため再オープン（2.1節・2.3節・3.1節・5節を修正）。 |
 
 ## 1. 設計の全体像
 
@@ -57,7 +57,7 @@ flowchart LR
 
     CMD["cmd/bsky-cleaner<br>(将来: 0004 で実装)"]
     CFG["internal/config<br>(新設)"]
-    TOMLLIB["BurntSushi/toml<br>(外部ライブラリ)"]
+    TOMLLIB["pelletier/go-toml/v2<br>(外部ライブラリ)"]
 
     CMD --> CFG
     CFG --> TOMLLIB
@@ -71,7 +71,11 @@ flowchart LR
 
 `cmd/bsky-cleaner` は現時点では `cmd/main.go` のプレースホルダーのみで、CLI フラグ解析を含む本格実装は [0004_cli_entrypoint](../0004_cli_entrypoint/01_requirements.md) で行われる。本設計では `internal/config` パッケージが提供する関数群のみを対象とする。
 
-**TOML パーサーライブラリの選定について**: TOML はテーブル・配列・インラインテーブル・複数の日時表現など仕様が複雑であり、自作パーサーは実装コストとバグ混入リスクの両面で見合わない。そのため [プロジェクト概要](../../overview.md#前提条件制約) の「外部依存の最小化」方針に照らし、TOML パースという単一機能に特化し、外部依存を持たない `github.com/BurntSushi/toml` を採用する（`indigo` のような広範な機能を持つ SDK とは異なり、責務が単一のライブラリであるため方針に反しない）。
+**TOML パーサーライブラリの選定について**: TOML はテーブル・配列・インラインテーブル・複数の日時表現など仕様が複雑であり、自作パーサーは実装コストとバグ混入リスクの両面で見合わない。そのため [プロジェクト概要](../../overview.md#前提条件制約) の「外部依存の最小化」方針に照らし、TOML パースという単一機能に特化し、外部依存を持たない `github.com/pelletier/go-toml/v2` を採用する（`indigo` のような広範な機能を持つ SDK とは異なり、責務が単一のライブラリであるため方針に反しない）。当初は `github.com/BurntSushi/toml` を候補としていたが、以下の理由で `go-toml/v2` に変更した:
+- `time.Duration` を独自解釈でデコードする組み込み挙動を持たない。本設計は `execution_timeout_seconds`（秒単位の整数）を独自に `time.Duration` へ変換する方針であり（3.1 節参照）、`BurntSushi/toml` ではこの独自解釈を明示的に回避する必要があったのに対し、`go-toml/v2` ではその回避自体が不要になる。
+- 未知キー検出が `Decoder.DisallowUnknownFields()` による厳格モードとして提供されており、返る `*toml.StrictMissingError` は `Unwrap() []error` を実装するため `errors.Is`/`errors.AsType` との親和性が高い（3.1 節参照）。
+- 開発が活発である一方、`BurntSushi/toml` は実質的にメンテナンスモードにある。
+- どちらも単一責務・外部依存ゼロのライブラリであり、外部依存最小化の方針への適合度は同等である。
 
 ### 2.2 コンポーネント配置
 
@@ -93,7 +97,7 @@ sequenceDiagram
     participant M as 呼び出し元 (cmd/bsky-cleaner)
     participant L as config.LoadAppConfig()
     participant F as TOML 設定ファイル
-    participant T as BurntSushi/toml
+    participant T as go-toml/v2
     participant E as 環境変数
     participant V as validate.go
 
@@ -188,8 +192,8 @@ classDiagram
 **フィールド設計上の要点**:
 
 - **必須項目の欠落検出（AC-04）**: `RetentionDays`・`Schedule`・`ExecutionTimeout` は TOML 上の必須項目である。TOML の欠落フィールドはゼロ値（`0` や `""`）に見えてしまい、「未設定」と「明示的なゼロ/空文字」を区別できない。そこで、TOML から一時的にマッピングする内部構造体（`rawConfig`、非公開）はポインタ型フィールドを用いて存在有無を保持する。`validateConfig()` は nil ポインタを欠落として検出したうえで、値を `Config`（値型フィールド）に変換する。この二段階変換により、欠落判定（AC-04）と値の範囲検証（AC-08〜AC-10）を同一の検証関数に集約できる。
-- **`ExecutionTimeout` の表現形式とオーバーフロー対策**: TOML 上では `execution_timeout_seconds`（整数・秒）として表現し、Go 側で `time.Duration` に変換する。文字列表現（例: `"5m"`）を使うことも検討したが、`time.Duration` は `encoding.TextUnmarshaler` を実装しておらず、`BurntSushi/toml` でこれを扱うには独自の変換型を追加実装する必要がある。整数秒であれば追加コードなしで `BurntSushi/toml` の標準的な整数マッピングのみで完結するため、YAGNI の観点からこちらを採用する。`validateConfig()` は「秒→ナノ秒」への変換前に、下限（0 より大きいこと、AC-10）に加えて上限（例: 24 時間相当）も検証する。実行タイムアウトは、多重起動対策としてこの値のみに依存する唯一の防衛線である（[セキュリティ設計](../../design/security.md) 参照）。上限を設けないと、極端に大きい `execution_timeout_seconds` が `time.Duration`（`int64` ナノ秒）変換時にオーバーフローし、意図しない極小値・負値に折り返るおそれがある。そのため、変換前の生値の段階で上限チェックを行う。
-- **未知キーの検出**: `BurntSushi/toml` は未知のキー（TOML ファイル中に存在するが `Config` に対応フィールドがないキー）を `toml.MetaData.Undecoded()` で検出できる。`Load()` はデコード後に `Undecoded()` が空でない場合を構文エラー相当（`ErrParseFailed`）として扱う。`Config` のフィールドはすべて必須項目であり、タイプミス自体は AC-04 の欠落検出でも捕捉されるが、この仕組みにより「どのキーが余分だったか」をエラーメッセージで示せるため、原因の切り分けが速くなる。
+- **`ExecutionTimeout` の表現形式とオーバーフロー対策**: TOML 上では `execution_timeout_seconds`（整数・秒）として表現し、Go 側で `time.Duration` に変換する。文字列表現（例: `"5m"`）を使うことも検討したが、`time.Duration` は `encoding.TextUnmarshaler` を実装しておらず、これを扱うには独自の変換型を追加実装する必要がある。整数秒であれば追加コードなしで `go-toml/v2` の標準的な整数マッピングのみで完結するため、YAGNI の観点からこちらを採用する（`go-toml/v2` は `time.Duration` に対する独自解釈を持たないため、`BurntSushi/toml` で必要だった「TOML の整数値をナノ秒として解釈してしまう挙動を避ける」という回避策自体が不要である）。`validateConfig()` は「秒→ナノ秒」への変換前に、下限（0 より大きいこと、AC-10）に加えて上限（例: 24 時間相当）も検証する。実行タイムアウトは、多重起動対策としてこの値のみに依存する唯一の防衛線である（[セキュリティ設計](../../design/security.md) 参照）。上限を設けないと、極端に大きい `execution_timeout_seconds` が `time.Duration`（`int64` ナノ秒）変換時にオーバーフローし、意図しない極小値・負値に折り返るおそれがある。そのため、変換前の生値の段階で上限チェックを行う。
+- **未知キーの検出**: `go-toml/v2` は `Decoder.DisallowUnknownFields()` により、未知のキー（TOML ファイル中に存在するが `Config` に対応フィールドがないキー）をデコード時にエラーとして検出できる。この場合に返る `*toml.StrictMissingError` は `Unwrap() []error`（`errors.Join` 互換）を実装しているため、`Load()` は本パッケージのセンチネルエラー（`ErrParseFailed`）でラップして返す（4節参照）。`Config` のフィールドはすべて必須項目であり、タイプミス自体は AC-04 の欠落検出でも捕捉されるが、この仕組みにより「どのキーが余分だったか」をエラーメッセージで示せるため、原因の切り分けが速くなる。
 - **`Schedule` は存在確認のみ**: cron 構文としての妥当性検証は本パッケージでは行わない。cron 構文の検証は [Docker 配布の詳細設計](../../design/docker_deployment.md#スケジュール設定と内蔵-cron-の連携) が定める `print-schedule` サブコマンド（[0007_docker_distribution](../0007_docker_distribution/01_requirements.md)）側の責務とし、cron 文法の知識を本パッケージに重複して持たせないための意図的な判断である。
 - **`Credentials` の必須フィールド（AC-05, AC-06）**: `Handle` と `AppPassword` はいずれも環境変数由来の必須項目である。`Handle` 自体は「秘匿情報」ではない（Bluesky 上で公開されるアカウント識別子）が、要件文書 [01_requirements.md](01_requirements.md) の方針に従い TOML には書かず環境変数から取得する。`AppPassword` のみ `SecretString` でラップする（`Handle` を漏洩対策の対象に含める必要はない）。
 - **`Credentials` の任意フィールド — Slack Webhook URL（AC-11, AC-13）**: `SlackSuccessWebhookURL`・`SlackFailureWebhookURL` は環境変数由来の任意項目であり、専用の環境変数（例: `BSKY_SLACK_WEBHOOK_URL_SUCCESS` / `BSKY_SLACK_WEBHOOK_URL_FAILURE`）から取得する。値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値であるため、`AppPassword` と同じ `SecretString` でラップする。未設定の場合はエラーにせず「当該チャンネルへの通知を行わない」として扱う（AC-13）。
@@ -280,7 +284,7 @@ func (e *FieldError) Unwrap() error
 - **秘匿情報の非表示化（AC-07, NF-003）**: `SecretString` は `AppPassword`・`SlackSuccessWebhookURL`・`SlackFailureWebhookURL` の3フィールドすべてに使う共通の型である。`String()`・`GoString()` を実装し、`%v`・`%s`・`%#v` のいずれで出力しても `"[REDACTED]"` のような固定文字列を返す。加えて `log/slog` 経由の構造化ログでも値が漏れないよう `slog.LogValuer` インターフェース（`LogValue() slog.Value`）も実装する。実際の値を取得できるのは `Reveal()` の呼び出しのみとし、認証リクエスト構築や Slack 通知ペイロード構築などの利用直前でのみ呼び出す運用とする。**残存リスク**: `Reveal()` の呼び出し元がその戻り値をログや別の通知先にそのまま渡さないことは、型システムでは強制できず、実装時のコードレビューに依存する。本パッケージのテスト（7.1 節）は `String()`/`GoString()`/`LogValue()` による非表示化のみを検証し、`Reveal()` の呼び出し箇所を制限する仕組み（lint ルール等）は本タスクでは導入しない。`Reveal()` を呼び出すのは [0002_atproto_client](../0002_atproto_client/01_requirements.md)（`AppPassword`）と [0006_slack_notification](../0006_slack_notification/01_requirements.md)（Slack Webhook URL）のリクエスト構築処理のみになる見込みであり、当該タスクのコードレビュー時にこの制約を確認する運用でカバーする。
 - **Slack Webhook URL を秘匿情報として再分類した経緯**: 当初の要件では Slack Webhook URL は TOML 上の非秘匿項目として扱っていたが、値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値であることから、`AppPassword` と同じ扱い（環境変数 + `SecretString`）に変更した（[01_requirements.md](01_requirements.md) の Comments 欄参照）。この変更は [プロジェクト概要](../../overview.md#前提条件制約) の「秘匿情報のみ `.env` に分離」という既存方針への準拠を強めるものであり、方針そのものへの例外ではない。
 - **設定改ざんへの fail-closed 対応（AC-08, AC-09, AC-10）**: [プロジェクト概要](../../overview.md#セキュリティ考慮事項) が挙げる「設定改ざん」リスクに対し、本パッケージが第一の防衛線となる。`retention_days` が 0 以下または未設定の場合、実行タイムアウトが 0 以下または未設定の場合は、`Config` を一切返さず起動を失敗させる。ファイルシステム権限管理・改ざん検知（ファイル自体の書き換え防止）は [01_requirements.md](01_requirements.md) の通り本タスクのスコープ外であり、値の妥当性検証のみで対応する。
-- **TOML ライブラリのサプライチェーン**: `github.com/BurntSushi/toml` は `go.mod` にバージョン固定で追加し、追加の推移的依存を持たない（2.1 節参照）。
+- **TOML ライブラリのサプライチェーン**: `github.com/pelletier/go-toml/v2` は `go.mod` にバージョン固定で追加し、追加の推移的依存を持たない（2.1 節参照）。
 - **スコープ外（N/A）の脅威**: 以下は [プロジェクト概要](../../overview.md#セキュリティ考慮事項) が挙げるリスクカテゴリだが、本タスクの範囲外のため対応しない。
   - Slack Webhook ホスト一致検証: [0006_slack_notification](../0006_slack_notification/01_requirements.md) が担当
   - SSRF（PDS エンドポイント偽装）: 本パッケージは DID 解決を行わないため該当なし
@@ -349,3 +353,5 @@ flowchart TD
 本ドキュメントは `docs/tasks/0001_config` の初回アーキテクチャ設計であり、置き換えた旧設計は存在しない。要件文書 [01_requirements.md](01_requirements.md) のレビューで追加された AC-12（設定ファイル仕様書の要求）を受け、3.3 節のコンポーネント責務表に `docs/design/configuration.md` を追加している。当初 AC-12 は TOML ファイルの仕様のみを対象としていたが、レビューにおいて「環境変数の名前・役割・書式（URL 項目のスキーム必須有無、クエリパラメータの許容有無等）も開発文書として残すべきであり、将来のユーザー向け文書のソースにもなる」という指摘を受け、対象を TOML・環境変数の両方を含む統合設定リファレンスへ拡張し、ファイル名も `config_file.md` から `configuration.md` に変更した。
 
 さらに、レビューにおいて Slack Webhook URL が「値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値」であるという指摘を受け、当初 TOML（`Config`/`SlackConfig`）に置いていた Slack Webhook URL を環境変数由来の `Credentials`（`SecretString` でラップ）へ移動した。これに伴い要件文書 [01_requirements.md](01_requirements.md) を修正・再オープンし（AC-13 追加、F-001/F-002 の境界変更）、[プロジェクト概要](../../overview.md) の秘匿情報の定義も合わせて更新している。旧設計（`Config.Slack SlackConfig`）は本ドキュメントの編集履歴（git log）で確認できる。
+
+さらに、[03_implementation_plan.md](03_implementation_plan.md) 作成後のレビューで、TOML パーサーライブラリを `github.com/BurntSushi/toml` から `github.com/pelletier/go-toml/v2` へ変更する指摘を受け、再オープンした（2.1節・2.3節・3.1節・5節を修正）。理由は `time.Duration` の独自解釈を持たないこと、未知キー検出のエラー型が `errors.Is`/`errors.AsType` と親和性が高いこと、開発が活発であることの3点。実装コード（`internal/config`）はまだ存在しないため、旧ライブラリを前提としたコードの手戻りは発生していない。
