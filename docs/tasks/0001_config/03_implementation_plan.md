@@ -133,7 +133,7 @@
 
 **レビュー観点**: `retention_days`・`execution_timeout_seconds` の境界値判定（0 以下、上限 86400 秒超過、オーバーフロー対策の順序）の正確性 / Slack Webhook URL のスキーム検証ロジック（`https` 限定、空文字列はスキップ） / `Load()`・`LoadCredentials()` を `validateConfig()`・`validateCredentials()` 呼び出しへ差し替えるリファクタリングで Phase 1・2 の欠落検知挙動が壊れていないか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
