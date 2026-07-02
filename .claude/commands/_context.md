@@ -71,9 +71,8 @@ PR boundary markers embedded in the implementation plan use these labels:
 ## Domain-specific (replace wholesale when porting)
 
 bsky-cleaner is a tool for cleaning up a Bluesky (AT Protocol) account (e.g.
-deleting old posts, unfollowing accounts). It has no Slack integration and no
-privilege-elevation security model, so those conditional guides from the
-reference project do not apply here.
+deleting old posts, unfollowing accounts). It has no privilege-elevation security model,
+so those conditional guides from the reference project do not apply here.
 
 | Name | Value |
 |---|---|
