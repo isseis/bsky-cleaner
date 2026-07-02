@@ -203,19 +203,24 @@ For actionable threads, build one shell block per thread:
 
 ```
 # Thread <threadId> (comment <databaseId>)
-gh api repos/<owner>/<repo>/pulls/<number>/comments/<databaseId>/replies \
-  -f body="<replyBody>" \
-&& gh api graphql -F threadId=<threadId> \
-  -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}'
+gh api repos/<owner>/<repo>/pulls/<number>/comments/<databaseId>/replies -f body=@- <<'REPLYBODY_EOF' && gh api graphql -F threadId=<threadId> -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}'
+<replyBody>
+REPLYBODY_EOF
 ```
 
 Agent prompt:
 
 > Post replies and resolve threads for PR #NUMBER by running the following
 > commands sequentially (not in parallel — avoids RPM/TPM rate limits). Each
-> block posts a reply then resolves the thread. Use `gh api`'s `-f body="..."`
-> flag for the reply so `gh` builds and escapes the JSON payload itself —
-> do not hand-build a JSON literal or pass it via `--input`/heredoc.
+> block posts a reply (`-f body=@-`, piped from a quoted heredoc,
+> `<<'REPLYBODY_EOF'`) then, only if that succeeds (`&&`), resolves the
+> thread. The heredoc must stay on the same logical command line as the
+> `&&`-chained resolve command, with the body text and closing
+> `REPLYBODY_EOF` delimiter following immediately after — do not restructure
+> this into separate commands or reorder the lines. This piping avoids
+> interpolating `replyBody` — LLM-generated text that may contain double
+> quotes, backticks, or `$(...)` — into a shell string. Do not switch to
+> `-f body="..."` inline quoting or hand-build a JSON literal.
 >
 > IMPORTANT: the reply endpoint requires the `/pulls/<number>/` segment
 > (`POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies`).
