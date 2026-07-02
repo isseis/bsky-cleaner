@@ -28,16 +28,16 @@
 
 一方で以下の外部依存・標準ライブラリ API は、実装前に事実確認を行った（数値・シグネチャは実装時に変わりうるため実装時に再確認すること）:
 
-- `github.com/BurntSushi/toml`（pkg.go.dev のドキュメントで確認、2026-07-02 時点）:
-  - `toml.DecodeFile(path string, v any) (toml.MetaData, error)` が存在する。
-  - `toml.MetaData.Undecoded() []toml.Key` で未知キー（デコードされなかったキー）を取得できる。
-  - Go 1.18 以上が必要（本プロジェクトは Go 1.26.2 のため問題なし）。
-  - `time.Duration` 型は本ライブラリが独自に「TOML の値が整数ならナノ秒、文字列なら `time.ParseDuration()`」として解釈する組み込みサポートを持つ。[02_architecture.md](02_architecture.md) 3.1 節は「秒単位の整数」を意図しているため、`Config.ExecutionTimeout time.Duration` に対して TOML の整数値を直接デコードさせると「ナノ秒」として解釈されてしまい意図と異なる。そのため同節の設計方針どおり、TOML 側は `execution_timeout_seconds`（プレーンな整数）として受け取り、Go 側で明示的に秒→`time.Duration` へ変換する実装を維持する。
+- `github.com/pelletier/go-toml/v2`（pkg.go.dev のドキュメントおよび README で確認、2026-07-02 時点）:
+  - `DecodeFile` に相当する関数は存在しない。ファイルからの読み込みは呼び出し側で `os.ReadFile(path)`（または `os.Open` + `io.Reader`）を行った上で `toml.Unmarshal(data, v any) error` に渡す、もしくは `toml.NewDecoder(io.Reader).Decode(v any) error` を使う必要がある。本タスクでは前者（`os.ReadFile` + `Unmarshal`）を採用する（[02_architecture.md](02_architecture.md) 2.3 節のシーケンス図は元々この形を想定しており、変更は不要）。
+  - 未知キー（デコードされなかったキー）の検出は `toml.NewDecoder(r).DisallowUnknownFields()` による厳格モードで行う。該当時は `*toml.StrictMissingError` が返る。この型は `Unwrap() []error`（v2.3.0 以降、`errors.Join` 互換）を実装しているため、`errors.As`/`errors.Is` で判定可能。`DisallowUnknownFields()` を使うため、ファイル読み込みには `Unmarshal` ではなく `NewDecoder(bytes.NewReader(data)).Decode(&raw)` を用いる。
+  - `time.Duration` 型に対する独自解釈（整数→ナノ秒等）の組み込みサポートは持たない。[02_architecture.md](02_architecture.md) 3.1 節の設計どおり、TOML 側は `execution_timeout_seconds`（プレーンな整数）として受け取り、Go 側で明示的に秒→`time.Duration` へ変換する実装を行う。`BurntSushi/toml` の場合と異なり、これは「独自解釈を避けるための回避策」ではなく、単純に「対応する組み込み機能が無いので自前で変換する」という素直な実装になる。
+  - Go 1.18 以上が必要（本プロジェクトは Go 1.26.2 のため問題なし）。README には「Go の直近2メジャーバージョンをサポートする」旨の記載がある。
 - `errors.AsType[T]`（`go doc errors` で確認、Go 1.26.2 同梱の標準ライブラリ）: `errors.AsType[*fs.PathError](err) (*fs.PathError, bool)` の形で存在する。
 - `log/slog.LogValuer`（`go doc log/slog LogValuer` で確認）: `LogValue() Value` を1メソッドに持つインターフェースとして存在する。
 - `testing.T.Setenv(key, value string)`（`go doc testing.T.Setenv` で確認）: プロセス環境変数を設定し、テスト終了時に自動復元する。並列テスト（`t.Parallel()`）とは併用不可。
-- `toml.DecodeFile(path string, v any) (toml.MetaData, error)` の実装（GitHub 上のソース `decode.go` で確認、2026-07-02 時点）: 内部で `os.Open(path)` を呼び出し、オープンに失敗した場合はそのエラー（`*fs.PathError`）をそのまま返す。オープン成功後の構文エラーは `toml.ParseError` 型で返る。したがって `errors.AsType[*fs.PathError](err)` の成否で「ファイルオープン失敗」と「構文エラー」を判別できる（2章 Phase 1 の `Load()` 実装で利用する）。
-- `.golangci.yml`（本リポジトリの実ファイルで確認）: `gosec` は `_test.go` のみ除外対象で、通常の `.go` ファイルには適用される。`Load(path string)` が `path` をそのまま `toml.DecodeFile` に渡す実装は `gosec` の G304（"Potential file inclusion via variable"）に該当しうる。該当した場合の対応は2章 Phase 1 のタスクに含める。
+- `os.ReadFile(name string) ([]byte, error)`（`go doc os.ReadFile` で確認、標準ライブラリ）: 内部で `os.Open` を呼び出し、オープンに失敗した場合はそのエラー（`*fs.PathError`）をそのまま返す。したがって `errors.AsType[*fs.PathError](err)` の成否で「ファイルオープン失敗」と「（オープン後の）構文エラー等」を判別できる（2章 Phase 1 の `Load()` 実装で利用する）。
+- `.golangci.yml`（本リポジトリの実ファイルで確認）: `gosec` は `_test.go` のみ除外対象で、通常の `.go` ファイルには適用される。`Load(path string)` が `path` をそのまま `os.ReadFile`（または `os.Open`）に渡す実装は `gosec` の G304（"Potential file inclusion via variable"）に該当しうる。該当した場合の対応は2章 Phase 1 のタスクに含める。
 - `Makefile`・`.github/workflows/ci.yml`（本リポジトリの実ファイルで確認）: `make test` および CI の `Test` ステップはいずれも `go test ./...` であり、`-tags test` を付与していない。[test_organization.md](../../dev/developer_guide/test_organization.md) が要求する `//go:build test` タグ付きファイル（`test_helpers.go` 等）は、このビルドタグを有効にしない限りコンパイル対象に含まれない（`go help build` の `-tags` 説明で確認）。本タスクが `internal/config/test_helpers.go` を新設する最初のタスクであるため、`Makefile`・CI 側で `-tags test` を有効化する変更が必要であり、2章 Phase 1 のタスクに含める。
 
 ## 2. 実装ステップ
@@ -48,16 +48,16 @@
 
 **ファイル**: `go.mod`, `go.sum`, `Makefile`, `.github/workflows/ci.yml`, `internal/config/errors.go`, `internal/config/config.go`, `internal/config/test_helpers.go`, `internal/config/config_test.go`
 
-- [ ] `go get github.com/BurntSushi/toml@latest` を実行し、`go.mod`/`go.sum` にバージョン固定で依存を追加する（ネットワークアクセスを伴うため、実行前にユーザーの承認を得ること）。
+- [ ] `go get github.com/pelletier/go-toml/v2@latest` を実行し、`go.mod`/`go.sum` にバージョン固定で依存を追加する（ネットワークアクセスを伴うため、実行前にユーザーの承認を得ること）。
 - [ ] `Makefile` の `test` ターゲットを `go test ./...` から `go test -tags test ./...` に変更する。`.github/workflows/ci.yml` の `test` ジョブ「Test」ステップも同様に `go test ./...` から `go test -tags test ./...` に変更する（1.3 節のとおり、`//go:build test` タグ付きファイルを実際にテストビルドへ含めるために必須の変更。本タスクが `test_helpers.go` を導入する最初のタスクであるため、ここでリポジトリ全体の設定を変更する）。
 - [ ] `internal/config/errors.go` を新設し、センチネルエラー `ErrFileNotFound`, `ErrParseFailed`, `ErrMissingField`, `ErrInvalidValue`, `ErrMissingEnv`（[02_architecture.md](02_architecture.md) 4節のとおり）を定義する。Phase 3 で追加する範囲検証・環境変数検証でも同じ5つを再利用するため、ここで全種類をまとめて定義する（Phase 3 側で新規にセンチネルエラーを追加する必要はない）。
 - [ ] `internal/config/errors.go` に `FieldError` 型（`Field string`, `Value string`, `Err error`）を定義し、`Error() string`（`Field` と `Err` の内容を含むメッセージを組み立てる）と `Unwrap() error`（`Err` を返す）を実装する。
 - [ ] `internal/config/config.go` に公開構造体 `Config`（`RetentionDays int`, `Schedule string`, `ExecutionTimeout time.Duration`）を定義する。
 - [ ] `internal/config/config.go` に非公開構造体 `rawConfig`（`RetentionDays *int`, `Schedule *string`, `ExecutionTimeoutSeconds *int`、それぞれ `toml:"retention_days"` 等のタグを付与）を定義する。ポインタ型により「未設定（`nil`）」と「明示的なゼロ値」を区別する（[02_architecture.md](02_architecture.md) 3.1 節）。
 - [ ] `internal/config/config.go` に `Load(path string) (*Config, error)` を実装する:
-  - `toml.DecodeFile(path, &raw)` でファイル読み込みとパースを行う（`path` は呼び出し元がコマンドライン引数等から解決した信頼できる値であり、外部入力の直接埋め込みではない旨をコメントで明記する。1.3 節のとおり `gosec` の G304 で検知された場合は、この呼び出し1行のみを対象にした `//nolint:gosec` とその理由を説明する短いコメントを追加する）。
-  - 戻り値のエラーが `nil` でない場合、`errors.AsType[*fs.PathError](err)` で判定する。真の場合はファイルオープン失敗と判断し、`fmt.Errorf("...: %w: %w", ErrFileNotFound, err)` で元のエラーを保持したままラップする（1.3 節で確認したとおり `toml.DecodeFile` は内部の `os.Open` 失敗時のエラーをそのまま返すため）。偽の場合は TOML 構文エラー（`toml.ParseError`）と判断し、`fmt.Errorf("...: %w: %w", ErrParseFailed, err)` でラップする（[02_architecture.md](02_architecture.md) 4節）。
-  - `metaData.Undecoded()` が空でない場合も `ErrParseFailed` でラップしたエラーとして返す（未知キー検出、[02_architecture.md](02_architecture.md) 3.1 節「未知キーの検出」）。
+  - `os.ReadFile(path)` でファイル読み込みを行う（`path` は呼び出し元がコマンドライン引数等から解決した信頼できる値であり、外部入力の直接埋め込みではない旨をコメントで明記する。1.3 節のとおり `gosec` の G304 で検知された場合は、この呼び出し1行のみを対象にした `//nolint:gosec` とその理由を説明する短いコメントを追加する）。
+  - `os.ReadFile` の戻り値のエラーが `nil` でない場合、`errors.AsType[*fs.PathError](err)` で判定する。真の場合はファイルオープン失敗と判断し、`fmt.Errorf("...: %w: %w", ErrFileNotFound, err)` で元のエラーを保持したままラップする（1.3 節で確認したとおり `os.ReadFile` は内部の `os.Open` 失敗時のエラーをそのまま返すため）。
+  - 読み込んだバイト列を `toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields().Decode(&raw)` でデコードする。エラーが `nil` でない場合、`errors.AsType[*toml.StrictMissingError](err)` で判定する。真の場合は未知キー検出（[02_architecture.md](02_architecture.md) 3.1 節「未知キーの検出」）、偽の場合は TOML 構文エラーと判断し、いずれも `fmt.Errorf("...: %w: %w", ErrParseFailed, err)` でラップする（[02_architecture.md](02_architecture.md) 4節）。
   - `raw.RetentionDays`・`raw.Schedule`・`raw.ExecutionTimeoutSeconds` のいずれかが `nil` の場合、該当フィールド名を `Field` に、`Value` を空文字列に設定した `*FieldError`（`Err: ErrMissingField`）を返す（AC-04 の必須項目欠落検知。欠落時は報告すべき「実際の値」が存在しないため `Value` は常に空文字列とする。この時点では範囲検証は行わず、Phase 3 で `validateConfig()` に統合する）。
   - すべて存在する場合は `rawConfig` から `Config`（`ExecutionTimeoutSeconds` は `time.Duration(seconds) * time.Second` に変換）を組み立てて返す。
 - [ ] `internal/config/test_helpers.go` を新設し、`//go:build test` タグを付与する。`package config` とし、`writeTempTOML(t *testing.T, content string) string`（`t.TempDir()` と `os.WriteFile` を用いて一時 TOML ファイルを書き出しパスを返すヘルパー。4.2 節参照）を実装する。
@@ -175,7 +175,7 @@ Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列�
 |---|---|---|
 | `go get` 実行がネットワークアクセスを要し、承認待ちで Phase 1 の着手が遅れる | 進行遅延（小） | Phase 1 着手時点でまず承認を得てから作業を進める。承認が得られるまで他の設計作業（テストケースの洗い出し等）を先行させる |
 | `execution_timeout_seconds` の上限値（86400 秒）が要件定義書に明記されておらず、実装判断になる | 実装者間の解釈齟齬（小） | [02_architecture.md](02_architecture.md) 3.1 節が示す「24時間相当」という具体例をそのまま採用し、本書 2章 Phase 3 のタスクで名前付き定数として明記する |
-| `BurntSushi/toml` のバージョンアップにより `Undecoded()` 等の挙動が変わる | 低（枯れたライブラリで API 安定） | `go.sum` でバージョン固定するため、意図しないタイミングでの挙動変化は発生しない |
+| `go-toml/v2` のバージョンアップにより `DisallowUnknownFields()` 等の挙動が変わる | 低（活発な開発だが破壊的変更はメジャーバージョンでのみ想定） | `go.sum` でバージョン固定するため、意図しないタイミングでの挙動変化は発生しない |
 
 ## 6. 受け入れ基準の検証
 
