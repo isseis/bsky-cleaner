@@ -1,6 +1,11 @@
 # Test Helper File Organization
 
-Test helper files follow a two-tier classification system based on their scope and dependencies:
+Test helper files follow a two-tier classification system based on their scope and dependencies.
+
+For assertion style within test bodies (as opposed to helper file placement),
+see the "Assertions" guideline in [CLAUDE.md](/CLAUDE.md#testing-strategy):
+prefer `github.com/stretchr/testify` (`assert`/`require`) over hand-written
+`if`/`t.Errorf` checks in new tests.
 
 ## Classification A: `testutil/` Subdirectory (Cross-Package Helpers)
 
