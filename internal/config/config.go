@@ -48,18 +48,9 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("load config: %w: %w", ErrParseFailed, err)
 	}
 
-	switch {
-	case raw.RetentionDays == nil:
-		return nil, &FieldError{Field: "retention_days", Err: ErrMissingField}
-	case raw.Schedule == nil:
-		return nil, &FieldError{Field: "schedule", Err: ErrMissingField}
-	case raw.ExecutionTimeoutSeconds == nil:
-		return nil, &FieldError{Field: "execution_timeout_seconds", Err: ErrMissingField}
+	cfg, err := validateConfig(raw)
+	if err != nil {
+		return nil, err
 	}
-
-	return &Config{
-		RetentionDays:    *raw.RetentionDays,
-		Schedule:         *raw.Schedule,
-		ExecutionTimeout: time.Duration(*raw.ExecutionTimeoutSeconds) * time.Second,
-	}, nil
+	return &cfg, nil
 }

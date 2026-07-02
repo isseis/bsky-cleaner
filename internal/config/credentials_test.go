@@ -88,6 +88,41 @@ func TestLoadCredentials_SlackWebhookURLOptional(t *testing.T) {
 	}
 }
 
+func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{name: "http scheme", url: "http://hooks.slack.com/services/success"},
+		{name: "syntactically invalid", url: "://not-a-url"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("BSKY_HANDLE", "alice.bsky.social")
+			t.Setenv("BSKY_APP_PASSWORD", "app-password")
+			t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", tt.url)
+			unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_FAILURE")
+
+			_, err := LoadCredentials()
+			if !errors.Is(err, ErrInvalidValue) {
+				t.Fatalf("LoadCredentials() error = %v, want wrapping ErrInvalidValue", err)
+			}
+
+			fieldErr, ok := errors.AsType[*FieldError](err)
+			if !ok {
+				t.Fatalf("LoadCredentials() error = %v, want *FieldError", err)
+			}
+			if fieldErr.Field != "BSKY_SLACK_WEBHOOK_URL_SUCCESS" {
+				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, "BSKY_SLACK_WEBHOOK_URL_SUCCESS")
+			}
+			if fieldErr.Value != "" {
+				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
+			}
+		})
+	}
+}
+
 func TestLoadCredentials_SlackWebhookURLOnlyOneSet(t *testing.T) {
 	t.Setenv("BSKY_HANDLE", "alice.bsky.social")
 	t.Setenv("BSKY_APP_PASSWORD", "app-password")

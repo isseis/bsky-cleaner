@@ -116,14 +116,14 @@
 
 **ファイル**: `internal/config/validate.go`, `internal/config/config.go`（`Load()` の呼び出し先を差し替え）, `internal/config/credentials.go`（`LoadCredentials()` の呼び出し先を差し替え）, `internal/config/config_test.go`, `internal/config/credentials_test.go`
 
-- [ ] `internal/config/validate.go` を新設し、`validateConfig(raw rawConfig) (Config, error)` を実装する。Phase 1 で `Load()` に直接書いた欠落検出ロジック（`nil` チェックと `*FieldError` 生成）をこの関数に移し、`Load()` からは `validateConfig()` を呼び出す形に変更する。
-- [ ] `validateConfig()` に `retention_days` の範囲検証を追加する: 値が `0` 以下の場合、`Field: "retention_days"`, `Value: strconv.Itoa(*raw.RetentionDays)`, `Err: ErrInvalidValue` の `*FieldError` を返す（AC-08）。正の整数の場合のみ `Config.RetentionDays` に値を設定する（AC-09）。
-- [ ] `validateConfig()` に実行タイムアウトの範囲検証を追加する: `execution_timeout_seconds` が `0` 以下の場合、`Field: "execution_timeout_seconds"`, `Value` に元の整数値の文字列表現, `Err: ErrInvalidValue` の `*FieldError` を返す（AC-10）。加えて、`time.Duration`（`int64` ナノ秒）へ変換した際にオーバーフローしないよう、秒→ナノ秒変換前の生値の段階で上限（24時間 = `86400` 秒、[02_architecture.md](02_architecture.md) 3.1 節「`ExecutionTimeout` の表現形式とオーバーフロー対策」で言及されている値）を超える場合も同様に `ErrInvalidValue` の `*FieldError` を返す。上限値はパッケージ内の名前付き定数として定義する（例: `maxExecutionTimeoutSeconds = 24 * 60 * 60`）。
-- [ ] `internal/config/validate.go` に `validateCredentials(handle, appPassword string, slackSuccessURL, slackFailureURL string) (Credentials, error)` を実装する。Phase 2 で `LoadCredentials()` に直接書いた必須環境変数の欠落検出ロジックをこの関数に移し、`LoadCredentials()` からは `validateCredentials()` を呼び出す形に変更する。
-- [ ] `validateCredentials()` に Slack Webhook URL の形式検証を追加する: 値が空文字列でない場合のみ `net/url.Parse` で構文解析し、パースエラーまたは `u.Scheme != "https"` の場合に `Field` を対応する環境変数名（`"BSKY_SLACK_WEBHOOK_URL_SUCCESS"` または `"BSKY_SLACK_WEBHOOK_URL_FAILURE"`）とした `*FieldError`（`Err: ErrInvalidValue`, `Value` は空文字列のまま）を返す（AC-11）。空文字列（未設定）の場合はエラーにせずスキップする（AC-13 の継続確認）。
-- [ ] `internal/config/config_test.go` に境界値テストを追加する（詳細は 4章参照）。
-- [ ] `internal/config/credentials_test.go` に Slack Webhook URL 形式検証のテストを追加する（詳細は 4章参照）。
-- [ ] `make fmt && make test && make lint` が green であることを確認する。
+- [x] `internal/config/validate.go` を新設し、`validateConfig(raw rawConfig) (Config, error)` を実装する。Phase 1 で `Load()` に直接書いた欠落検出ロジック（`nil` チェックと `*FieldError` 生成）をこの関数に移し、`Load()` からは `validateConfig()` を呼び出す形に変更する。
+- [x] `validateConfig()` に `retention_days` の範囲検証を追加する: 値が `0` 以下の場合、`Field: "retention_days"`, `Value: strconv.Itoa(*raw.RetentionDays)`, `Err: ErrInvalidValue` の `*FieldError` を返す（AC-08）。正の整数の場合のみ `Config.RetentionDays` に値を設定する（AC-09）。
+- [x] `validateConfig()` に実行タイムアウトの範囲検証を追加する: `execution_timeout_seconds` が `0` 以下の場合、`Field: "execution_timeout_seconds"`, `Value` に元の整数値の文字列表現, `Err: ErrInvalidValue` の `*FieldError` を返す（AC-10）。加えて、`time.Duration`（`int64` ナノ秒）へ変換した際にオーバーフローしないよう、秒→ナノ秒変換前の生値の段階で上限（24時間 = `86400` 秒、[02_architecture.md](02_architecture.md) 3.1 節「`ExecutionTimeout` の表現形式とオーバーフロー対策」で言及されている値）を超える場合も同様に `ErrInvalidValue` の `*FieldError` を返す。上限値はパッケージ内の名前付き定数として定義する（例: `maxExecutionTimeoutSeconds = 24 * 60 * 60`）。
+- [x] `internal/config/validate.go` に `validateCredentials(handle, appPassword string, slackSuccessURL, slackFailureURL string) (Credentials, error)` を実装する。Phase 2 で `LoadCredentials()` に直接書いた必須環境変数の欠落検出ロジックをこの関数に移し、`LoadCredentials()` からは `validateCredentials()` を呼び出す形に変更する。実装時の変更点: 必須環境変数の欠落検出は `os.LookupEnv` の `ok` 判定ではなく、`validateCredentials()` に渡す文字列が空文字列かどうかで判定する形にした（`validateCredentials()` のシグネチャが文字列のみを受け取るため）。`LoadCredentials()` 側は `BSKY_HANDLE`・`BSKY_APP_PASSWORD` も含めた4変数すべてを `os.Getenv` で読み込むように変更した。必須環境変数が「未設定」と「明示的な空文字列」を区別する要件は AC-06 にないため、両者を同じ `ErrMissingEnv` として扱うこの変更は要件を満たす。
+- [x] `validateCredentials()` に Slack Webhook URL の形式検証を追加する: 値が空文字列でない場合のみ `net/url.Parse` で構文解析し、パースエラーまたは `u.Scheme != "https"` の場合に `Field` を対応する環境変数名（`"BSKY_SLACK_WEBHOOK_URL_SUCCESS"` または `"BSKY_SLACK_WEBHOOK_URL_FAILURE"`）とした `*FieldError`（`Err: ErrInvalidValue`, `Value` は空文字列のまま）を返す（AC-11）。空文字列（未設定）の場合はエラーにせずスキップする（AC-13 の継続確認）。
+- [x] `internal/config/config_test.go` に境界値テストを追加する（詳細は 4章参照）。
+- [x] `internal/config/credentials_test.go` に Slack Webhook URL 形式検証のテストを追加する（詳細は 4章参照）。
+- [x] `make fmt && make test && make lint` が green であることを確認する。
 
 ### PR-3 作成ポイント: config and credential validation
 
