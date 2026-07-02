@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-02 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-02 |
+| Reviewer | isseis |
 | Comments | - |
 
 ## 1. 背景と目的
@@ -95,6 +95,7 @@ DID 解決・PDS エンドポイント決定ロジックは、実装を誤ると
 - **NF-003**: DID 解決・PDS 通信は SSRF を防ぐため、リダイレクトの扱いも含めて意図しないホストへの通信が発生しないこと。
 - **NF-004**: HTTP 通信部分はインターフェース化し、実際のネットワーク通信を伴わない単体テストが可能であること。
 - **NF-005**: Go 1.26.2 以上でビルドできること。
+- **NF-006**: NF-004 のモックベース単体テストで使うレスポンスフィクスチャは、AT Protocol の公式 lexicon（`com.atproto.server.createSession` / `com.atproto.repo.listRecords` 等の JSON Schema）に準拠していることを検証すること。これにより、モックの契約が実際の API 仕様から乖離した状態でテストが緑になることを防ぐ。実 API との最終的な動作確認は本タスクの自動テストの範囲外とし、[プロジェクト概要](../../overview.md) の「完了の定義」にある手動 dry-run 確認に委ねる。
 
 ## 5. スコープ外の根拠
 
