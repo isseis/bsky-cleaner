@@ -90,19 +90,23 @@ func TestLoadCredentials_SlackWebhookURLOptional(t *testing.T) {
 
 func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
 	tests := []struct {
-		name string
-		url  string
+		name   string
+		envVar string
+		url    string
 	}{
-		{name: "http scheme", url: "http://hooks.slack.com/services/success"},
-		{name: "syntactically invalid", url: "://not-a-url"},
+		{name: "success http scheme", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "http://hooks.slack.com/services/success"},
+		{name: "success syntactically invalid", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "://not-a-url"},
+		{name: "failure http scheme", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "http://hooks.slack.com/services/failure"},
+		{name: "failure syntactically invalid", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "://not-a-url"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("BSKY_HANDLE", "alice.bsky.social")
 			t.Setenv("BSKY_APP_PASSWORD", "app-password")
-			t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", tt.url)
+			unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_SUCCESS")
 			unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_FAILURE")
+			t.Setenv(tt.envVar, tt.url)
 
 			_, err := LoadCredentials()
 			if !errors.Is(err, ErrInvalidValue) {
@@ -113,8 +117,8 @@ func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
 			if !ok {
 				t.Fatalf("LoadCredentials() error = %v, want *FieldError", err)
 			}
-			if fieldErr.Field != "BSKY_SLACK_WEBHOOK_URL_SUCCESS" {
-				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, "BSKY_SLACK_WEBHOOK_URL_SUCCESS")
+			if fieldErr.Field != tt.envVar {
+				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, tt.envVar)
 			}
 			if fieldErr.Value != "" {
 				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
