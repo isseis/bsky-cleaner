@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-02 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-03 |
+| Reviewer | isseis |
 | Comments | - |
 
 関連ドキュメント: [要件定義書](01_requirements.md) / [アーキテクチャ設計書](02_architecture.md)
@@ -47,15 +47,15 @@
 - `internal/atproto/testutil/mocks.go`（新設）
 
 **作業内容**:
-- [ ] `internal/atproto/http.go` に `HTTPDoer` インターフェース（`Do(req *http.Request) (*http.Response, error)`）を定義する（アーキテクチャ 3.1節）。
-- [ ] `internal/atproto/http.go` に XRPC リクエスト構築・応答デコードの共通処理（メソッド名・エンドポイント URL 組み立て、JSON デコード、非 2xx 応答を `HTTPError` へラップする処理）を実装する。生の `net/http` エラーや `*url.Error` を呼び出し元にそのまま透過させない（アーキテクチャ4節「秘匿情報を含まない設計」）。
-- [ ] `internal/atproto/http.go` に、検証済みアドレス集合のみに接続を許可する `DialContext` ラッパーと、3xx 応答を常に拒否する `CheckRedirect` ポリシーを提供する関数（例: 検証済みアドレス集合とホスト名を受け取り `*http.Client` を組み立てる関数）を実装する（アーキテクチャ5.2節の具体的方式）。この関数はホスト名の再解決を行わず、渡されたアドレスへ IP リテラルとして直接 `Dial` し、TLS の `ServerName` は元のホスト名に設定する。`net.IP` の `IsPrivate`/`IsLoopback`/`IsLinkLocalUnicast`/`IsLinkLocalMulticast`/`IsUnspecified` はいずれも Go 標準ライブラリ `net` パッケージに存在することを確認済み（`go doc net.IP` で確認、アーキテクチャ 5.2節1）。実際にこの関数を検証済みアドレス集合とともに呼び出し `Client` の `HTTPDoer` として組み込む配線は Phase 2（`did.go`）で行う。
-- [ ] `internal/atproto/errors.go` にセンチネルエラー群（`ErrDIDResolutionFailed`, `ErrUntrustedPDSEndpoint`, `ErrAuthenticationFailed`, `ErrHTTPStatus`, `ErrTransportFailure`, `ErrPaginationStalled`）を定義する（アーキテクチャ4節のコード例通り）。
-- [ ] `internal/atproto/errors.go` に `SSRFStage` 型（`SSRFStageInitialValidation`, `SSRFStageDialRevalidation`）を定義する。
-- [ ] `internal/atproto/errors.go` に `HTTPError`（`Method`, `StatusCode`, `Err` フィールド、`Error()`/`Unwrap()`）を実装する。`*http.Request`/`*http.Response`/生のレスポンスボディを一切保持しない。
-- [ ] `internal/atproto/errors.go` に `SSRFError`（`Endpoint`, `Stage`, `Err` フィールド、`Error()`/`Unwrap()`）を実装する。
-- [ ] `internal/atproto/testutil/mocks.go`（`package atprototestutil`）に `HTTPDoer` のモック実装を作成する。呼び出しごとにリクエスト（メソッド・URL・ボディ）を記録し、後続テストが「これ以上リクエストが発行されていないこと」をアサートできるよう呼び出し回数・記録済みリクエストを公開する。レスポンスは呼び出し元が `func(*http.Request) (*http.Response, error)` 形式のハンドラを差し替えられる設計とし、DID 解決・ログイン・投稿一覧・削除の各テストが URL/メソッドごとに異なる応答を返せるようにする。
-- [ ] `make lint` を実行し、`gosec` が動的な URL を使う HTTP リクエスト構築（`http.go` の XRPC 共通処理、`did.go` の DID ドキュメント取得、5.2節の `DialContext`/`CheckRedirect` ラッパー）を指摘するか確認する。`.golangci.yml` は `gosec` を `_test\.go` ファイルのみ除外しており、`testutil/mocks.go`（`//go:build test` だが `_test.go` ではない）を含む非テストファイルには適用され続けるため、`internal/atproto/testutil/mocks.go` も対象に含めて確認する。指摘された場合は、指摘箇所に限定した `//nolint:gosec // <理由>` を追加する（ファイル単位・パッケージ単位の抑制は行わない）。理由コメントには、宛先ホストが `validatePDSEndpoint`（アーキテクチャ 5.2節）で事前検証済みであることを明記し、抑制が本番コードの一般的な機能ではなく本パッケージの検証済み接続に限定されることが分かる文言にする。
+- [x] `internal/atproto/http.go` に `HTTPDoer` インターフェース（`Do(req *http.Request) (*http.Response, error)`）を定義する（アーキテクチャ 3.1節）。
+- [x] `internal/atproto/http.go` に XRPC リクエスト構築・応答デコードの共通処理（メソッド名・エンドポイント URL 組み立て、JSON デコード、非 2xx 応答を `HTTPError` へラップする処理）を実装する。生の `net/http` エラーや `*url.Error` を呼び出し元にそのまま透過させない（アーキテクチャ4節「秘匿情報を含まない設計」）。
+- [x] `internal/atproto/http.go` に、検証済みアドレス集合のみに接続を許可する `DialContext` ラッパーと、3xx 応答を常に拒否する `CheckRedirect` ポリシーを提供する関数（例: 検証済みアドレス集合とホスト名を受け取り `*http.Client` を組み立てる関数）を実装する（アーキテクチャ5.2節の具体的方式）。この関数はホスト名の再解決を行わず、渡されたアドレスへ IP リテラルとして直接 `Dial` し、TLS の `ServerName` は元のホスト名に設定する。`net.IP` の `IsPrivate`/`IsLoopback`/`IsLinkLocalUnicast`/`IsLinkLocalMulticast`/`IsUnspecified` はいずれも Go 標準ライブラリ `net` パッケージに存在することを確認済み（`go doc net.IP` で確認、アーキテクチャ 5.2節1）。実際にこの関数を検証済みアドレス集合とともに呼び出し `Client` の `HTTPDoer` として組み込む配線は Phase 2（`did.go`）で行う。
+- [x] `internal/atproto/errors.go` にセンチネルエラー群（`ErrDIDResolutionFailed`, `ErrUntrustedPDSEndpoint`, `ErrAuthenticationFailed`, `ErrHTTPStatus`, `ErrTransportFailure`, `ErrPaginationStalled`）を定義する（アーキテクチャ4節のコード例通り）。
+- [x] `internal/atproto/errors.go` に `SSRFStage` 型（`SSRFStageInitialValidation`, `SSRFStageDialRevalidation`）を定義する。
+- [x] `internal/atproto/errors.go` に `HTTPError`（`Method`, `StatusCode`, `Err` フィールド、`Error()`/`Unwrap()`）を実装する。`*http.Request`/`*http.Response`/生のレスポンスボディを一切保持しない。
+- [x] `internal/atproto/errors.go` に `SSRFError`（`Endpoint`, `Stage`, `Err` フィールド、`Error()`/`Unwrap()`）を実装する。
+- [x] `internal/atproto/testutil/mocks.go`（`package atprototestutil`）に `HTTPDoer` のモック実装を作成する。呼び出しごとにリクエスト（メソッド・URL・ボディ）を記録し、後続テストが「これ以上リクエストが発行されていないこと」をアサートできるよう呼び出し回数・記録済みリクエストを公開する。レスポンスは呼び出し元が `func(*http.Request) (*http.Response, error)` 形式のハンドラを差し替えられる設計とし、DID 解決・ログイン・投稿一覧・削除の各テストが URL/メソッドごとに異なる応答を返せるようにする。
+- [x] `make lint` を実行し、`gosec` が動的な URL を使う HTTP リクエスト構築（`http.go` の XRPC 共通処理、5.2節の `DialContext`/`CheckRedirect` ラッパー）を指摘するか確認する。`.golangci.yml` は `gosec` を `_test\.go` ファイルのみ除外しており、`testutil/mocks.go`（`//go:build test` だが `_test.go` ではない）を含む非テストファイルには適用され続けるため、`internal/atproto/testutil/mocks.go` も対象に含めて確認する。指摘された場合は、指摘箇所に限定した `//nolint:gosec // <理由>` を追加する（ファイル単位・パッケージ単位の抑制は行わない）。理由コメントには、宛先ホストが `validatePDSEndpoint`（アーキテクチャ 5.2節）で事前検証済みであることを明記し、抑制が本番コードの一般的な機能ではなく本パッケージの検証済み接続に限定されることが分かる文言にする。`did.go` の DID ドキュメント取得は Phase 2 で新設されるため、その箇所の同様の確認は Phase 2 の完了条件で改めて行う（本書 2節 Phase 2 参照）。
 
 **完了条件**: `go build ./internal/atproto/...` が通り、`go test -tags test -run '^$' ./internal/atproto/...` がコンパイルエラーなく完了する（テスト本体は Phase 2 以降で追加するため、この時点では空でよい）。`make fmt` を実行する。
 
@@ -70,22 +70,36 @@
 - `internal/atproto/http_test.go`（新設）
 
 **作業内容**:
-- [ ] `internal/atproto/client.go` に `Client` 構造体（`httpDoer HTTPDoer`, `pdsBaseURL *url.URL`, `handle string`, `did string`）を定義する（アーキテクチャ 3.1節）。`session *Session` フィールドは `Session` 型が定義される Phase 3 で追加する（Phase 2 の時点では `Client` 構造体に `session` フィールドを含めない）。
-- [ ] `internal/atproto/did.go` に `resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error)` を実装する。
-- [ ] `internal/atproto/did.go` に `resolveDIDDocument(ctx context.Context, httpDoer HTTPDoer, did string) (serviceEndpoint string, err error)` を実装する。
-- [ ] `internal/atproto/did.go` に `validatePDSEndpoint(ctx context.Context, serviceEndpoint string) (verifiedAddrs []net.IP, host string, err error)` を実装する。スキームが `https` 以外なら `SSRFError{Stage: SSRFStageInitialValidation}` を返す（AC-02）。名前解決には `net.DefaultResolver.LookupIPAddr(ctx, host)`（`[]net.IPAddr` を返す）を使い、`ctx` のキャンセル・タイムアウトが名前解決にも及ぶようにする（アーキテクチャ 5.2節1 は `net.LookupIP` と表記しているが、`net.LookupIP` は `context.Context` を受け取らず本関数の `ctx` 引数を使わない死んだ引数になってしまうため、同一の「ホスト名を一度だけ解決し全アドレスを検証する」設計を保ったまま、`ctx` 対応版である `LookupIPAddr` に読み替える）。各 `net.IPAddr` の `.IP` フィールド（`net.IP` 型）に対し、返された全アドレスについてプライベート/ループバック/リンクローカル/未指定アドレスを判定し、1つでも該当すれば `SSRFError{Stage: SSRFStageInitialValidation}` を返す（AC-03、アーキテクチャ 5.2節1）。
-- [ ] `internal/atproto/client.go` に `NewClient(ctx context.Context, handle string, httpDoer HTTPDoer) (*Client, error)` を実装する。`resolveHandleToDID` → `resolveDIDDocument` → `validatePDSEndpoint` の順に呼び出し、いずれかが失敗した場合は `*Client` を返さない（AC-03: app パスワードを送信できる `*Client` を渡さないことで型レベルで保証する。アーキテクチャ 3.1節）。検証成功後、Phase 1 で実装した検証済みアドレス限定の `HTTPDoer` ラッパーで元の `httpDoer` を包み、以降 `Client` が保持する `httpDoer` として使う。
-- [ ] `internal/atproto/did_test.go` に `TestValidatePDSEndpoint_Success`（AC-01: 正常な DID 解決で PDS エンドポイントを抽出できること）を実装する。
-- [ ] `internal/atproto/did_test.go` に `TestNewClient_ResolvesHandleToDIDAndPDSEndpoint`（AC-01: `NewClient` が `handle`/`did`/`pdsBaseURL` を正しく保持すること）を実装する。
-- [ ] `internal/atproto/did_test.go` に `TestValidatePDSEndpoint_RejectsNonHTTPSScheme`（AC-02: スキームが `https` 以外の場合に `SSRFError{Stage: SSRFStageInitialValidation}` を返すこと）を実装する。
-- [ ] `internal/atproto/did_test.go` に `TestValidatePDSEndpoint_RejectsUntrustedHost`（AC-03）を表駆動テストとして実装する。`validatePDSEndpoint` が判定に使う5つの `net.IP` 判定メソッド（`IsPrivate`/`IsLoopback`/`IsLinkLocalUnicast`/`IsLinkLocalMulticast`/`IsUnspecified`、アーキテクチャ 5.2節1）それぞれに対応する行を最低1つ含める表とし、具体的には: プライベートアドレス（RFC 1918、例 `10.0.0.1`）、ループバック（IPv4 `127.0.0.1` と IPv6 `::1` の両方）、リンクローカルユニキャスト（例 `169.254.1.1`）、リンクローカルマルチキャスト（例 `224.0.0.251`）、未指定アドレス（`0.0.0.0`）、IPv4-mapped IPv6（`::ffff:127.0.0.1`）、IPv6 ユニークローカルアドレス（`IsPrivate` の対象となる `fc00::/7`、例 `fd00::1`）、および1つのホスト名が「公開 IP と非公開 IP の両方」を返す複数アドレス応答を含める（アーキテクチャ 7.1節）。
-- [ ] `internal/atproto/did_test.go` に `TestNewClient_DIDResolutionFailure`（AC-03: DID 解決自体が失敗した場合に `*Client` を返さないこと）を実装する。
-- [ ] `internal/atproto/did_test.go` に `TestNewClient_RejectsUntrustedHost_NoFurtherRequest`（AC-03: 拒否後、モックへの追加リクエストが発行されていないことを `testutil` の呼び出し回数記録でアサートする）を実装する。
-- [ ] `internal/atproto/http_test.go` に `TestRestrictedDialContext_RejectsUnverifiedAddress`（アーキテクチャ 5.2節2: 検証済みアドレス集合外への接続が拒否されること）を実装する。この検証は、検証済みアドレス集合とラッパーへ渡すアドレスを比較するロジック単体のテストとして実装し、実際の TCP 接続を発生させない純粋なロジックテストとする（`net.Listener` 等の実リソースは使わない）。
-- [ ] `internal/atproto/http_test.go` に `TestRestrictedDialContext_ConnectFailureIsTransportError`（アーキテクチャ 5.2節: `DialContext` 自体の接続失敗が `SSRFError` ではなく `ErrTransportFailure` になること）を実装する。このテストは実際の接続失敗を発生させる必要があるため、ローカルの `net.Listener`（`net.Listen("tcp", "127.0.0.1:0")` で確保後、接続前に `Close()` して未使用ポートを作る、または即座に `Close()` して「接続拒否」を発生させる）を使う。`net.Listener` を確保した場合は取得直後に `t.Cleanup(func() { _ = listener.Close() })` を登録する（`net.Listener.Close` は標準ライブラリの実 API）。
-- [ ] `internal/atproto/http_test.go` に `TestCheckRedirect_AlwaysRejects`（アーキテクチャ 5.2節: 3xx 応答を受信した場合に `SSRFError{Stage: SSRFStageDialRevalidation}` を返し、リダイレクト先へ接続しないこと）を実装する。
+- [x] `internal/atproto/client.go` に `Client` 構造体（`httpDoer HTTPDoer`, `pdsBaseURL *url.URL`, `handle string`, `did string`）を定義する（アーキテクチャ 3.1節）。`session *Session` フィールドは `Session` 型が定義される Phase 3 で追加する（Phase 2 の時点では `Client` 構造体に `session` フィールドを含めない）。
+- [x] `internal/atproto/did.go` に `resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error)` を実装する。
+- [x] `internal/atproto/did.go` に `resolveDIDDocument(ctx context.Context, httpDoer HTTPDoer, did string) (serviceEndpoint string, err error)` を実装する。
+- [x] `internal/atproto/did.go` に `validatePDSEndpoint(ctx context.Context, serviceEndpoint string) (verifiedAddrs []net.IP, host string, err error)` を実装する。スキームが `https` 以外なら `SSRFError{Stage: SSRFStageInitialValidation}` を返す（AC-02）。名前解決には `net.DefaultResolver.LookupIPAddr(ctx, host)`（`[]net.IPAddr` を返す）を使い、`ctx` のキャンセル・タイムアウトが名前解決にも及ぶようにする（アーキテクチャ 5.2節1 は `net.LookupIP` と表記しているが、`net.LookupIP` は `context.Context` を受け取らず本関数の `ctx` 引数を使わない死んだ引数になってしまうため、同一の「ホスト名を一度だけ解決し全アドレスを検証する」設計を保ったまま、`ctx` 対応版である `LookupIPAddr` に読み替える）。各 `net.IPAddr` の `.IP` フィールド（`net.IP` 型）に対し、返された全アドレスについてプライベート/ループバック/リンクローカル/未指定アドレスを判定し、1つでも該当すれば `SSRFError{Stage: SSRFStageInitialValidation}` を返す（AC-03、アーキテクチャ 5.2節1）。
+- [x] `internal/atproto/client.go` に `NewClient(ctx context.Context, handle string, httpDoer HTTPDoer) (*Client, error)` を実装する。`resolveHandleToDID` → `resolveDIDDocument` → `validatePDSEndpoint` の順に呼び出し、いずれかが失敗した場合は `*Client` を返さない（AC-03: app パスワードを送信できる `*Client` を渡さないことで型レベルで保証する。アーキテクチャ 3.1節）。検証成功後、Phase 1 で実装した検証済みアドレス限定の `HTTPDoer` ラッパーで元の `httpDoer` を包み、以降 `Client` が保持する `httpDoer` として使う。
+- [x] `internal/atproto/did_test.go` に `TestValidatePDSEndpoint_Success`（AC-01: 正常な DID 解決で PDS エンドポイントを抽出できること）を実装する。
+- [x] `internal/atproto/did_test.go` に `TestNewClient_ResolvesHandleToDIDAndPDSEndpoint`（AC-01: `NewClient` が `handle`/`did`/`pdsBaseURL` を正しく保持すること）を実装する。
+- [x] `internal/atproto/did_test.go` に `TestValidatePDSEndpoint_RejectsNonHTTPSScheme`（AC-02: スキームが `https` 以外の場合に `SSRFError{Stage: SSRFStageInitialValidation}` を返すこと）を実装する。
+- [x] `internal/atproto/did_test.go` に `TestValidatePDSEndpoint_RejectsUntrustedHost`（AC-03）を表駆動テストとして実装する。`validatePDSEndpoint` が判定に使う5つの `net.IP` 判定メソッド（`IsPrivate`/`IsLoopback`/`IsLinkLocalUnicast`/`IsLinkLocalMulticast`/`IsUnspecified`、アーキテクチャ 5.2節1）それぞれに対応する行を最低1つ含める表とし、具体的には: プライベートアドレス（RFC 1918、例 `10.0.0.1`）、ループバック（IPv4 `127.0.0.1` と IPv6 `::1` の両方）、リンクローカルユニキャスト（例 `169.254.1.1`）、リンクローカルマルチキャスト（例 `224.0.0.251`）、未指定アドレス（`0.0.0.0`）、IPv4-mapped IPv6（`::ffff:127.0.0.1`）、IPv6 ユニークローカルアドレス（`IsPrivate` の対象となる `fc00::/7`、例 `fd00::1`）、および1つのホスト名が「公開 IP と非公開 IP の両方」を返す複数アドレス応答を含める（アーキテクチャ 7.1節）。
+- [x] `internal/atproto/did_test.go` に `TestNewClient_DIDResolutionFailure`（AC-03: DID 解決自体が失敗した場合に `*Client` を返さないこと）を実装する。
+- [x] `internal/atproto/did_test.go` に `TestNewClient_RejectsUntrustedHost_NoFurtherRequest`（AC-03: 拒否後、モックへの追加リクエストが発行されていないことを `testutil` の呼び出し回数記録でアサートする）を実装する。
+- [x] `internal/atproto/http_test.go` に `TestRestrictedDialContext_RejectsUnverifiedAddress`（アーキテクチャ 5.2節2: 検証済みアドレス集合外への接続が拒否されること）を実装する。この検証は、検証済みアドレス集合とラッパーへ渡すアドレスを比較するロジック単体のテストとして実装し、実際の TCP 接続を発生させない純粋なロジックテストとする（`net.Listener` 等の実リソースは使わない）。
+- [x] `internal/atproto/http_test.go` に `TestRestrictedDialContext_ConnectFailureIsTransportError`（アーキテクチャ 5.2節: `DialContext` 自体の接続失敗が `SSRFError` ではなく `ErrTransportFailure` になること）を実装する。このテストは実際の接続失敗を発生させる必要があるため、ローカルの `net.Listener`（`net.Listen("tcp", "127.0.0.1:0")` で確保後、接続前に `Close()` して未使用ポートを作る、または即座に `Close()` して「接続拒否」を発生させる）を使う。`net.Listener` を確保した場合は取得直後に `t.Cleanup(func() { _ = listener.Close() })` を登録する（`net.Listener.Close` は標準ライブラリの実 API）。
+- [x] `internal/atproto/http_test.go` に `TestCheckRedirect_AlwaysRejects`（アーキテクチャ 5.2節: 3xx 応答を受信した場合に `SSRFError{Stage: SSRFStageDialRevalidation}` を返し、リダイレクト先へ接続しないこと）を実装する。
+- [x] `make lint` を実行し、`gosec` が `did.go` の DID ドキュメント取得（動的な URL を使う HTTP リクエスト構築）を指摘するか確認する（Phase 1 の同様の確認の続き、本書 2節 Phase 1 参照）。指摘された場合は、指摘箇所に限定した `//nolint:gosec // <理由>` を追加し、理由コメントに宛先ホストが `validatePDSEndpoint` で事前検証済みであることを明記する。
 
 **完了条件**: `make test`（`go test -tags test ./internal/atproto/...` を含む）、`make lint` が成功する。
+
+### PR-1 作成ポイント: HTTP abstraction, error types, DID resolution
+
+**対象ステップ**: Phase 1 / Phase 2
+
+**推奨タイトル**: `feat(0002): add HTTP abstraction, error types, and SSRF-safe DID resolution`
+
+**レビュー観点**: `validatePDSEndpoint` の境界値（プライベート/ループバック/リンクローカル/IPv4-mapped/複数アドレス応答）の網羅性 / `DialContext`/`CheckRedirect` の SSRF ガードが検証済みアドレス集合外への接続を確実に拒否すること / `HTTPError`/`SSRFError` が生のリクエスト/レスポンスを保持しないこと — このPRは本タスクの中で最もレビュー負荷が高い（SSRF 防御の中核と土台部分の骨組みが同居する）ため、コミットを SSRF 関連（`DialContext`/`CheckRedirect`/`validatePDSEndpoint`/境界値テスト）とそれ以外（インターフェース定義・エラー型・モック）に分けて積み、SSRF 関連のコミットを独立してレビューできるようにする
+
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/20）
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 3 — ログイン
 
@@ -111,6 +125,19 @@
 
 **完了条件**: `make test`、`make lint` が成功する。
 
+### PR-2 作成ポイント: Login
+
+**対象ステップ**: Phase 3
+
+**推奨タイトル**: `feat(0002): add Login`
+
+**レビュー観点**: `appPassword.Reveal()` の呼び出し箇所がリクエストボディ構築の直前に限定されていること / エラー文字列に秘匿情報が含まれないこと / `newTestClient` が非公開フィールドを直接設定するテスト専用ファクトリとして適切に隔離されていること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### Phase 4 — 投稿一覧取得
 
 **対応 AC**: AC-07, AC-08, AC-09, AC-10
@@ -122,7 +149,7 @@
 **作業内容**:
 - [ ] `internal/atproto/posts.go` に `PostType` 列挙型（`PostTypeOriginal`, `PostTypeReply`, `PostTypeQuote`, `PostTypeRepost`）を実装する。
 - [ ] `internal/atproto/posts.go` に `Post` 構造体（`RKey string`, `Type PostType`, `CreatedAt time.Time`, `Pinned bool`）を実装する。
-- [ ] `internal/atproto/posts.go` に `Client.ListPosts(ctx context.Context) ([]Post, error)` を実装する。アーキテクチャ 3.2節の分類ロジック（`reply` フィールドの有無で `PostTypeReply`、`embed.$type` が `app.bsky.embed.record`/`app.bsky.embed.recordWithMedia` で `PostTypeQuote`、両方に該当しうる場合は `PostTypeReply` を優先、いずれでもなければ `PostTypeOriginal`）に従う。実装時に、`listRecords`/`getRecord` の呼び出しが `c.session`（`Login` で取得したアクセス JWT）を必要とするか（`Authorization` ヘッダーを要求するか）を確認する。必要な場合は `DeleteRecord`（Phase 5）と同様に `c.session` が `nil` のときリクエストを送信せず `ErrAuthenticationFailed` を返すガードを追加し、`TestClient_ListPosts_WithoutSession_ReturnsError` を追加する。不要な場合はこのタスクの完了条件としてその判断根拠を実装コメントか PR 説明に残す。
+- [ ] `internal/atproto/posts.go` に `Client.ListPosts(ctx context.Context) ([]Post, error)` を実装する。アーキテクチャ 3.2節の分類ロジック（`reply` フィールドの有無で `PostTypeReply`、`embed.$type` が `app.bsky.embed.record`/`app.bsky.embed.recordWithMedia` で `PostTypeQuote`、両方に該当しうる場合は `PostTypeReply` を優先、いずれでもなければ `PostTypeOriginal`）に従う。実装時に、`listRecords`/`getRecord` の呼び出しが `c.session`（`Login` で取得したアクセス JWT）を必要とするか（`Authorization` ヘッダーを要求するか）を確認する。必要な場合は `c.session` が `nil` のときリクエストを送信せず `ErrAuthenticationFailed` を返すガードを追加し（`DeleteRecord` にも Phase 5 で同じパターンを適用する）、`TestClient_ListPosts_WithoutSession_ReturnsError` を追加する。不要な場合はこのタスクの完了条件としてその判断根拠を実装コメントか PR 説明に残す。
 - [ ] `com.atproto.repo.listRecords`（`collection=app.bsky.feed.post`）のページネーションループを実装し、`cursor` が空になるまで全件取得する（AC-08）。
 - [ ] `com.atproto.repo.listRecords`（`collection=app.bsky.feed.repost`）のページネーションループを実装し、全件を `PostTypeRepost` として追加する（AC-08）。
 - [ ] 上記2つのページネーションループそれぞれに、直前に使ったカーソルと新たに返されたカーソルが同一の場合にループを打ち切り `ErrPaginationStalled` を返す終端保証を実装する（アーキテクチャ 6.2節「ページネーションの終端保証」）。2箇所のループに同一の停止ロジックを適用する。
@@ -138,13 +165,27 @@
 
 **完了条件**: `make test`、`make lint` が成功する。
 
+### PR-3 作成ポイント: ListPosts
+
+**対象ステップ**: Phase 4
+
+**推奨タイトル**: `feat(0002): add ListPosts`
+
+**レビュー観点**: `PostType` 判定ロジック（`reply` と `embed.$type` の優先順位）の正しさ / ページネーションの終端保証（`ErrPaginationStalled`）が2つのコレクション双方に適用されていること / ピン留め判定と `profile` レコード不在時のフォールバック挙動
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### Phase 5 — 投稿削除
 
-**対応 AC**: AC-11, AC-12, AC-13
+**対応 AC**: AC-11, AC-12, AC-13, AC-14, AC-15（NF-004 の土台、4.2節「単体テストのカバレッジ方針」参照）
 
 **変更対象ファイル**:
 - `internal/atproto/delete.go`（新設）
 - `internal/atproto/delete_test.go`（新設）
+- `internal/atproto/errors_test.go`（新設。全 Phase のエラーパスが出揃った時点で横断的に確認するため、Phase 5 のこの位置で追加する。4.2節参照）
 
 **作業内容**:
 - [ ] 着手前に、存在しない `rkey` を指定した `com.atproto.repo.deleteRecord` の実際の挙動（200 で成功応答を返すか、`InvalidRequest` 系のエラー名を伴う 400 応答を返すか）を、AT Protocol lexicon 一次資料（`com.atproto.repo.deleteRecord` の lexicon 定義）で確認する（アーキテクチャ 6.3節「冪等性の前提と検証状況」の未検証の仮定を解消するタスク）。lexicon 定義がエラー応答時の挙動を明示していない場合は、[プロジェクト概要](../../overview.md#完了の定義) の手動 dry-run/apply 確認で実際の PDS 応答を確認し、確認結果を本ステップのチェックボックス完了時のコミットメッセージまたは PR 説明に記録する。
@@ -156,8 +197,24 @@
 - [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_AlreadyDeleted_Idempotent`（AC-12: 既に削除済みの rkey に対してクラッシュせず正常系として扱われること。上記調査で確定した応答条件をモックで再現する）を実装する。
 - [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_UsesOwnDID`（AC-13: リクエストの `repo` パラメータが常に `c.session.DID` であることをモックが記録したリクエストボディでアサートする）を実装する。
 - [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_WithoutSession_ReturnsError`（AC-05: `newTestClient` で `session` に `nil` を渡した `*Client` に対し `DeleteRecord` を呼び出した場合、パニックせず `errors.Is(err, atproto.ErrAuthenticationFailed)` を満たすエラーが返り、モックへのリクエストが1件も発行されていないこと）を実装する。
+- [ ] `internal/atproto/errors_test.go` に `TestHTTPError_ErrorsIs`（AC-14: `errors.Is(err, atproto.ErrHTTPStatus)` 等のセンチネル判定が機能すること）を実装する。この時点で Phase 1〜5 の全エラーパスが出揃っているため、横断確認をこの位置で行う（4.2節参照）。
+- [ ] `internal/atproto/errors_test.go` に `TestHTTPError_AsType`（AC-14: `errors.AsType[*atproto.HTTPError](err)` でステータスコードを取得できること）を実装する。
+- [ ] `internal/atproto/errors_test.go` に `TestErrors_NoSecretLeakage`（AC-15: タイムアウト・5xx・4xx・ログイン失敗の各エラーパスについて、`Error()` の文字列表現に `Authorization` ヘッダーの値・app パスワード・セッション JWT のいずれも含まれないことを表駆動テストで確認する）を実装する。
 
-**完了条件**: `make test`、`make lint` が成功する。
+**完了条件**: `make test`（`errors_test.go` を含む）、`make lint` が成功する。
+
+### PR-4 作成ポイント: DeleteRecord
+
+**対象ステップ**: Phase 5
+
+**推奨タイトル**: `feat(0002): add DeleteRecord`
+
+**レビュー観点**: `repo` パラメータが常に自分の DID であること / 冪等性の前提として確認した実際の PDS 応答条件の妥当性 / `errors_test.go` が全エラーパス（タイムアウト・5xx・4xx・ログイン失敗）で秘匿情報漏洩がないことを網羅していること / `session` が `nil` の状態からのガードがパニックせずエラーを返すこと
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 6 — テストフィクスチャの lexicon 準拠検証
 
@@ -178,7 +235,21 @@
 
 **完了条件**: `make test`、`make lint`、`make deadcode` が成功する。`internal/atproto` パッケージ全体の AC-01〜AC-15 のテストが green であることを確認する。
 
+### PR-5 作成ポイント: Fixture lexicon compliance
+
+**対象ステップ**: Phase 6
+
+**推奨タイトル**: `test(0002): verify fixtures against AT Protocol lexicon`
+
+**レビュー観点**: フィクスチャのフィールド名が lexicon と一致していること / `DisallowUnknownFields` によって乖離が確実に検出できること / `TestFixtures_RequiredFieldsPresent` が lexicon 必須フィールドの欠落を実際に検出できる網羅性であること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
+
 ## 3. 実装順序とマイルストーン
+
+### 3.1 マイルストーン
 
 Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優先順位をそのまま踏襲し、この順序で実装する。各 Phase は前段の Phase が定義する型・関数に依存するため、後続 Phase の作業を先に着手しない。
 
@@ -188,39 +259,20 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 | M2 | Phase 2 完了 | `NewClient` による DID 解決・SSRF ガードが動作し、AC-01〜AC-03 のテストが green |
 | M3 | Phase 3 完了 | `Login` が動作し、AC-04〜AC-06 のテストが green |
 | M4 | Phase 4 完了 | `ListPosts` が動作し、AC-07〜AC-10 のテストが green |
-| M5 | Phase 5 完了 | `DeleteRecord` が動作し、AC-11〜AC-13 のテストが green |
-| M5.5 | エラーパス横断テスト完了（本書 4.2節） | `errors_test.go` が実装され、AC-14・AC-15 のテストが green |
+| M5 | Phase 5 完了 | `DeleteRecord` が動作し、AC-11〜AC-13 のテストが green。エラーパス横断テスト（`errors_test.go`）も Phase 5 内（本書2節）で実装され、AC-14・AC-15 のテストが green |
 | M6 | Phase 6 完了 | フィクスチャの lexicon 準拠検証が完了し、NF-006 を満たす。パッケージ参照ドキュメントが更新される |
 
-### PR-1 作成ポイント: HTTP abstraction, error types, DID resolution
+### 3.2 PR 構成
 
-**対象ステップ**: Phase 1, Phase 2
-**推奨タイトル**: `feat(atproto): add HTTP abstraction, error types, and SSRF-safe DID resolution`
-**レビュー観点**: `validatePDSEndpoint` の境界値（プライベート/ループバック/リンクローカル/IPv4-mapped/複数アドレス応答）の網羅性、`DialContext`/`CheckRedirect` の SSRF ガードが検証済みアドレス集合外への接続を確実に拒否すること、`HTTPError`/`SSRFError` が生のリクエスト/レスポンスを保持しないこと。
+1 PR = 1 Phase を基本とし、Phase 5 のみエラーパス横断テスト（旧 M5.5、`errors_test.go`）を含めて1つの PR にまとめる（Phase 1〜4 の全エラーパスが出揃うのが Phase 5 完了時点であるため）。各 PR は前段の PR が導入する型・関数にのみ依存し、後続 PR のスタブを必要としないため、この単位でグリーンゲート（`make fmt && make test && make lint`）を独立して満たせる。
 
-### PR-2 作成ポイント: Login
-
-**対象ステップ**: Phase 3
-**推奨タイトル**: `feat(atproto): add Login`
-**レビュー観点**: `appPassword.Reveal()` の呼び出し箇所がリクエストボディ構築の直前に限定されていること、エラー文字列に秘匿情報が含まれないこと。
-
-### PR-3 作成ポイント: ListPosts
-
-**対象ステップ**: Phase 4
-**推奨タイトル**: `feat(atproto): add ListPosts`
-**レビュー観点**: `PostType` 判定ロジック（`reply` と `embed.$type` の優先順位）、ページネーションの終端保証、ピン留め判定の正しさ。
-
-### PR-4 作成ポイント: DeleteRecord
-
-**対象ステップ**: Phase 5、およびエラーパス横断テスト（本書 4.2節、M5.5）
-**推奨タイトル**: `feat(atproto): add DeleteRecord`
-**レビュー観点**: `repo` パラメータが常に自分の DID であること、冪等性の前提として確認した実際の PDS 応答条件の妥当性、`errors_test.go` が全エラーパス（タイムアウト・5xx・4xx・ログイン失敗）で秘匿情報漏洩がないことを網羅していること。
-
-### PR-5 作成ポイント: Fixture lexicon compliance
-
-**対象ステップ**: Phase 6
-**推奨タイトル**: `test(atproto): verify fixtures against AT Protocol lexicon`
-**レビュー観点**: フィクスチャのフィールド名が lexicon と一致していること、`DisallowUnknownFields` によって乖離が確実に検出できること。
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | Phase 1 / Phase 2 | HTTP 抽象化（`HTTPDoer`）、エラー型（`HTTPError`/`SSRFError`）、SSRF ガード付き DID 解決（`NewClient`）、テストダブル（`testutil/mocks.go`）、SSRF ガード単体テスト（`http_test.go`） |
+| PR-2 | Phase 3 | `Login`（`Session`/`secretString`） |
+| PR-3 | Phase 4 | `ListPosts`（`PostType` 判定、ページネーション、ピン留め判定） |
+| PR-4 | Phase 5 | `DeleteRecord`、エラーパス横断テスト（`errors_test.go`） |
+| PR-5 | Phase 6 | テストフィクスチャの lexicon 準拠検証、`package_reference.md` 更新 |
 
 ## 4. テスト戦略
 
@@ -238,17 +290,7 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 ### 4.2 単体テストのカバレッジ方針
 
 - 正常系・異常系（認証失敗、HTTP ステータス異常、transport 障害）・境界値（IP アドレス境界、カーソル非進行、0件）をすべて表駆動テストまたは個別テスト関数でカバーする。各テストの詳細は2節の各 Phase のチェックリストに列挙した通り。
-- 秘匿情報漏洩の確認（AC-06, AC-15）は、タイムアウト・5xx・4xx・ログイン失敗の各エラーパスを `errors_test.go`（Phase 1 で型を定義するが、テスト自体は全 Phase のエラーパスが出揃う Phase 5 完了後に実装する）で横断的に確認する。
-
-**変更対象ファイルの追加**:
-- `internal/atproto/errors_test.go`（新設、Phase 5 完了後に追加）
-
-**作業内容の追加（Phase 5 完了後、Phase 6 着手前に実施）**:
-- [ ] `internal/atproto/errors_test.go` に `TestHTTPError_ErrorsIs`（AC-14: `errors.Is(err, atproto.ErrHTTPStatus)` 等のセンチネル判定が機能すること）を実装する。
-- [ ] `internal/atproto/errors_test.go` に `TestHTTPError_AsType`（AC-14: `errors.AsType[*atproto.HTTPError](err)` でステータスコードを取得できること）を実装する。
-- [ ] `internal/atproto/errors_test.go` に `TestErrors_NoSecretLeakage`（AC-15: タイムアウト・5xx・4xx・ログイン失敗の各エラーパスについて、`Error()` の文字列表現に `Authorization` ヘッダーの値・app パスワード・セッション JWT のいずれも含まれないことを表駆動テストで確認する）を実装する。
-
-このタスクは Phase 5 完了後、Phase 6 着手前の中間タスクとして扱う（全エラーパスが出揃った時点でまとめて横断確認するため）。
+- 秘匿情報漏洩の確認（AC-06, AC-15）は、タイムアウト・5xx・4xx・ログイン失敗の各エラーパスを `errors_test.go`（Phase 1 で型を定義するが、テスト自体は全 Phase のエラーパスが出揃う Phase 5 の末尾で実装する。作業内容は本書2節 Phase 5 参照）で横断的に確認する。
 
 ### 4.3 クロスサーチチェックリスト
 
@@ -264,16 +306,17 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 | Phase 5 着手前の `deleteRecord` 冪等性調査で lexicon 定義がエラー応答挙動を明示しない場合、確定に時間がかかる | Phase 5 のスケジュール遅延 | lexicon 定義で確認できない場合は手動 dry-run/apply 確認に切り替える代替手順をあらかじめ Phase 5 の作業内容に明記済み（本書 2節 Phase 5）。 |
 | `validatePDSEndpoint` の境界値テスト（IPv4-mapped IPv6 等）で `net.IP` の判定メソッドの挙動が想定と異なる可能性 | AC-03 のテストが誤って green/red になる | Phase 2 の `TestValidatePDSEndpoint_RejectsUntrustedHost` で境界値を明示的に列挙し、実装時に `go doc net.IP` で各メソッドの実際の判定範囲を都度確認する。 |
 | `DialContext`/`CheckRedirect` ラッパーの実装が複雑になり、Phase 2 のスコープが肥大化する | スケジュール遅延、レビュー負荷増大 | Phase 1 で汎用的なラッパー構築関数を用意し、Phase 2 では `NewClient` からの呼び出し（配線）のみに限定する（本書 2節 Phase 1・Phase 2 の作業内容の分割方針）。 |
+| PR-1（Phase 1・2）は本タスクで最大の PR であり、SSRF 防御の中核（`DialContext`/`CheckRedirect`/`validatePDSEndpoint`）と HTTP 抽象化・エラー型の骨組みが同一 PR に同居する。Phase 1 は完了条件がコンパイルのみで実質的なテストを持たないため（本書 2節 Phase 1）、これ以上 PR を細分化すると前段 PR が単体でグリーンゲートを満たせなくなる | レビュー負荷増大、SSRF 関連の変更が他の変更に埋もれるリスク | これ以上の PR 分割は行わず、PR-1 のレビュー観点（本書 2節）でコミット分割によるレビュー順序の指定を行うことで軽減する。 |
 
 ## 6. 実装チェックリスト
 
-- [ ] Phase 1 — HTTP 抽象化とエラー型（本書 2節）完了
-- [ ] Phase 2 — DID 解決（本書 2節）完了
-- [ ] Phase 3 — ログイン（本書 2節）完了
-- [ ] Phase 4 — 投稿一覧取得（本書 2節）完了
-- [ ] Phase 5 — 投稿削除（本書 2節）完了
-- [ ] エラーパス横断テスト（本書 4.2節、Phase 5 完了後・Phase 6 着手前）完了
-- [ ] Phase 6 — テストフィクスチャの lexicon 準拠検証（本書 2節）完了
+（各 PR 作成ポイント（2節）のインラインチェックボックスと対応する。ここでは PR 単位の完了状況のみをまとめて確認する）
+
+- [ ] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2）
+- [ ] PR-2 マージ済み（対象ステップ: Phase 3）
+- [ ] PR-3 マージ済み（対象ステップ: Phase 4）
+- [ ] PR-4 マージ済み（対象ステップ: Phase 5）
+- [ ] PR-5 マージ済み（対象ステップ: Phase 6）
 - [ ] `make fmt && make test && make lint` が最終的に成功する
 - [ ] `make deadcode` が成功する
 
