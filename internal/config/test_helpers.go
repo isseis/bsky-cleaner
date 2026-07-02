@@ -33,7 +33,13 @@ func unsetEnv(t *testing.T, key string) {
 	}
 	t.Cleanup(func() {
 		if wasSet {
-			_ = os.Setenv(key, prev)
+			if err := os.Setenv(key, prev); err != nil {
+				t.Errorf("unsetEnv(%q) cleanup: %v", key, err)
+			}
+			return
+		}
+		if err := os.Unsetenv(key); err != nil {
+			t.Errorf("unsetEnv(%q) cleanup: %v", key, err)
 		}
 	})
 }
