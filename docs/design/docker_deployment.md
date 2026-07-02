@@ -10,7 +10,9 @@
 
 ## 秘匿情報の管理（`.env`）
 
-`docker-compose.yml` には秘匿情報を直接書かず、`env_file` 等で `.env` を参照する形にする。
+`docker-compose.yml` には秘匿情報を直接書かず、Compose の変数展開機能を通じて `.env` の値を参照する形にする。
+
+> **`.env` と `env_file` の役割の違い**: Compose における `.env` ファイルは `docker-compose.yml` 内の変数展開（例: `${BSKY_APP_PASSWORD}`）専用であり、コンテナの環境変数には自動では入らない。コンテナへは `environment:` キーで `BSKY_APP_PASSWORD: ${BSKY_APP_PASSWORD}` のように明示的に渡す。`env_file:` ディレクティブはファイル内の変数をコンテナに丸ごと渡す別機能であり、本設計では使用しない。
 
 - `.env` に実際の app パスワード等を記載する
 - `.env` の扱いは、運用に応じて以下のいずれかを選択できるようにする
@@ -22,7 +24,7 @@
 
 実行スケジュールも他の設定と同様に TOML に一元化する（`docker-compose.yml` の環境変数には出さない）。TOML はコンテナ起動時にしか読めない内蔵 cron 定義ファイルとは別物のため、以下の手順で橋渡しする。
 
-1. バイナリに `print-schedule` のような隠しサブコマンドを用意し、TOML から schedule フィールド（例: `schedule = "0 3 * * *"`）だけを取り出して標準出力する。TOML のパース処理をこのサブコマンドに集約し、二重実装を避ける
+1. バイナリに `print-schedule` のような隠しサブコマンドを用意し、TOML から schedule フィールド（例: `schedule = "0 3 * * *"`）だけを取り出して標準出力する。TOML のパース処理をこのサブコマンドに集約し、二重実装を避ける。出力前に「改行を含まない1行の cron 式」であることを検証し、不正な値の場合は非0で終了する（改行を含む値をそのまま crontab に書き込むと、crontab の追加行として任意コマンドを注入できるため）
 2. イメージ同梱のエントリポイントスクリプトが、コンテナ起動時にこのサブコマンドを呼び出し、結果を使って `supercronic` 用の crontab ファイルを動的生成する
 3. `exec supercronic <生成した crontab>` で内蔵 cron を起動し、以降はそのスケジュールに従って本体（`bsky-cleaner --apply --config ...`）を定期実行する
 
