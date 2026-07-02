@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoad_ValidConfig(t *testing.T) {
@@ -17,35 +20,23 @@ execution_timeout_seconds = 3600
 `)
 
 	cfg, err := Load(path)
-	if err != nil {
-		t.Fatalf("Load() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if cfg.RetentionDays != 30 {
-		t.Errorf("RetentionDays = %d, want 30", cfg.RetentionDays)
-	}
-	if cfg.Schedule != "0 3 * * *" {
-		t.Errorf("Schedule = %q, want %q", cfg.Schedule, "0 3 * * *")
-	}
-	if cfg.ExecutionTimeout != time.Hour {
-		t.Errorf("ExecutionTimeout = %v, want %v", cfg.ExecutionTimeout, time.Hour)
-	}
+	assert.Equal(t, 30, cfg.RetentionDays)
+	assert.Equal(t, "0 3 * * *", cfg.Schedule)
+	assert.Equal(t, time.Hour, cfg.ExecutionTimeout)
 }
 
 func TestLoad_SyntaxError(t *testing.T) {
 	path := writeTempTOML(t, `retention_days = [30`)
 
 	_, err := Load(path)
-	if !errors.Is(err, ErrParseFailed) {
-		t.Fatalf("Load() error = %v, want wrapping ErrParseFailed", err)
-	}
+	require.ErrorIs(t, err, ErrParseFailed)
 }
 
 func TestLoad_FileNotFound(t *testing.T) {
 	_, err := Load("/nonexistent/path/config.toml")
-	if !errors.Is(err, ErrFileNotFound) {
-		t.Fatalf("Load() error = %v, want wrapping ErrFileNotFound", err)
-	}
+	require.ErrorIs(t, err, ErrFileNotFound)
 }
 
 func TestLoad_MissingRequiredFields(t *testing.T) {
@@ -85,20 +76,12 @@ schedule = "0 3 * * *"
 			path := writeTempTOML(t, tt.content)
 
 			_, err := Load(path)
-			if !errors.Is(err, ErrMissingField) {
-				t.Fatalf("Load() error = %v, want wrapping ErrMissingField", err)
-			}
+			require.ErrorIs(t, err, ErrMissingField)
 
 			fieldErr, ok := errors.AsType[*FieldError](err)
-			if !ok {
-				t.Fatalf("Load() error = %v, want *FieldError", err)
-			}
-			if fieldErr.Field != tt.field {
-				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, tt.field)
-			}
-			if fieldErr.Value != "" {
-				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
-			}
+			require.Truef(t, ok, "Load() error = %v, want *FieldError", err)
+			assert.Equal(t, tt.field, fieldErr.Field)
+			assert.Empty(t, fieldErr.Value)
 		})
 	}
 }
@@ -125,24 +108,14 @@ execution_timeout_seconds = 3600
 
 			cfg, err := Load(path)
 			if tt.wantErr {
-				if !errors.Is(err, ErrInvalidValue) {
-					t.Fatalf("Load() error = %v, want wrapping ErrInvalidValue", err)
-				}
+				require.ErrorIs(t, err, ErrInvalidValue)
 				fieldErr, ok := errors.AsType[*FieldError](err)
-				if !ok {
-					t.Fatalf("Load() error = %v, want *FieldError", err)
-				}
-				if fieldErr.Value != strconv.Itoa(tt.retentionDays) {
-					t.Errorf("FieldError.Value = %q, want %q", fieldErr.Value, strconv.Itoa(tt.retentionDays))
-				}
+				require.Truef(t, ok, "Load() error = %v, want *FieldError", err)
+				assert.Equal(t, strconv.Itoa(tt.retentionDays), fieldErr.Value)
 				return
 			}
-			if err != nil {
-				t.Fatalf("Load() unexpected error: %v", err)
-			}
-			if cfg.RetentionDays != tt.retentionDays {
-				t.Errorf("RetentionDays = %d, want %d", cfg.RetentionDays, tt.retentionDays)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.retentionDays, cfg.RetentionDays)
 		})
 	}
 }
@@ -171,18 +144,11 @@ execution_timeout_seconds = %d
 
 			cfg, err := Load(path)
 			if tt.wantErr {
-				if !errors.Is(err, ErrInvalidValue) {
-					t.Fatalf("Load() error = %v, want wrapping ErrInvalidValue", err)
-				}
+				require.ErrorIs(t, err, ErrInvalidValue)
 				return
 			}
-			if err != nil {
-				t.Fatalf("Load() unexpected error: %v", err)
-			}
-			want := time.Duration(tt.seconds) * time.Second
-			if cfg.ExecutionTimeout != want {
-				t.Errorf("ExecutionTimeout = %v, want %v", cfg.ExecutionTimeout, want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, time.Duration(tt.seconds)*time.Second, cfg.ExecutionTimeout)
 		})
 	}
 }
@@ -196,7 +162,5 @@ retension_days = 30
 `)
 
 	_, err := Load(path)
-	if !errors.Is(err, ErrParseFailed) {
-		t.Fatalf("Load() error = %v, want wrapping ErrParseFailed", err)
-	}
+	require.ErrorIs(t, err, ErrParseFailed)
 }
