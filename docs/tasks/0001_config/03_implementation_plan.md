@@ -29,8 +29,8 @@
 一方で以下の外部依存・標準ライブラリ API は、実装前に事実確認を行った（数値・シグネチャは実装時に変わりうるため実装時に再確認すること）:
 
 - `github.com/pelletier/go-toml/v2`（pkg.go.dev のドキュメントおよび README で確認、2026-07-02 時点）:
-  - `DecodeFile` に相当する関数は存在しない。ファイルからの読み込みは呼び出し側で `os.ReadFile(path)`（または `os.Open` + `io.Reader`）を行った上で `toml.Unmarshal(data, v any) error` に渡す、もしくは `toml.NewDecoder(io.Reader).Decode(v any) error` を使う必要がある。本タスクでは前者（`os.ReadFile` + `Unmarshal`）を採用する（[02_architecture.md](02_architecture.md) 2.3 節のシーケンス図は元々この形を想定しており、変更は不要）。
-  - 未知キー（デコードされなかったキー）の検出は `toml.NewDecoder(r).DisallowUnknownFields()` による厳格モードで行う。該当時は `*toml.StrictMissingError` が返る。この型は `Unwrap() []error`（v2.3.0 以降、`errors.Join` 互換）を実装しているため、`errors.As`/`errors.Is` で判定可能。`DisallowUnknownFields()` を使うため、ファイル読み込みには `Unmarshal` ではなく `NewDecoder(bytes.NewReader(data)).Decode(&raw)` を用いる。
+  - `DecodeFile` に相当する関数は存在しない。ファイルからの読み込みは呼び出し側で `os.ReadFile(path)`（または `os.Open` + `io.Reader`）を行った上で `toml.Unmarshal(data, v any) error` に渡す、もしくは `toml.NewDecoder(io.Reader).Decode(v any) error` を使う必要がある。本タスクでは後述のとおり未知キー検出に `DisallowUnknownFields()` を用いるため、`os.ReadFile` + `toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields().Decode(&raw)` を採用する（[02_architecture.md](02_architecture.md) 2.3 節のシーケンス図は元々「バイト列を読んでからデコードする」形を想定しており、変更は不要）。
+  - 未知キー（デコードされなかったキー）の検出は `toml.NewDecoder(r).DisallowUnknownFields()` による厳格モードで行う。該当時は `*toml.StrictMissingError` が返る。この型は `Unwrap() []error`（v2.3.0 以降、`errors.Join` 互換）を実装しているため、`errors.As`/`errors.Is` で判定可能。
   - `time.Duration` 型に対する独自解釈（整数→ナノ秒等）の組み込みサポートは持たない。[02_architecture.md](02_architecture.md) 3.1 節の設計どおり、TOML 側は `execution_timeout_seconds`（プレーンな整数）として受け取り、Go 側で明示的に秒→`time.Duration` へ変換する実装を行う。`BurntSushi/toml` の場合と異なり、これは「独自解釈を避けるための回避策」ではなく、単純に「対応する組み込み機能が無いので自前で変換する」という素直な実装になる。
   - Go 1.18 以上が必要（本プロジェクトは Go 1.26.2 のため問題なし）。README には「Go の直近2メジャーバージョンをサポートする」旨の記載がある。
 - `errors.AsType[T]`（`go doc errors` で確認、Go 1.26.2 同梱の標準ライブラリ）: `errors.AsType[*fs.PathError](err) (*fs.PathError, bool)` の形で存在する。
@@ -208,7 +208,7 @@ Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列�
 ## 8. 完了基準
 
 - **機能面**: AC-01〜AC-13 がすべて 6章の検証方法で green である。
-- **品質面**: `make test`・`make lint`・`make deadcode` がすべて成功し、`golangci-lint`（`gosec` 含む）の指摘がゼロである。2章 Phase 1 で想定している `Load()` 内の `toml.DecodeFile` 呼び出しに対する `gosec` G304 の指摘（発生した場合のみ、その1行に限定した `//nolint:gosec` で対応）を除き、それ以外の箇所で `//nolint` によるスコープ抑制が必要な箇所は現時点で想定されない（秘匿情報は `SecretString` でラップするのみで、`InsecureSkipVerify` 等の他のセキュリティリンタが検知する構成要素を含まないため）。
+- **品質面**: `make test`・`make lint`・`make deadcode` がすべて成功し、`golangci-lint`（`gosec` 含む）の指摘がゼロである。2章 Phase 1 で想定している `Load()` 内の `os.ReadFile`（または `os.Open`）呼び出しに対する `gosec` G304 の指摘（発生した場合のみ、その1行に限定した `//nolint:gosec` で対応）を除き、それ以外の箇所で `//nolint` によるスコープ抑制が必要な箇所は現時点で想定されない（秘匿情報は `SecretString` でラップするのみで、`InsecureSkipVerify` 等の他のセキュリティリンタが検知する構成要素を含まないため）。
 - **セキュリティ面**: `secret_test.go` が NF-003 を直接検証し、`FieldError.Value` が `Credentials` 由来のエラーで常に空文字列であることを 6章 AC-06・AC-11 のテストが確認する。
 - **文書面**: `docs/design/configuration.md` が実装と一致し、`docs/dev/developer_guide/package_reference.md` が `internal/config` パッケージを反映している。
 
