@@ -50,7 +50,7 @@
 
 - [ ] `go get github.com/pelletier/go-toml/v2@latest` を実行し、`go.mod`/`go.sum` にバージョン固定で依存を追加する（ネットワークアクセスを伴うため、実行前にユーザーの承認を得ること）。
 - [ ] `Makefile` の `test` ターゲットを `go test ./...` から `go test -tags test ./...` に変更する。`.github/workflows/ci.yml` の `test` ジョブ「Test」ステップも同様に `go test ./...` から `go test -tags test ./...` に変更する（1.3 節のとおり、`//go:build test` タグ付きファイルを実際にテストビルドへ含めるために必須の変更。本タスクが `test_helpers.go` を導入する最初のタスクであるため、ここでリポジトリ全体の設定を変更する）。
-- [ ] `internal/config/errors.go` を新設し、センチネルエラー `ErrFileNotFound`, `ErrParseFailed`, `ErrMissingField`, `ErrInvalidValue`, `ErrMissingEnv`（[02_architecture.md](02_architecture.md) 4節のとおり）を定義する。Phase 3 で追加する範囲検証・環境変数検証でも同じ5つを再利用するため、ここで全種類をまとめて定義する（Phase 3 側で新規にセンチネルエラーを追加する必要はない）。
+- [ ] `internal/config/errors.go` を新設し、センチネルエラー `ErrFileNotFound`, `ErrParseFailed`, `ErrMissingField`, `ErrInvalidValue`, `ErrMissingEnv`（[02_architecture.md](02_architecture.md) 4節のとおり）を定義する。Phase 3 で追加する範囲検証・環境変数検証でも同じ5つを再利用するため、ここで全種類をまとめて定義する（Phase 3 側で新規にセンチネルエラーを追加する必要はない）。このうち `ErrInvalidValue`・`ErrMissingEnv` は Phase 1 のコードからは参照されない（初回使用は Phase 2・Phase 3）。`make lint`（`unused`）が green であることを Phase 1 完了条件で確認する際、この2つが未使用として指摘されないことも合わせて確認する（golangci-lint の `unused` はエクスポートされた識別子を既定では対象としないため通常は問題にならない想定だが、本タスクは `internal/config` パッケージを新設する最初のケースであるため実測で確認する）。
 - [ ] `internal/config/errors.go` に `FieldError` 型（`Field string`, `Value string`, `Err error`）を定義し、`Error() string`（`Field` と `Err` の内容を含むメッセージを組み立てる）と `Unwrap() error`（`Err` を返す）を実装する。
 - [ ] `internal/config/config.go` に公開構造体 `Config`（`RetentionDays int`, `Schedule string`, `ExecutionTimeout time.Duration`）を定義する。
 - [ ] `internal/config/config.go` に非公開構造体 `rawConfig`（`RetentionDays *int`, `Schedule *string`, `ExecutionTimeoutSeconds *int`、それぞれ `toml:"retention_days"` 等のタグを付与）を定義する。ポインタ型により「未設定（`nil`）」と「明示的なゼロ値」を区別する（[02_architecture.md](02_architecture.md) 3.1 節）。
@@ -64,6 +64,19 @@
 - [ ] `internal/config/config_test.go` に表駆動テストを実装する（詳細は 4章参照）。
 - [ ] `internal/config/errors_test.go` に `TestFieldError_ErrorAndUnwrap` を実装する（詳細は 4章参照）。
 - [ ] `make fmt && make test && make lint` が green であることを確認する。
+
+### PR-1 作成ポイント: TOML config loading foundation
+
+**対象ステップ**: Phase 1
+
+**推奨タイトル**: `feat(0001): add TOML config loading foundation`
+
+**レビュー観点**: TOML デコードエラー（構文エラー / 未知キー）の分類が `ErrParseFailed` に正しく集約されているか / `rawConfig` のポインタ判定による必須項目欠落検知（AC-04）の網羅性 / `os.ReadFile` の `gosec` G304 対応（`//nolint:gosec` の適用範囲とコメント） / `test_helpers.go` 導入に伴う `Makefile`・CI の `-tags test` 変更がリポジトリ全体の `make test` に与える影響（`internal/config/test_helpers.go` が `-tags test` を要求する最初のファイルであるため、CI/Makefile 変更とパッケージ新設を1つの PR に含めることは不可避である点に留意する。CI/Makefile 変更単独では検証対象コードがなく独立した PR として意味を持たないため分割していない） / Phase 1 時点で未使用の `ErrInvalidValue`・`ErrMissingEnv` が `make lint` で指摘されていないか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 2 — 秘匿情報の取り扱い（AC-05, AC-06, AC-07, AC-13）
 
@@ -84,6 +97,19 @@
 - [ ] `internal/config/credentials_test.go` に `t.Setenv()` を用いた表駆動テストを実装する（詳細は 4章参照）。
 - [ ] `make fmt && make test && make lint` が green であることを確認する。
 
+### PR-2 作成ポイント: credential and secret handling
+
+**対象ステップ**: Phase 2
+
+**推奨タイトル**: `feat(0001): add secret-masked credentials loading`
+
+**レビュー観点**: `SecretString` のすべての出力経路（`String`/`GoString`/`LogValue`）で元の値が漏洩しないか（AC-07, NF-003） / 必須環境変数欠落時の `FieldError.Value` が空文字列のままであること（秘匿値を誤って含めていないか） / Slack Webhook URL 未設定時に非エラーでゼロ値の `SecretString` になる挙動が AC-13 と整合しているか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### Phase 3 — 検証（AC-08, AC-09, AC-10, AC-11）
 
 対象 AC: AC-08（`retention_days` の 0 以下・未設定の拒否）, AC-09（`retention_days` の正常系）, AC-10（実行タイムアウトの 0 以下・未設定の拒否）, AC-11（Slack Webhook URL の形式検証）。AC-04・AC-06・AC-13 についても、Phase 1・Phase 2 で導入した検証ロジックを、ここで `validateConfig()`・`validateCredentials()` として改めて整理する。
@@ -98,6 +124,19 @@
 - [ ] `internal/config/config_test.go` に境界値テストを追加する（詳細は 4章参照）。
 - [ ] `internal/config/credentials_test.go` に Slack Webhook URL 形式検証のテストを追加する（詳細は 4章参照）。
 - [ ] `make fmt && make test && make lint` が green であることを確認する。
+
+### PR-3 作成ポイント: config and credential validation
+
+**対象ステップ**: Phase 3
+
+**推奨タイトル**: `feat(0001): add config value validation`
+
+**レビュー観点**: `retention_days`・`execution_timeout_seconds` の境界値判定（0 以下、上限 86400 秒超過、オーバーフロー対策の順序）の正確性 / Slack Webhook URL のスキーム検証ロジック（`https` 限定、空文字列はスキップ） / `Load()`・`LoadCredentials()` を `validateConfig()`・`validateCredentials()` 呼び出しへ差し替えるリファクタリングで Phase 1・2 の欠落検知挙動が壊れていないか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 4 — 統合と文書化（AC-12）
 
@@ -115,7 +154,22 @@
 - [ ] `docs/dev/developer_guide/package_reference.md` を更新し、「パッケージ未実装」の記述を、`internal/config` パッケージ（責務: TOML 設定ファイルと環境変数を読み込み、検証済みの設定値を返す）を含む実際のディレクトリ構成に置き換える（CLAUDE.md「Keep Package Reference in sync with `cmd/` and `internal/` as packages are actually added」に対応）。
 - [ ] `make fmt && make test && make lint` が green であることを確認する。
 
+### PR-4 作成ポイント: AppConfig integration and documentation
+
+**対象ステップ**: Phase 4
+
+**推奨タイトル**: `feat(0001): integrate AppConfig and add configuration docs`
+
+**レビュー観点**: `LoadAppConfig()` が `Load()`・`LoadCredentials()` のいずれのエラーもそのまま伝播しているか / `docs/design/configuration.md` の記載（TOML キー名・環境変数名・制約・記述例）が実装と一致しているか（AC-12） / `package_reference.md` 更新後に AC-12 の静的検証コマンド（`rg -c "internal/config"` 等）が実際にヒットするか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ## 3. 実装順序とマイルストーン
+
+### 3.1 マイルストーン
 
 | マイルストーン | 内容 | 完了条件 |
 |---|---|---|
@@ -125,6 +179,17 @@
 | M4 (最終) | Phase 4 完了 | `LoadAppConfig()` が `Load`・`LoadCredentials` を正しく合成し、`docs/design/configuration.md` が実装と一致し、AC-01〜AC-13 がすべて green |
 
 Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列に進める（各 Phase は前の Phase の型・関数に依存するため並行実装はしない）。
+
+### 3.2 PR 構成
+
+1 PR = 1 Phase として粒度を揃える。各 Phase は前の Phase の型・関数にのみ依存し、後続 Phase のスタブを必要としないため、Phase 単位でグリーンゲート（`make fmt && make test && make lint`）を独立して満たせる。
+
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | Phase 1 | TOML 読み込みの基盤（`Load()`、センチネルエラー、`FieldError`、`test_helpers.go` 新設と `-tags test` 化） |
+| PR-2 | Phase 2 | 秘匿情報の取り扱い（`SecretString`、`Credentials`、`LoadCredentials()`） |
+| PR-3 | Phase 3 | 検証ロジックの分離・拡充（`validateConfig()`、`validateCredentials()`、境界値・形式検証） |
+| PR-4 | Phase 4 | `AppConfig`／`LoadAppConfig()` による統合と設定リファレンス文書化 |
 
 ## 4. テスト戦略
 
@@ -198,11 +263,13 @@ Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列�
 
 ## 7. 実装チェックリスト
 
-- [ ] Phase 1 — TOML 読み込みの基盤（2章参照）
-- [ ] Phase 2 — 秘匿情報の取り扱い（2章参照）
-- [ ] Phase 3 — 検証（2章参照）
-- [ ] Phase 4 — 統合と文書化（2章参照）
-- [ ] 全 Phase 完了後、`make fmt && make test && make lint` が green
+（各 PR 作成ポイント（2章）のインラインチェックボックスと対応する。ここでは PR 単位の完了状況のみをまとめて確認する）
+
+- [ ] PR-1 マージ済み（対象ステップ: Phase 1）
+- [ ] PR-2 マージ済み（対象ステップ: Phase 2）
+- [ ] PR-3 マージ済み（対象ステップ: Phase 3）
+- [ ] PR-4 マージ済み（対象ステップ: Phase 4）
+- [ ] 全 PR マージ後、`make fmt && make test && make lint` が green
 - [ ] `make deadcode` を実行し、未使用コードが残っていないことを確認する
 
 ## 8. 完了基準
