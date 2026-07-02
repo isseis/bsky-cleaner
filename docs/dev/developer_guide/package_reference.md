@@ -7,28 +7,19 @@ codebase grows.
 
 ## Directory Structure
 
-No packages exist yet — this project has not started implementation. When the
-first package is added under `cmd/` or `internal/`, replace this section with
-an actual directory listing (see the reference format below) and keep it
-updated on every architecture change.
-
-Expected format once populated:
-
 ```
 - `cmd/`: Command-line entry points
-  - `<binary>/`: <one-line purpose>
+  - `main.go`: placeholder only, no config loading logic yet (see docs/tasks/0004_cli_entrypoint)
 - `internal/`: Core implementation
-  - `<package>/`: <one-line purpose>
-    - `<subpackage>/`: <one-line purpose>
+  - `config/`: reads and validates the TOML configuration file and environment variables, returning validated configuration values
 - `docs/`: Project documentation with requirements and architecture
 ```
 
 ## Package Responsibilities
 
-Once packages exist, list each under a short category heading (e.g. "AT
-Protocol client", "Cleanup engine", "CLI"), one bullet per package, with a
-one-line description of its responsibility — mirroring the Directory
-Structure section above so both stay consistent.
+**Configuration**
+
+- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
 
 ## Key Design Patterns
 
