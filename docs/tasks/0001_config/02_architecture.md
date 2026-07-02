@@ -97,7 +97,7 @@ sequenceDiagram
     participant E as 環境変数
     participant V as validate.go
 
-    M->>L: LoadAppConfig(path, os.LookupEnv)
+    M->>L: LoadAppConfig(path)
     L->>F: 読み込み
     alt ファイルが存在しない
         F-->>L: ファイル読み込みエラー
@@ -116,7 +116,7 @@ sequenceDiagram
                 L-->>M: *FieldError
             else 検証成功
                 V-->>L: Config
-                L->>E: getenv("BSKY_HANDLE"), getenv("BSKY_APP_PASSWORD")
+                L->>E: os.LookupEnv("BSKY_HANDLE"), os.LookupEnv("BSKY_APP_PASSWORD")
                 E-->>L: 値の有無
                 L->>V: validateCredentials(values)
                 alt 環境変数欠落
@@ -210,13 +210,14 @@ package config
 func Load(path string) (*Config, error)
 
 // LoadCredentials reads and validates secret configuration values from
-// environment variables. getenv matches the signature of os.LookupEnv,
-// allowing tests to inject a fake environment.
-func LoadCredentials(getenv func(key string) (string, bool)) (*Credentials, error)
+// the process environment (BSKY_HANDLE, BSKY_APP_PASSWORD via
+// os.LookupEnv). It takes no parameters: it only ever reads these two
+// fixed variable names, never an arbitrary key.
+func LoadCredentials() (*Credentials, error)
 
 // LoadAppConfig combines Load and LoadCredentials into a single entry
 // point for callers that need both.
-func LoadAppConfig(path string, getenv func(key string) (string, bool)) (*AppConfig, error)
+func LoadAppConfig(path string) (*AppConfig, error)
 
 // Reveal returns the underlying secret value. Callers must only invoke
 // this at the point of use (e.g. building an authentication request) and
@@ -224,7 +225,9 @@ func LoadAppConfig(path string, getenv func(key string) (string, bool)) (*AppCon
 func (s SecretString) Reveal() string
 ```
 
-**インターフェースを導入しない理由（YAGNI）**: `Load`/`LoadCredentials` は「ローカルファイルパス」「プロセス環境変数」という単一の実装しか持たず、テストは一時ファイルおよび `getenv` 引数への偽実装注入で十分に行える（NF-002）。差し替え可能な複数実装を想定した `Loader` インターフェースを導入する具体的な要求は現時点で存在しないため、関数ベースの API とする。
+**インターフェースを導入しない理由（YAGNI）**: `Load`/`LoadCredentials` は「ローカルファイルパス」「プロセス環境変数」という単一の実装しか持たず、テストは一時ファイル（`Load`）および `t.Setenv()`（`LoadCredentials`、Go 1.17+ の標準テストヘルパーで、テスト終了時に値を自動復元する）で十分に行える（NF-002）。差し替え可能な複数実装を想定した `Loader` インターフェースを導入する具体的な要求は現時点で存在しないため、関数ベースの API とする。
+
+**`LoadCredentials` に `getenv` のようなコールバックを注入しない理由**: `func(key string) (string, bool)` のようなコールバックを引数で受け取る設計も検討したが、これは「関数の内部が任意の環境変数を読める」という、実際に必要な範囲（`BSKY_HANDLE`・`BSKY_APP_PASSWORD` の2つに限定）より広い権限を公開 API に持たせてしまう。テストは `t.Setenv()` で完結するため、この広い権限を許容してまで注入可能にする必要はない。`LoadCredentials()` は内部で `os.LookupEnv` をこの2つの変数名に対してのみ直接呼び出す。
 
 ### 3.3 コンポーネント責務表
 
@@ -320,7 +323,7 @@ flowchart TD
 
 - `internal/config/config_test.go`: 妥当な TOML・構文不正な TOML・存在しないファイル・必須項目欠落・未知のキー（タイプミスを想定）の各ケースを網羅する表駆動テスト（AC-01〜AC-04）。
 - `internal/config/validate_test.go`: `retention_days`・`execution_timeout_seconds` の境界値テスト（`0`・負値・未設定・正の整数・`time.Duration` へのナノ秒変換でオーバーフローする極端に大きい値）（AC-08〜AC-10）。Slack Webhook URL の形式検証（`https` 以外のスキーム、未設定時はスキップされることの確認）（AC-11）。
-- `internal/config/credentials_test.go`: `getenv` に偽実装を注入し、環境変数が設定されている場合/欠落している場合の双方を検証（AC-05, AC-06）。
+- `internal/config/credentials_test.go`: `t.Setenv()` で `BSKY_HANDLE`・`BSKY_APP_PASSWORD` を設定/未設定にした双方のケースを検証する（AC-05, AC-06）。
 - `internal/config/secret_test.go`: `SecretString` を `fmt.Sprintf("%v", ...)`・`fmt.Sprintf("%#v", ...)`・`slog` の `Info` 呼び出しに渡し、出力に実際の値が含まれないことをアサートする（AC-07, NF-003）。
 
 ### 7.2 静的検証
