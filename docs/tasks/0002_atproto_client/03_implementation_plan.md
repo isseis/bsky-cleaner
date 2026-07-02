@@ -96,7 +96,7 @@
 
 **レビュー観点**: `validatePDSEndpoint` の境界値（プライベート/ループバック/リンクローカル/IPv4-mapped/複数アドレス応答）の網羅性 / `DialContext`/`CheckRedirect` の SSRF ガードが検証済みアドレス集合外への接続を確実に拒否すること / `HTTPError`/`SSRFError` が生のリクエスト/レスポンスを保持しないこと — このPRは本タスクの中で最もレビュー負荷が高い（SSRF 防御の中核と土台部分の骨組みが同居する）ため、コミットを SSRF 関連（`DialContext`/`CheckRedirect`/`validatePDSEndpoint`/境界値テスト）とそれ以外（インターフェース定義・エラー型・モック）に分けて積み、SSRF 関連のコミットを独立してレビューできるようにする
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
