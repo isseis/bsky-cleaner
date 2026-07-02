@@ -192,7 +192,8 @@ classDiagram
 - **未知キーの検出**: `BurntSushi/toml` は未知のキー（TOML ファイル中に存在するが `Config` に対応フィールドがないキー）を `toml.MetaData.Undecoded()` で検出できる。`Load()` はデコード後に `Undecoded()` が空でない場合を構文エラー相当（`ErrParseFailed`）として扱う。`Config` のフィールドはすべて必須項目であり、タイプミス自体は AC-04 の欠落検出でも捕捉されるが、この仕組みにより「どのキーが余分だったか」をエラーメッセージで示せるため、原因の切り分けが速くなる。
 - **`Schedule` は存在確認のみ**: cron 構文としての妥当性検証は本パッケージでは行わない。cron 構文の検証は [Docker 配布の詳細設計](../../design/docker_deployment.md#スケジュール設定と内蔵-cron-の連携) が定める `print-schedule` サブコマンド（[0007_docker_distribution](../0007_docker_distribution/01_requirements.md)）側の責務とし、cron 文法の知識を本パッケージに重複して持たせないための意図的な判断である。
 - **`Credentials` の必須フィールド（AC-05, AC-06）**: `Handle` と `AppPassword` はいずれも環境変数由来の必須項目である。`Handle` 自体は「秘匿情報」ではない（Bluesky 上で公開されるアカウント識別子）が、要件文書 [01_requirements.md](01_requirements.md) の方針に従い TOML には書かず環境変数から取得する。`AppPassword` のみ `SecretString` でラップする（`Handle` を漏洩対策の対象に含める必要はない）。
-- **`Credentials` の任意フィールド — Slack Webhook URL（AC-11, AC-13）**: `SlackSuccessWebhookURL`・`SlackFailureWebhookURL` は環境変数由来の任意項目であり、専用の環境変数（例: `BSKY_SLACK_WEBHOOK_URL_SUCCESS` / `BSKY_SLACK_WEBHOOK_URL_FAILURE`）から取得する。値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値であるため、`AppPassword` と同じ `SecretString` でラップする。未設定の場合はエラーにせず「当該チャンネルへの通知を行わない」として扱う（AC-13）。設定されている場合のみ `https` スキーム等の形式検証を行う（AC-11）。ホスト一致検証は [0006_slack_notification](../0006_slack_notification/01_requirements.md) の責務であり、本パッケージは行わない。
+- **`Credentials` の任意フィールド — Slack Webhook URL（AC-11, AC-13）**: `SlackSuccessWebhookURL`・`SlackFailureWebhookURL` は環境変数由来の任意項目であり、専用の環境変数（例: `BSKY_SLACK_WEBHOOK_URL_SUCCESS` / `BSKY_SLACK_WEBHOOK_URL_FAILURE`）から取得する。値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値であるため、`AppPassword` と同じ `SecretString` でラップする。未設定の場合はエラーにせず「当該チャンネルへの通知を行わない」として扱う（AC-13）。
+  - **形式検証の具体的な範囲（AC-11）**: 設定されている場合、`net/url.Parse` で構文的に妥当な URL であること、かつスキームが厳密に `https` であることのみを検証する。パス・クエリパラメータの内容には制約を設けない（Slack の Incoming Webhook URL は `https://hooks.slack.com/services/<...>` のようにパス自体がトークンを兼ねるため、パス形式に固有の制約を課すと Slack 側の URL 仕様変更に追従できなくなるリスクがある）。ホスト一致検証は [0006_slack_notification](../0006_slack_notification/01_requirements.md) の責務であり、本パッケージは行わない。この検証範囲は `docs/design/configuration.md` に明記する（AC-12）。
 
 ### 3.2 インターフェース定義
 
@@ -235,7 +236,7 @@ func (s SecretString) Reveal() string
 | `internal/config/validate.go` | `validateConfig()`・`validateCredentials()`（必須項目・値の範囲検証） | AC-04, AC-08, AC-09, AC-10, AC-11, AC-13 |
 | `internal/config/errors.go` | センチネルエラー（`ErrFileNotFound` 等）、`FieldError` 型 | AC-02, AC-03, AC-04, AC-06, AC-08, AC-10, AC-11 |
 | `internal/config/app_config.go` | `AppConfig` 型定義、`LoadAppConfig()`（`Load` と `LoadCredentials` の合成） | - |
-| `docs/design/config_file.md` | TOML 設定ファイルの仕様書（項目名・型・必須/任意・デフォルト値・記述例） | AC-12 |
+| `docs/design/configuration.md` | TOML 設定ファイルおよび環境変数を統合した設定リファレンス（項目名・型・必須/任意・デフォルト値・書式や制約・記述例） | AC-12 |
 
 すべて新設ファイルであり、既存コードとの責務重複はない（`cmd/main.go` はプレースホルダーのみで、設定読み込みロジックを持たない）。
 
@@ -324,7 +325,7 @@ flowchart TD
 
 ### 7.2 静的検証
 
-- `docs/design/config_file.md` の存在確認、および記載されたフィールド名・型が `Config`/`Credentials` のフィールド定義と一致していることをレビューで確認する（AC-12）。
+- `docs/design/configuration.md` の存在確認、および記載されたフィールド名・型（TOML の `Config` 側・環境変数の `Credentials` 側の双方）が実装のフィールド定義と一致していることをレビューで確認する（AC-12）。
 
 ### 7.3 セキュリティテスト
 
@@ -335,7 +336,7 @@ flowchart TD
 1. **Phase 1 — TOML 読み込みの基盤**: `Config` 型、`rawConfig`（非公開）、`Load()` の骨格実装（AC-01〜AC-04）
 2. **Phase 2 — 秘匿情報の取り扱い**: `SecretString`、`Credentials`（`AppPassword` と Slack Webhook URL の双方）、`LoadCredentials()`（AC-05〜AC-07, AC-13）
 3. **Phase 3 — 検証**: `validateConfig()`・`validateCredentials()`、`FieldError`、センチネルエラー群（AC-08〜AC-11, AC-13）
-4. **Phase 4 — 統合と文書化**: `AppConfig`・`LoadAppConfig()`、`docs/design/config_file.md` の作成（AC-12）
+4. **Phase 4 — 統合と文書化**: `AppConfig`・`LoadAppConfig()`、`docs/design/configuration.md` の作成（AC-12）
 
 ## 9. 将来の拡張性
 
@@ -345,6 +346,6 @@ flowchart TD
 
 ## 付録: 決定履歴
 
-本ドキュメントは `docs/tasks/0001_config` の初回アーキテクチャ設計であり、置き換えた旧設計は存在しない。要件文書 [01_requirements.md](01_requirements.md) のレビューで追加された AC-12（設定ファイル仕様書の要求）を受け、3.3 節のコンポーネント責務表に `docs/design/config_file.md` を追加している。
+本ドキュメントは `docs/tasks/0001_config` の初回アーキテクチャ設計であり、置き換えた旧設計は存在しない。要件文書 [01_requirements.md](01_requirements.md) のレビューで追加された AC-12（設定ファイル仕様書の要求）を受け、3.3 節のコンポーネント責務表に `docs/design/configuration.md` を追加している。当初 AC-12 は TOML ファイルの仕様のみを対象としていたが、レビューにおいて「環境変数の名前・役割・書式（URL 項目のスキーム必須有無、クエリパラメータの許容有無等）も開発文書として残すべきであり、将来のユーザー向け文書のソースにもなる」という指摘を受け、対象を TOML・環境変数の両方を含む統合設定リファレンスへ拡張し、ファイル名も `config_file.md` から `configuration.md` に変更した。
 
 さらに、レビューにおいて Slack Webhook URL が「値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値」であるという指摘を受け、当初 TOML（`Config`/`SlackConfig`）に置いていた Slack Webhook URL を環境変数由来の `Credentials`（`SecretString` でラップ）へ移動した。これに伴い要件文書 [01_requirements.md](01_requirements.md) を修正・再オープンし（AC-13 追加、F-001/F-002 の境界変更）、[プロジェクト概要](../../overview.md) の秘匿情報の定義も合わせて更新している。旧設計（`Config.Slack SlackConfig`）は本ドキュメントの編集履歴（git log）で確認できる。
