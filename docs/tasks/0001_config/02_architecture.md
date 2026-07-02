@@ -4,7 +4,7 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-02 |
 | Review date | 2026-07-02 |
 | Reviewer | isseis |
