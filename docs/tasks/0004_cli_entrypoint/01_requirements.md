@@ -41,9 +41,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: CLI フラグ・引数のパース
 
 **Acceptance Criteria**:
@@ -72,8 +69,6 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
 - **AC-11**: 一部の投稿の削除が失敗した場合でも、残りの投稿の削除処理は継続され、最終的に失敗があったことが分かる形で非 0 の終了コードを返す
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: `cmd/main.go` はコンポーネントの結線に専念し、ビジネスロジック（削除対象判定等）を持ち込まない。

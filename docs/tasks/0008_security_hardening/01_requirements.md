@@ -39,9 +39,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: エンドツーエンドでの秘密情報非漏洩
 
 **Acceptance Criteria**:
@@ -61,8 +58,6 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
 - **AC-06**: 実行タイムアウトが処理途中で発生した場合でも、それまでに削除済みの投稿と未処理の投稿が判別可能な形で結果が得られ、次回実行時に重複削除の試行によってエラーにならないことを検証する
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: 統合テストは実際の Bluesky API に依存せず、モック/フェイクサーバーを用いて再現可能であること。

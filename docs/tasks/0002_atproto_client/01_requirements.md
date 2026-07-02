@@ -45,9 +45,6 @@ DID 解決・PDS エンドポイント決定ロジックは、実装を誤ると
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: DID 解決による PDS エンドポイントの決定
 
 アカウントの DID を解決し、そのアカウントが実際にデータを保持する PDS のエンドポイントを安全に決定する。
@@ -92,8 +89,6 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
 - **AC-15**: いかなるエラーパスにおいても、`Authorization` ヘッダーの値・app パスワード・セッション JWT がエラーオブジェクトの文字列表現に含まれない
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: 外部依存を最小化し、HTTP 通信は標準ライブラリ（`net/http`）ベースの薄い自作実装とする（`indigo` 等の大型 SDK を導入しない）。

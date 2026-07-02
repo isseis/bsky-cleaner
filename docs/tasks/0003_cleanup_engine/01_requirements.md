@@ -37,9 +37,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: 経過日数による削除対象の判定
 
 設定された保持日数（`retention_days`）と投稿の `createdAt` を UTC 基準で比較し、削除対象かどうかを判定する。
@@ -65,8 +62,6 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
 - **AC-08**: ピン留めが解除された投稿は、経過日数条件を満たせば通常通り削除対象と判定される
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: 判定ロジックは AT Protocol クライアントへの依存を持たず、入出力が純粋な関数（またはそれに準ずる構造）として実装され、モックなしに単体テスト可能であること。

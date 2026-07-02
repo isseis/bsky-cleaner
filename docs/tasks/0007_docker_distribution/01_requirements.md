@@ -40,9 +40,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: `print-schedule` サブコマンド
 
 TOML 設定ファイルから `schedule` フィールドのみを取り出し、標準出力に 1 行の cron 式として出力する隠しサブコマンド。
@@ -74,8 +71,6 @@ TOML 設定ファイルから `schedule` フィールドのみを取り出し、
 - **AC-12**: `docker compose up` により、TOML 設定ファイルをボリュームマウントした状態でコンテナが起動し、定期実行が開始される
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: `.env` は `.gitignore` によりデフォルトでバージョン管理から除外される。

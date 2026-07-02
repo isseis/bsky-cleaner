@@ -37,9 +37,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: TOML 設定ファイルのパース
 
 TOML 形式の設定ファイル（パスはコマンドライン引数等で指定）を読み込み、Go の構造体にマッピングする。少なくとも以下の項目を含む: `retention_days`（保持日数）、`schedule`（cron 相当のスケジュール文字列）、実行タイムアウト、Slack Webhook URL（正常系・異常系）。
@@ -70,8 +67,6 @@ app パスワードや Bluesky アカウント識別子（handle 等）など、
 - **AC-11**: Slack Webhook URL が設定されている場合、URL として妥当な形式（スキームが `https` であること等）を検証する
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: 設定ファイルの読み込み・検証は、他コンポーネント（AT Protocol クライアント等）に依存せず単体でテスト可能であること。

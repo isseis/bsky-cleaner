@@ -42,9 +42,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: Slack Webhook への通知送信
 
 **Acceptance Criteria**:
@@ -78,8 +75,6 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
 - **AC-12**: エラーオブジェクトをそのまま文字列化して通知に含めるような実装ではなく、通知に含めてよいフィールドを明示的に選択する形で構築される（構造体の丸ごと出力による秘密情報混入を防ぐ）
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: Webhook への実際のネットワーク通信なしに、通知ペイロードの構築・サニタイズ・ホスト検証ロジックを単体テストできること。

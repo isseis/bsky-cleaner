@@ -40,9 +40,6 @@
 
 ## 3. 機能要件と受け入れ基準
 
-各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
-
 ### F-001: 指数バックオフ付きリトライ
 
 **Acceptance Criteria**:
@@ -65,8 +62,6 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
 - **AC-09**: タイムアウトにより処理が中断した場合、それまでに削除が完了した投稿と、未処理のまま残った投稿が判別できる形で結果が返る
 
 ## 4. 非機能要件
-
-必要に応じて `NF-XXX` の識別子を付け、実装計画書からの参照を可能にする。
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する。
 - **NF-002**: リトライ・タイムアウトのロジックは、実際の HTTP 通信や `time.Sleep` の実時間待機なしに単体テストできること（時間のモック化）。
