@@ -33,7 +33,7 @@ jobs:
         run: make build
 
       - name: Test
-        run: go test ./...
+        run: go test -tags test ./...
 
   lint:
     name: Lint

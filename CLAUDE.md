@@ -64,7 +64,7 @@ When translating Japanese documentation to English:
 - `make clean` - Clean build artifacts
 
 ### Test Commands
-- `make test` - Run all tests (`go test ./...`)
+- `make test` - Run all tests (`go test -tags test ./...`)
 
 ### Code Quality
 - `make fmt` - Format all files with `gofmt`

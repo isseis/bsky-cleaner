@@ -13,7 +13,7 @@ fmt:
 	gofmt -l -w .
 
 test:
-	go test ./...
+	go test -tags test ./...
 
 lint:
 	golangci-lint run
