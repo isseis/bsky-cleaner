@@ -105,7 +105,7 @@
 
 **レビュー観点**: `SecretString` のすべての出力経路（`String`/`GoString`/`LogValue`）で元の値が漏洩しないか（AC-07, NF-003） / 必須環境変数欠落時の `FieldError.Value` が空文字列のままであること（秘匿値を誤って含めていないか） / Slack Webhook URL 未設定時に非エラーでゼロ値の `SecretString` になる挙動が AC-13 と整合しているか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
