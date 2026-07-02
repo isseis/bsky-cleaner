@@ -112,16 +112,16 @@
 - `internal/atproto/client.go`（変更: `session` フィールド追加）
 
 **作業内容**:
-- [ ] `internal/atproto/session.go` に非公開型 `secretString`（`value string` フィールド、`String()`/`GoString()`/`LogValue()` で固定文字列 `"[REDACTED]"` を返す）を実装する（`internal/config/secret.go` の `SecretString` と同じマスキング方式、アーキテクチャ 3.1節）。
-- [ ] `internal/atproto/session.go` に `Session` 構造体（`DID string`, `AccessJWT secretString`）を実装する。
-- [ ] `internal/atproto/client.go` の `Client` 構造体に `session *Session` フィールドを追加する。
-- [ ] `internal/atproto/session.go` に `Client.Login(ctx context.Context, appPassword config.SecretString) error` を実装する。`identifier` には `NewClient` で検証済みの `c.handle` を使う（`Login` の引数として別の handle を受け取らない、アーキテクチャ 3.1節）。`appPassword.Reveal()` はリクエストボディ構築の直前でのみ呼び出す。
-- [ ] `com.atproto.server.createSession` への POST リクエストが 401 を返した場合、`HTTPError` を返し `c.session` を更新しない（AC-05）。
-- [ ] 認証成功時、`c.session = &Session{DID: ..., AccessJWT: newSecretString(accessJwt)}` を設定する（AC-04）。
-- [ ] `internal/atproto/test_helpers.go`（`//go:build test`）に `newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, did string, session *Session) *Client` を実装する。`Client` の非公開フィールド（`httpDoer`/`pdsBaseURL`/`did`/`session`）すべてに直接値を設定し、DID 解決・ログインを経由せずに `ListPosts`/`DeleteRecord` を単体テストできるようにする（`pdsBaseURL` を渡さないと `ListPosts`/`DeleteRecord` が XRPC リクエスト URL を組み立てられないため必須。Phase 4・Phase 5 で再利用、test_organization.md の Classification B「非公開フィールドを扱うファクトリ関数」に該当）。
-- [ ] `internal/atproto/session_test.go` に `TestClient_Login_Success`（AC-04: 正しい認証情報でセッション情報が取得できること）を実装する。
-- [ ] `internal/atproto/session_test.go` に `TestClient_Login_InvalidCredentials_NoFurtherCalls`（AC-05: 誤った認証情報でエラーが返り、後続の API 呼び出し用のセッションが設定されないこと）を実装する。
-- [ ] `internal/atproto/session_test.go` に `TestClient_Login_ErrorDoesNotLeakSecrets`（AC-06: エラーオブジェクトの `Error()` 文字列表現に送信した app パスワード・レスポンスに含まれるセッション JWT のいずれも含まれないこと）を実装する。
+- [x] `internal/atproto/session.go` に非公開型 `secretString`（`value string` フィールド、`String()`/`GoString()`/`LogValue()` で固定文字列 `"[REDACTED]"` を返す）を実装する（`internal/config/secret.go` の `SecretString` と同じマスキング方式、アーキテクチャ 3.1節）。
+- [x] `internal/atproto/session.go` に `Session` 構造体（`DID string`, `AccessJWT secretString`）を実装する。
+- [x] `internal/atproto/client.go` の `Client` 構造体に `session *Session` フィールドを追加する。
+- [x] `internal/atproto/session.go` に `Client.Login(ctx context.Context, appPassword config.SecretString) error` を実装する。`identifier` には `NewClient` で検証済みの `c.handle` を使う（`Login` の引数として別の handle を受け取らない、アーキテクチャ 3.1節）。`appPassword.Reveal()` はリクエストボディ構築の直前でのみ呼び出す。
+- [x] `com.atproto.server.createSession` への POST リクエストが 401 を返した場合、`HTTPError` を返し `c.session` を更新しない（AC-05）。
+- [x] 認証成功時、`c.session = &Session{DID: ..., AccessJWT: newSecretString(accessJwt)}` を設定する（AC-04）。
+- [x] `internal/atproto/test_helpers.go`（`//go:build test`）に `newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, did string, session *Session) *Client` を実装する。`Client` の非公開フィールド（`httpDoer`/`pdsBaseURL`/`did`/`session`）すべてに直接値を設定し、DID 解決・ログインを経由せずに `ListPosts`/`DeleteRecord` を単体テストできるようにする（`pdsBaseURL` を渡さないと `ListPosts`/`DeleteRecord` が XRPC リクエスト URL を組み立てられないため必須。Phase 4・Phase 5 で再利用、test_organization.md の Classification B「非公開フィールドを扱うファクトリ関数」に該当）。
+- [x] `internal/atproto/session_test.go` に `TestClient_Login_Success`（AC-04: 正しい認証情報でセッション情報が取得できること）を実装する。
+- [x] `internal/atproto/session_test.go` に `TestClient_Login_InvalidCredentials_NoFurtherCalls`（AC-05: 誤った認証情報でエラーが返り、後続の API 呼び出し用のセッションが設定されないこと）を実装する。
+- [x] `internal/atproto/session_test.go` に `TestClient_Login_ErrorDoesNotLeakSecrets`（AC-06: エラーオブジェクトの `Error()` 文字列表現に送信した app パスワード・レスポンスに含まれるセッション JWT のいずれも含まれないこと）を実装する。
 
 **完了条件**: `make test`、`make lint` が成功する。
 
