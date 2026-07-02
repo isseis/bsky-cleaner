@@ -245,6 +245,7 @@ var (
     ErrAuthenticationFailed = errors.New("authentication failed")
     ErrHTTPStatus           = errors.New("unexpected HTTP status")
     ErrTransportFailure     = errors.New("HTTP transport failure") // timeout, DNS failure, connection refused, etc.
+    ErrPaginationStalled    = errors.New("pagination cursor did not advance") // server protocol misbehavior, not a transport failure
 )
 
 // SSRFStage identifies which validation step rejected a PDS endpoint,
@@ -256,7 +257,13 @@ type SSRFStage int
 
 const (
     SSRFStageInitialValidation SSRFStage = iota // rejected by validatePDSEndpoint before first connection
-    SSRFStageDialRevalidation                   // rejected by the DialContext wrapper at connection time
+    SSRFStageDialRevalidation                   // rejected by re-validation after validatePDSEndpoint:
+                                                 // the DialContext wrapper refusing to connect to an
+                                                 // address outside the verified set, or CheckRedirect
+                                                 // refusing a 3xx redirect (5.2 節参照). A DialContext
+                                                 // connection failure itself (transport failure, e.g.
+                                                 // timeout/connection refused) is ErrTransportFailure,
+                                                 // not an SSRFError — it is not an SSRF rejection.
 )
 
 // HTTPError identifies an XRPC call that received an unexpected HTTP
@@ -292,7 +299,7 @@ func (e *SSRFError) Unwrap() error
 - **エラー型による判定（AC-14）**: `HTTPError`/`SSRFError` はいずれも `Unwrap()` を実装し、`errors.Is(err, atproto.ErrHTTPStatus)` のようなセンチネル判定と `errors.AsType[*atproto.HTTPError](err)` によるステータスコード取得の両方を可能にする。
 - **秘匿情報を含まない設計（AC-06, AC-15）**: `HTTPError`/`SSRFError` はどちらも「XRPC メソッド名・ステータスコード・検証に失敗したホスト名」のみを保持し、`*http.Request`・`*http.Response`・生のレスポンスボディを一切保持しない。`Authorization` ヘッダーの値、送信した app パスワード、レスポンスに含まれるセッション JWT は、これらのエラー型のどのフィールドにも格納されないため、`Error()` の文字列表現に含まれえない。HTTP リクエスト構築処理（`http.go`）は、リクエスト送信後に返す全てのエラーをこの2つの型のいずれかでラップしてから返す（生の `net/http` エラーや `*url.Error` をそのまま透過させない）。`*url.Error` は失敗したリクエストの URL を含むが、AT Protocol の XRPC リクエストでは秘匿情報（app パスワード・セッション JWT）は常に POST ボディまたは `Authorization` ヘッダーで送信し、URL のクエリパラメータには含めない設計とするため、この経路からの漏洩リスクはない。
 - **`net/http` の標準タイムアウト・ネットワークエラーの扱い**: タイムアウトや DNS 解決失敗などの transport レベルのエラーは `HTTPError{StatusCode: 0}` に `ErrTransportFailure` をラップして返し、`errors.Is(err, atproto.ErrHTTPStatus)`（応答を受け取った上でのステータス異常）とは異なるセンチネル判定ができるようにする。
-- **`SSRFError.Stage` による原因の切り分け（NF-003 と関連）**: `SSRFError` は「`validatePDSEndpoint` による初回検証で拒否された」（`SSRFStageInitialValidation`）のか「`DialContext` による接続時の再検証で拒否された」（`SSRFStageDialRevalidation`）のかを `Stage` フィールドで区別する。本プロジェクトは削除ログをファイルへ記録しない方針（[プロジェクト概要](../../overview.md#安全性についての方針)）のため、オンコール担当者が状況を知る手段は最終的に Slack 通知（[0006_slack_notification](../0006_slack_notification/01_requirements.md)）に含まれるエラー内容のみになる。両者を同一メッセージに畳み込むと、「DID ドキュメントの設定ミス」（初回検証での拒否、多くの場合は静的な設定不備）と「同一リクエスト中に DNS 応答が変化した」（接続時の再検証での拒否、能動的な攻撃を示唆するより深刻なシグナル）を区別できなくなるため、`Stage` を分けて 0006 側が通知内容を出し分けられるようにする。
+- **`SSRFError.Stage` による原因の切り分け（NF-003 と関連）**: `SSRFError` は「`validatePDSEndpoint` による初回検証で拒否された」（`SSRFStageInitialValidation`）のか「初回検証の後に行われる再検証で拒否された」（`SSRFStageDialRevalidation`）のかを `Stage` フィールドで区別する。後者には、`DialContext` が検証済みアドレス集合外への接続を拒否したケースと、`CheckRedirect` が 3xx リダイレクトを拒否したケース（5.2 節の図の `REJECT3` を参照）の両方が含まれる——いずれも「一度は初回検証を通過した接続が、その後の接続段階で改めて拒否される」という点で共通するため、同じ `Stage` にまとめている。なお `DialContext` そのものの接続失敗（タイムアウト・接続拒否などの transport レベル障害）は SSRF 判定とは無関係であり、`SSRFError` ではなく `ErrTransportFailure` として扱う（5.2 節の図の `REJECT2` を参照）。本プロジェクトは削除ログをファイルへ記録しない方針（[プロジェクト概要](../../overview.md#安全性についての方針)）のため、オンコール担当者が状況を知る手段は最終的に Slack 通知（[0006_slack_notification](../0006_slack_notification/01_requirements.md)）に含まれるエラー内容のみになる。両者を同一メッセージに畳み込むと、「DID ドキュメントの設定ミス」（初回検証での拒否、多くの場合は静的な設定不備）と「同一リクエスト中に DNS 応答が変化した、または応答がリダイレクトを返した」（初回検証後の再検証での拒否、能動的な攻撃を示唆するより深刻なシグナル）を区別できなくなるため、`Stage` を分けて 0006 側が通知内容を出し分けられるようにする。
 
 ## 5. セキュリティ考慮事項
 
@@ -407,7 +414,7 @@ sequenceDiagram
 
 **凡例**: 矢印 A → B は同期呼び出し、A -->> B は戻り値/エラーの返却を表す（2.2 節と同じ規約）。`loop` はカーソルが空になるまでの繰り返しを表す。
 
-**ページネーションの終端保証**: `cursor` はレスポンスの値をそのまま次リクエストへ渡すが、実装は直前に使ったカーソルと新たに返されたカーソルが同一の場合（カーソルが進行しない不正な応答）を検出し、ループを継続させず `ErrTransportFailure` 相当のエラーで打ち切る。フェデレーション型のプロトコル上、本パッケージが直接制御できない任意の PDS 実装が対象になりうるため、行儀の悪い応答（カーソルが収束しない）によって呼び出し元の処理が無限に停止することを防ぐための最小限のガードとして設ける。
+**ページネーションの終端保証**: `cursor` はレスポンスの値をそのまま次リクエストへ渡すが、実装は直前に使ったカーソルと新たに返されたカーソルが同一の場合（カーソルが進行しない不正な応答）を検出し、ループを継続させず `ErrPaginationStalled`（4節）で打ち切る。これは 200 応答が正常に返っている状態でのサーバ側プロトコル不正であり、`ErrTransportFailure` が表す timeout・DNS 失敗・接続拒否等の transport レベル障害とは種類が異なるため、別センチネルとして区別する。フェデレーション型のプロトコル上、本パッケージが直接制御できない任意の PDS 実装が対象になりうるため、行儀の悪い応答（カーソルが収束しない）によって呼び出し元の処理が無限に停止することを防ぐための最小限のガードとして設ける。[0005_retry_timeout](../0005_retry_timeout/01_requirements.md) のリトライ層は、この種のエラーを一時的な transport 障害と混同して再試行対象に含めるべきではない（再試行しても同じ不正な応答が繰り返されるだけであり、`ErrTransportFailure` と同列に扱うと無意味なリトライを招く）。`errors.Is(err, atproto.ErrPaginationStalled)` によって、リトライ対象外の恒久的な失敗として区別できるようにする。
 
 ### 6.3 投稿削除（AC-11〜AC-13）
 
