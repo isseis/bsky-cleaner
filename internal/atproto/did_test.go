@@ -201,6 +201,25 @@ func TestDIDWebDocumentURL_RejectsInvalidDomainSegment(t *testing.T) {
 	}
 }
 
+func TestDIDWebDocumentURL_RejectsInvalidPathSegment(t *testing.T) {
+	tests := []struct {
+		name string
+		did  string
+	}{
+		{name: "path separator injection via percent-encoding", did: "did:web:example.com:user%2Fevil"},
+		{name: "query injection via percent-encoding", did: "did:web:example.com:user%3Fq%3D1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := didWebDocumentURL(tt.did)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+		})
+	}
+}
+
 func TestResolveDIDDocument_RejectsUnsafeDidWebHost(t *testing.T) {
 	mock := &atprototestutil.MockHTTPDoer{
 		Handler: func(req *http.Request) (*http.Response, error) {

@@ -174,6 +174,11 @@ func didWebDocumentURL(did string) (string, error) {
 	if len(pathParts) == 0 {
 		return "https://" + domain + "/.well-known/did.json", nil
 	}
+	for _, p := range pathParts {
+		if strings.ContainsAny(p, "/?#@") {
+			return "", fmt.Errorf("resolve did:web document URL: invalid path segment %q: %w", p, ErrDIDResolutionFailed)
+		}
+	}
 	return "https://" + domain + "/" + strings.Join(pathParts, "/") + "/did.json", nil
 }
 

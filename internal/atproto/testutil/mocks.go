@@ -47,6 +47,7 @@ func (m *MockHTTPDoer) Do(req *http.Request) (*http.Response, error) {
 			return nil, fmt.Errorf("MockHTTPDoer: read request body: %w", err)
 		}
 		body = b
+		_ = req.Body.Close()
 		req.Body = io.NopCloser(bytes.NewReader(b))
 	}
 
