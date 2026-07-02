@@ -46,7 +46,7 @@
 
 対象 AC: AC-01（正常マッピング）, AC-02（構文エラー検知）, AC-03（ファイル不在検知）, AC-04（必須項目欠落検知）。
 
-**ファイル**: `go.mod`, `go.sum`, `Makefile`, `.github/workflows/ci.yml`, `internal/config/errors.go`, `internal/config/config.go`, `internal/config/test_helpers.go`, `internal/config/config_test.go`
+**ファイル**: `go.mod`, `go.sum`, `Makefile`, `.github/workflows/ci.yml`, `internal/config/errors.go`, `internal/config/config.go`, `internal/config/test_helpers.go`, `internal/config/config_test.go`, `internal/config/errors_test.go`
 
 - [ ] `go get github.com/pelletier/go-toml/v2@latest` を実行し、`go.mod`/`go.sum` にバージョン固定で依存を追加する（ネットワークアクセスを伴うため、実行前にユーザーの承認を得ること）。
 - [ ] `Makefile` の `test` ターゲットを `go test ./...` から `go test -tags test ./...` に変更する。`.github/workflows/ci.yml` の `test` ジョブ「Test」ステップも同様に `go test ./...` から `go test -tags test ./...` に変更する（1.3 節のとおり、`//go:build test` タグ付きファイルを実際にテストビルドへ含めるために必須の変更。本タスクが `test_helpers.go` を導入する最初のタスクであるため、ここでリポジトリ全体の設定を変更する）。
@@ -62,6 +62,7 @@
   - すべて存在する場合は `rawConfig` から `Config`（`ExecutionTimeoutSeconds` は `time.Duration(seconds) * time.Second` に変換）を組み立てて返す。
 - [ ] `internal/config/test_helpers.go` を新設し、`//go:build test` タグを付与する。`package config` とし、`writeTempTOML(t *testing.T, content string) string`（`t.TempDir()` と `os.WriteFile` を用いて一時 TOML ファイルを書き出しパスを返すヘルパー。4.2 節参照）を実装する。
 - [ ] `internal/config/config_test.go` に表駆動テストを実装する（詳細は 4章参照）。
+- [ ] `internal/config/errors_test.go` に `TestFieldError_ErrorAndUnwrap` を実装する（詳細は 4章参照）。
 - [ ] `make fmt && make test && make lint` が green であることを確認する。
 
 ### Phase 2 — 秘匿情報の取り扱い（AC-05, AC-06, AC-07, AC-13）
@@ -192,7 +193,7 @@ Phase は [02_architecture.md](02_architecture.md) 8節の順序どおり直列�
 | AC-09 | `retention_days` の正常系 | `internal/config/config_test.go::TestLoad_RetentionDaysValidation`（正の整数のケース） | test |
 | AC-10 | 実行タイムアウトの 0 以下・未設定拒否 | `internal/config/config_test.go::TestLoad_ExecutionTimeoutValidation` | test |
 | AC-11 | Slack Webhook URL の形式検証 | `internal/config/credentials_test.go::TestLoadCredentials_SlackWebhookURLInvalidScheme` | test |
-| AC-12 | 統合設定リファレンス文書の存在と実装との一致 | 以下の静的検証手順を実施する:<br>1. `test -f docs/design/configuration.md` でファイルが存在することを確認する（期待結果: 終了コード `0`）。<br>2. `rg -o '\`([a-z_]+)\`' internal/config/config.go internal/config/credentials.go` で TOML/環境変数のフィールド名（`retention_days`, `schedule`, `execution_timeout_seconds`, `BSKY_HANDLE`, `BSKY_APP_PASSWORD`, `BSKY_SLACK_WEBHOOK_URL_SUCCESS`, `BSKY_SLACK_WEBHOOK_URL_FAILURE`）を抽出し、抽出した各項目名が `rg -F '<項目名>' docs/design/configuration.md` で1件以上ヒットすることを確認する（期待結果: 全項目がヒット）。<br>3. `docs/design/configuration.md` の型・必須/任意・制約の記載を実装（`internal/config/config.go`・`internal/config/credentials.go`・`internal/config/validate.go`）と目視で突き合わせ、内容が一致していることを確認する（レビュー時に実施） | static |
+| AC-12 | 統合設定リファレンス文書の存在と実装との一致 | 以下の静的検証手順を実施する:<br>1. `test -f docs/design/configuration.md` でファイルが存在することを確認する（期待結果: 終了コード `0`）。<br>2. TOML フィールド名と環境変数名は表記が異なる（前者は小文字の backtick 付き `toml:"..."` タグ、後者は大文字の二重引用符付き文字列リテラル）ため、抽出コマンドを2つに分ける。まず `rg -o 'toml:"([a-z_]+)"' -r '$1' internal/config/config.go` で TOML フィールド名（`retention_days`, `schedule`, `execution_timeout_seconds`）を抽出する。次に `rg -o '"(BSKY_[A-Z_]+)"' -r '$1' internal/config/credentials.go` で環境変数名（`BSKY_HANDLE`, `BSKY_APP_PASSWORD`, `BSKY_SLACK_WEBHOOK_URL_SUCCESS`, `BSKY_SLACK_WEBHOOK_URL_FAILURE`）を抽出する。抽出した各項目名が `rg -F '<項目名>' docs/design/configuration.md` で1件以上ヒットすることを確認する（期待結果: 全項目がヒット）。<br>3. `docs/design/configuration.md` の型・必須/任意・制約の記載を実装（`internal/config/config.go`・`internal/config/credentials.go`・`internal/config/validate.go`）と目視で突き合わせ、内容が一致していることを確認する（レビュー時に実施） | static |
 | AC-13 | Slack Webhook URL の任意項目としての読み込み | `internal/config/credentials_test.go::TestLoadCredentials_SlackWebhookURLOptional` | test |
 
 ## 7. 実装チェックリスト
