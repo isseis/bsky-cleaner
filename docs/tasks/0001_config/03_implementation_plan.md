@@ -84,18 +84,18 @@
 
 **ファイル**: `internal/config/secret.go`, `internal/config/credentials.go`, `internal/config/secret_test.go`, `internal/config/credentials_test.go`
 
-- [ ] `internal/config/secret.go` に `SecretString` 型（非公開フィールド `value string`）を定義する。
-- [ ] `SecretString` に `Reveal() string`（`value` をそのまま返す）を実装する。
-- [ ] `SecretString` に `String() string` と `GoString() string` を実装し、いずれも固定文字列（例: `"[REDACTED]"`）を返す（AC-07）。
-- [ ] `SecretString` に `LogValue() slog.Value` を実装し、`slog.StringValue("[REDACTED]")` のような固定値を返す（AC-07, NF-003）。
-- [ ] `internal/config/credentials.go` に `Credentials` 構造体（`Handle string`, `AppPassword SecretString`, `SlackSuccessWebhookURL SecretString`, `SlackFailureWebhookURL SecretString`）を定義する。
-- [ ] `internal/config/credentials.go` に `LoadCredentials() (*Credentials, error)` を実装する:
+- [x] `internal/config/secret.go` に `SecretString` 型（非公開フィールド `value string`）を定義する。
+- [x] `SecretString` に `Reveal() string`（`value` をそのまま返す）を実装する。
+- [x] `SecretString` に `String() string` と `GoString() string` を実装し、いずれも固定文字列（例: `"[REDACTED]"`）を返す（AC-07）。
+- [x] `SecretString` に `LogValue() slog.Value` を実装し、`slog.StringValue("[REDACTED]")` のような固定値を返す（AC-07, NF-003）。
+- [x] `internal/config/credentials.go` に `Credentials` 構造体（`Handle string`, `AppPassword SecretString`, `SlackSuccessWebhookURL SecretString`, `SlackFailureWebhookURL SecretString`）を定義する。
+- [x] `internal/config/credentials.go` に `LoadCredentials() (*Credentials, error)` を実装する:
   - `os.LookupEnv("BSKY_HANDLE")` と `os.LookupEnv("BSKY_APP_PASSWORD")` を呼び出し、いずれかが未設定の場合は該当する環境変数名を `Field` に設定した `*FieldError`（`Err: ErrMissingEnv`, `Value` は空文字列のまま）を返す（AC-06。[02_architecture.md](02_architecture.md) 4節「設計方針」のとおり `Credentials` 由来のエラーは `Value` を埋めない）。
-  - `os.LookupEnv("BSKY_SLACK_WEBHOOK_URL_SUCCESS")` と `os.LookupEnv("BSKY_SLACK_WEBHOOK_URL_FAILURE")` を呼び出す。値が存在しない場合はエラーにせず、対応するフィールドをゼロ値の `SecretString` のままにする(AC-13)。この時点では URL 形式の検証は行わず、Phase 3 で `validateCredentials()` に統合する。
+  - `os.Getenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS")` と `os.Getenv("BSKY_SLACK_WEBHOOK_URL_FAILURE")` を呼び出す（任意項目のため「未設定」と「明示的な空文字列」を区別する必要がなく、`os.LookupEnv` の`ok`判定は不要。`os.Getenv` は未設定時に空文字列を返すため、そのまま `SecretString` のゼロ値相当として扱える）。値が存在しない場合はエラーにせず、対応するフィールドをゼロ値の `SecretString` のままにする(AC-13)。この時点では URL 形式の検証は行わず、Phase 3 で `validateCredentials()` に統合する。
   - 取得した値から `Credentials` を組み立てて返す（AC-05）。
-- [ ] `internal/config/secret_test.go` に `SecretString` の非表示化を検証するテストを実装する（詳細は 4章参照）。
-- [ ] `internal/config/credentials_test.go` に `t.Setenv()` を用いた表駆動テストを実装する（詳細は 4章参照）。
-- [ ] `make fmt && make test && make lint` が green であることを確認する。
+- [x] `internal/config/secret_test.go` に `SecretString` の非表示化を検証するテストを実装する（詳細は 4章参照）。
+- [x] `internal/config/credentials_test.go` に `t.Setenv()` を用いた表駆動テストを実装する（詳細は 4章参照）。
+- [x] `make fmt && make test && make lint` が green であることを確認する。
 
 ### PR-2 作成ポイント: credential and secret handling
 
