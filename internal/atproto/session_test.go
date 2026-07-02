@@ -2,6 +2,7 @@ package atproto
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"testing"
@@ -12,12 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testHandle is the handle bound to every *Client built by
+// loginTestClient below, so tests can assert Login always sends this
+// value as the identifier, never a caller-supplied one.
+const testHandle = "alice.test"
+
 // testAppPassword builds a config.SecretString the same way production
 // code obtains one -- through config.LoadCredentials -- since the type has
 // no public constructor outside internal/config (architecture 3.1 節).
 func testAppPassword(t *testing.T, value string) config.SecretString {
 	t.Helper()
-	t.Setenv("BSKY_HANDLE", "alice.test")
+	t.Setenv("BSKY_HANDLE", testHandle)
 	t.Setenv("BSKY_APP_PASSWORD", value)
 	t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", "https://hooks.slack.com/services/success")
 	t.Setenv("BSKY_SLACK_WEBHOOK_URL_FAILURE", "https://hooks.slack.com/services/failure")
@@ -28,7 +34,7 @@ func testAppPassword(t *testing.T, value string) config.SecretString {
 }
 
 func loginTestClient(mock *atprototestutil.MockHTTPDoer) *Client {
-	return newTestClient(mock, &url.URL{Scheme: "https", Host: "pds.test"}, "", nil)
+	return newTestClient(mock, &url.URL{Scheme: "https", Host: "pds.test"}, testHandle, "", nil)
 }
 
 func TestClient_Login_Success(t *testing.T) {
@@ -48,6 +54,13 @@ func TestClient_Login_Success(t *testing.T) {
 	require.NotNil(t, client.session)
 	assert.Equal(t, "did:plc:test123", client.session.DID)
 	assert.Equal(t, "secret-access-jwt", client.session.AccessJWT.Reveal())
+
+	requests := mock.Requests()
+	require.Len(t, requests, 1)
+	var sentBody createSessionRequest
+	require.NoError(t, json.Unmarshal(requests[0].Body, &sentBody))
+	assert.Equal(t, testHandle, sentBody.Identifier, "identifier must always be c.handle, never a caller-supplied value")
+	assert.Equal(t, "correct-horse-battery-staple", sentBody.Password)
 }
 
 func TestClient_Login_InvalidCredentials_NoFurtherCalls(t *testing.T) {
