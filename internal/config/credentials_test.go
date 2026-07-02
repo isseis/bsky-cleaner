@@ -88,6 +88,49 @@ func TestLoadCredentials_SlackWebhookURLOptional(t *testing.T) {
 	}
 }
 
+func TestLoadCredentials_SlackWebhookURLInvalidScheme(t *testing.T) {
+	tests := []struct {
+		name   string
+		envVar string
+		url    string
+	}{
+		{name: "success http scheme", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "http://hooks.slack.com/services/success"},
+		{name: "success syntactically invalid", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "://not-a-url"},
+		{name: "failure http scheme", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "http://hooks.slack.com/services/failure"},
+		{name: "failure syntactically invalid", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "://not-a-url"},
+		{name: "success opaque URL", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "https:example.com"},
+		{name: "success empty host", envVar: "BSKY_SLACK_WEBHOOK_URL_SUCCESS", url: "https:///path"},
+		{name: "failure opaque URL", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "https:example.com"},
+		{name: "failure empty host", envVar: "BSKY_SLACK_WEBHOOK_URL_FAILURE", url: "https:///path"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("BSKY_HANDLE", "alice.bsky.social")
+			t.Setenv("BSKY_APP_PASSWORD", "app-password")
+			unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_SUCCESS")
+			unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_FAILURE")
+			t.Setenv(tt.envVar, tt.url)
+
+			_, err := LoadCredentials()
+			if !errors.Is(err, ErrInvalidValue) {
+				t.Fatalf("LoadCredentials() error = %v, want wrapping ErrInvalidValue", err)
+			}
+
+			fieldErr, ok := errors.AsType[*FieldError](err)
+			if !ok {
+				t.Fatalf("LoadCredentials() error = %v, want *FieldError", err)
+			}
+			if fieldErr.Field != tt.envVar {
+				t.Errorf("FieldError.Field = %q, want %q", fieldErr.Field, tt.envVar)
+			}
+			if fieldErr.Value != "" {
+				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
+			}
+		})
+	}
+}
+
 func TestLoadCredentials_SlackWebhookURLOnlyOneSet(t *testing.T) {
 	t.Setenv("BSKY_HANDLE", "alice.bsky.social")
 	t.Setenv("BSKY_APP_PASSWORD", "app-password")

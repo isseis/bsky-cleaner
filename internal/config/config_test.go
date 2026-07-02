@@ -2,6 +2,9 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"math"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -95,6 +98,90 @@ schedule = "0 3 * * *"
 			}
 			if fieldErr.Value != "" {
 				t.Errorf("FieldError.Value = %q, want empty string", fieldErr.Value)
+			}
+		})
+	}
+}
+
+func TestLoad_RetentionDaysValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		retentionDays int
+		wantErr       bool
+	}{
+		{name: "zero", retentionDays: 0, wantErr: true},
+		{name: "negative", retentionDays: -1, wantErr: true},
+		{name: "positive", retentionDays: 30, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := fmt.Sprintf(`
+retention_days = %d
+schedule = "0 3 * * *"
+execution_timeout_seconds = 3600
+`, tt.retentionDays)
+			path := writeTempTOML(t, content)
+
+			cfg, err := Load(path)
+			if tt.wantErr {
+				if !errors.Is(err, ErrInvalidValue) {
+					t.Fatalf("Load() error = %v, want wrapping ErrInvalidValue", err)
+				}
+				fieldErr, ok := errors.AsType[*FieldError](err)
+				if !ok {
+					t.Fatalf("Load() error = %v, want *FieldError", err)
+				}
+				if fieldErr.Value != strconv.Itoa(tt.retentionDays) {
+					t.Errorf("FieldError.Value = %q, want %q", fieldErr.Value, strconv.Itoa(tt.retentionDays))
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() unexpected error: %v", err)
+			}
+			if cfg.RetentionDays != tt.retentionDays {
+				t.Errorf("RetentionDays = %d, want %d", cfg.RetentionDays, tt.retentionDays)
+			}
+		})
+	}
+}
+
+func TestLoad_ExecutionTimeoutValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		seconds int64
+		wantErr bool
+	}{
+		{name: "zero", seconds: 0, wantErr: true},
+		{name: "negative", seconds: -1, wantErr: true},
+		{name: "exceeds max", seconds: maxExecutionTimeoutSeconds + 1, wantErr: true},
+		{name: "extreme overflow-prone value", seconds: math.MaxInt64 / int64(time.Second), wantErr: true},
+		{name: "valid", seconds: 3600, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := fmt.Sprintf(`
+retention_days = 30
+schedule = "0 3 * * *"
+execution_timeout_seconds = %d
+`, tt.seconds)
+			path := writeTempTOML(t, content)
+
+			cfg, err := Load(path)
+			if tt.wantErr {
+				if !errors.Is(err, ErrInvalidValue) {
+					t.Fatalf("Load() error = %v, want wrapping ErrInvalidValue", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() unexpected error: %v", err)
+			}
+			want := time.Duration(tt.seconds) * time.Second
+			if cfg.ExecutionTimeout != want {
+				t.Errorf("ExecutionTimeout = %v, want %v", cfg.ExecutionTimeout, want)
 			}
 		})
 	}
