@@ -34,7 +34,7 @@ execution_timeout_seconds = 3600
 |---|---|---|---|---|
 | `BSKY_HANDLE` | 文字列 | 必須 | なし | Bluesky アカウントの handle（例: `alice.bsky.social`）。空文字列・未設定はいずれも起動失敗 |
 | `BSKY_APP_PASSWORD` | 文字列（秘匿） | 必須 | なし | Bluesky の app パスワード。空文字列・未設定はいずれも起動失敗 |
-| `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | 文字列（秘匿・URL） | 任意 | 未設定（該当チャンネルへの通知を行わない） | 成功時通知用の Slack Incoming Webhook URL。設定する場合はスキームが `https` であること、かつホスト部を含む構文的に妥当な URL であることのみを検証する（パス・クエリパラメータの内容には制約を設けない）。未設定の場合はエラーにせず、当該チャンネルへの通知を行わない設定として扱う |
+| `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | 文字列（秘匿・URL） | 任意 | 未設定（該当チャンネルへの通知を行わない） | 成功時通知用の Slack Incoming Webhook URL。設定する場合はスキームが `https` であること、かつホスト部を含む構文的に妥当な URL であることのみを検証する（パス・クエリパラメータの内容には制約を設けない）。未設定の場合はエラーにせず、当該チャンネルへの通知を行わない設定として扱う。なお環境変数が未設定の場合と空文字列に設定された場合は区別されず、いずれも「通知を行わない」として同一に扱われる |
 | `BSKY_SLACK_WEBHOOK_URL_FAILURE` | 文字列（秘匿・URL） | 任意 | 未設定（該当チャンネルへの通知を行わない） | 失敗時通知用の Slack Incoming Webhook URL。制約・未設定時の挙動は `BSKY_SLACK_WEBHOOK_URL_SUCCESS` と同じ |
 
 Slack Webhook URL のホスト（`hooks.slack.com` 等）が実際に Slack のものであることの一致検証は本パッケージでは行わない（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) の責務）。
