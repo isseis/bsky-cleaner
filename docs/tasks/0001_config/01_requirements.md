@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-02 |
 | Review date | 2026-07-02 |
 | Reviewer | isseis |
-| Comments | 2026-07-02 に一度 `approved` となったが、(1) Slack Webhook URL を秘匿情報として扱うべきという指摘を受け F-001/F-002 の境界を修正、(2) AC-12 の対象を TOML 仕様書から TOML+環境変数の統合設定リファレンス（`docs/design/configuration.md`）に拡張、のため再オープン。要再レビュー。 |
+| Comments | 2026-07-02 に一度 `approved` となった後、(1) Slack Webhook URL を秘匿情報として扱うべきという指摘を受け F-001/F-002 の境界を修正、(2) AC-12 の対象を TOML 仕様書から TOML+環境変数の統合設定リファレンス（`docs/design/configuration.md`）に拡張、のため再オープンし、再承認済み。 |
 
 ## 1. 背景と目的
 
