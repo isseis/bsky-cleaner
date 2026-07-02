@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-02 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-20 |
+| Reviewer | isseis |
 | Comments | - |
 
 ## 1. 実装概要
