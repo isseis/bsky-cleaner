@@ -87,3 +87,22 @@ func TestLoadCredentials_SlackWebhookURLOptional(t *testing.T) {
 		t.Errorf("SlackFailureWebhookURL = %#v, want zero value", creds.SlackFailureWebhookURL)
 	}
 }
+
+func TestLoadCredentials_SlackWebhookURLOnlyOneSet(t *testing.T) {
+	t.Setenv("BSKY_HANDLE", "alice.bsky.social")
+	t.Setenv("BSKY_APP_PASSWORD", "app-password")
+	t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", "https://hooks.slack.com/services/success")
+	unsetEnv(t, "BSKY_SLACK_WEBHOOK_URL_FAILURE")
+
+	creds, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("LoadCredentials() unexpected error: %v", err)
+	}
+
+	if creds.SlackSuccessWebhookURL.Reveal() != "https://hooks.slack.com/services/success" {
+		t.Errorf("SlackSuccessWebhookURL.Reveal() = %q, want %q", creds.SlackSuccessWebhookURL.Reveal(), "https://hooks.slack.com/services/success")
+	}
+	if creds.SlackFailureWebhookURL != (SecretString{}) {
+		t.Errorf("SlackFailureWebhookURL = %#v, want zero value", creds.SlackFailureWebhookURL)
+	}
+}

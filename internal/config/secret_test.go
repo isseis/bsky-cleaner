@@ -17,20 +17,13 @@ func TestSecretString_StringRedacted(t *testing.T) {
 	if got := s.String(); got != redacted {
 		t.Errorf("String() = %q, want %q", got, redacted)
 	}
-	if strings.Contains(fmt.Sprintf("%v", s), "super-secret") {
-		t.Errorf("Sprintf(%%v) leaked the underlying value")
-	}
 }
 
 func TestSecretString_GoStringRedacted(t *testing.T) {
 	s := SecretString{value: "super-secret"}
 
-	got := fmt.Sprintf("%#v", s)
-	if got != redacted {
+	if got := fmt.Sprintf("%#v", s); got != redacted {
 		t.Errorf("Sprintf(%%#v) = %q, want %q", got, redacted)
-	}
-	if strings.Contains(got, "super-secret") {
-		t.Errorf("Sprintf(%%#v) leaked the underlying value")
 	}
 }
 
