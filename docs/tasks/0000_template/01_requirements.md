@@ -37,7 +37,7 @@
 ## 3. 機能要件と受け入れ基準
 
 各機能要件には、独立して検証可能な受け入れ基準（Acceptance Criteria）を明示すること。
-AC の採番ルールは [requirements_process.md](../dev/developer_guide/requirements_process.md) を参照。
+AC の採番ルールは [requirements_process.md](../../dev/developer_guide/requirements_process.md) を参照。
 
 ### F-001: [機能名]
 

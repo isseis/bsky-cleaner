@@ -42,7 +42,7 @@ flowchart LR
 
 ### 2.1 コンポーネント配置
 
-(コンポーネント配置を Mermaid flowchart で示す。[mermaid_reference.md](../dev/developer_guide/mermaid_reference.md) の配色規則に従う)
+(コンポーネント配置を Mermaid flowchart で示す。[mermaid_reference.md](../../dev/developer_guide/mermaid_reference.md) の配色規則に従う)
 
 ### 2.2 データフロー
 
@@ -86,8 +86,8 @@ type PostFilter interface {
 
 ## 5. セキュリティ考慮事項
 
-(この機能固有のセキュリティ設計。プロジェクト共通のリスクは [セキュリティ設計](../design/security.md) を参照。
-[_context.md](../../.claude/commands/_context.md) の Conditional-guide trigger に該当する場合は、専用の設計ノートを追加すること)
+(この機能固有のセキュリティ設計。プロジェクト共通のリスクは [セキュリティ設計](../../design/security.md) を参照。
+[_context.md](../../../.claude/commands/_context.md) の Conditional-guide trigger に該当する場合は、専用の設計ノートを追加すること)
 
 ### 5.1 副作用契約
 

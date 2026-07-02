@@ -190,4 +190,4 @@ operate on.
 - Don't run the following commands without the user's explicit approval:
   - commands interacting with the network, e.g. `git pull`
   - merging pull requests on GitHub
-- `git commit` and `git push` may be executed without explicit approval
+- `git commit` and `git push` may be executed without explicit approval — `git push` here only pushes the current branch to this repository's own remote, not an arbitrary network operation, so it is an intentional exception to the network-interaction rule above

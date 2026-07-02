@@ -88,7 +88,7 @@ PR分割の単位ごとに「PR作成ポイント」を該当フェーズの直�
 
 ### 4.4 テストヘルパ方針
 
-[test_organization.md](../dev/developer_guide/test_organization.md) の分類（`testutil/` か `test_helpers.go` か）に従って方針を記載する。
+[test_organization.md](../../dev/developer_guide/test_organization.md) の分類（`testutil/` か `test_helpers.go` か）に従って方針を記載する。
 
 ## 5. リスク管理
 
