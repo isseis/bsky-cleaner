@@ -163,7 +163,7 @@
 **レビュー観点**: `LoadAppConfig()` が `Load()`・`LoadCredentials()` のいずれのエラーもそのまま伝播しているか / `docs/design/configuration.md` の記載（TOML キー名・環境変数名・制約・記述例）が実装と一致しているか（AC-12） / `package_reference.md` 更新後に AC-12 の静的検証コマンド（`rg -c "internal/config"` 等）が実際にヒットするか
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/16）
 - [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
 
 ## 3. 実装順序とマイルストーン
