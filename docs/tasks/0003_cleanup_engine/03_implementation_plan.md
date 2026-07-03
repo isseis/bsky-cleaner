@@ -24,7 +24,7 @@
 
 ### 1.3 既存コード調査結果
 
-- `internal/cleanup` パッケージは存在しない（`find /Users/issei/git/bsky-cleaner/internal -type f -name '*.go'` で確認済み）。本タスクはこのディレクトリと配下のファイルを新規作成するのみで、既存ファイルへの変更は発生しない。
+- `internal/cleanup` パッケージは存在しない（リポジトリルートで `find internal -type f -name '*.go'` を実行して確認済み）。本タスクはこのディレクトリと配下のファイルを新規作成するのみで、既存ファイルへの変更は発生しない。
 - 入出力型 `atproto.Post` / `atproto.PostType` は `internal/atproto/posts.go` に既に定義済み（`internal/atproto/posts.go:34-56`）。`PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote`/`PostTypeRepost` の4定数がこの順で `iota` 定義されている。本タスクはこれらの型をそのまま再利用し、新しい型を追加しない（設計書 3.1 節）。
 - `internal/config/validate.go:28-34` で `retentionDays <= 0` は既に拒否されており、本パッケージが受け取る時点で正の整数であることが保証されている（設計書 1.1 節・4節）。本パッケージ側で再検証は行わない。
 - テストヘルパーの観点では、`atproto.Post`/`atproto.PostType` はいずれもエクスポートされた型・定数であり、`internal/cleanup/cleanup_test.go` から直接 `atproto.Post{...}` を組み立てられる。想定外の `PostType` 値も `atproto.PostType(99)` のようにテストコードから直接構成できるため、`internal/atproto/testutil` 配下のフィクスチャ（XRPC レスポンス JSON 用であり本タスクの入力形式とは無関係）や新規モックは不要である。よって `testutil/` にも `test_helpers.go` にも新規ヘルパーファイルは不要と判断する（7節参照）。
@@ -62,7 +62,7 @@
     - [ ] `TestSelectDeletionTargets_UnknownPostType_Excluded`: `atproto.PostType(99)` のように既知4定数のいずれにも一致しない値を持つ投稿が、経過日数条件を満たしていても戻り値に含まれないことを検証する（AC-06）。
     - [ ] `TestSelectDeletionTargets_Pinned_Excluded`: `Pinned: true` かつ経過日数条件を満たす投稿1件が戻り値に含まれないことを検証する（AC-07）。
     - [ ] `TestSelectDeletionTargets_Unpinned_Included`: `Pinned: false` かつ経過日数条件を満たす投稿1件が戻り値に含まれることを検証する（AC-08。ピン留め解除後の状態を、解除後の `Post` 値をそのまま入力として与えることで表現する。ピン留め状態の時系列変化そのものは本パッケージの関心事ではなく、単に `Pinned` フィールドの現在値に基づく判定であることを確認する）。
-    - [ ] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライス（または `nil`）を返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
+    - [ ] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライスを返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
   - **完了基準**: `make test` で `internal/cleanup` パッケージの全テストが成功する。各テストは `assert`/`require`（`github.com/stretchr/testify`）を用いてアサーションを記述する（CLAUDE.md テスト方針）。
 
 **PR-1 作成ポイントに統合**（フェーズ1と同一 PR。理由: 判定ロジックとそのテストは1つの完結した変更単位であり、実装のみを含む中間 PR は動作確認ができないため分割しない）
