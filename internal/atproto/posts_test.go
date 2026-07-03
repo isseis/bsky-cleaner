@@ -117,6 +117,11 @@ func TestClient_ListPosts_ClassifiesPostTypes(t *testing.T) {
 			valueJSON: fmt.Sprintf(`{"$type":"app.bsky.feed.post","text":"hi","createdAt":%q,"reply":{"parent":{"uri":"at://did:plc:other/app.bsky.feed.post/p","cid":"c"},"root":{"uri":"at://did:plc:other/app.bsky.feed.post/r","cid":"c"}},"embed":{"$type":"app.bsky.embed.record","record":{"uri":"at://did:plc:other/app.bsky.feed.post/q","cid":"c"}}}`, createdAt),
 			wantType:  PostTypeReply,
 		},
+		{
+			name:      "original post: reply field explicitly null is not a reply",
+			valueJSON: fmt.Sprintf(`{"$type":"app.bsky.feed.post","text":"hello","createdAt":%q,"reply":null}`, createdAt),
+			wantType:  PostTypeOriginal,
+		},
 	}
 
 	var records []string
@@ -240,6 +245,17 @@ func TestClient_ListPosts_PinnedDetection(t *testing.T) {
 		for _, p := range posts {
 			assert.False(t, p.Pinned)
 		}
+	})
+
+	t.Run("profile fetch fails with a genuine server error: propagated, not swallowed as no pin", func(t *testing.T) {
+		handler := newListPostsHandler(t, []string{postPage}, []string{repostPage}, http.StatusInternalServerError, `{"error":"InternalServerError"}`)
+		client, _ := newPostsTestClient(handler)
+
+		posts, err := client.ListPosts(context.Background())
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrHTTPStatus)
+		assert.Nil(t, posts)
 	})
 }
 

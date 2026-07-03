@@ -194,12 +194,22 @@ func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listR
 	}
 }
 
+// pinnedPostRKeyNotFoundStatus is the HTTP status the AT Protocol
+// com.atproto.repo.getRecord endpoint returns when the requested record
+// does not exist (e.g. an account with no customized profile record),
+// carrying an InvalidRequest/RecordNotFound error name in its body. Only
+// this specific status is treated as "no pinned post"; any other error
+// status (5xx, rate limiting, a decode failure on a 2xx body, etc.) is a
+// genuine failure and must propagate rather than being silently reported
+// as "not pinned" (pinned-post exclusion is a safety guarantee downstream
+// cleanup logic relies on -- see docs/overview.md's pinned-post exclusion
+// rule).
+const pinnedPostRKeyNotFoundStatus = http.StatusBadRequest
+
 // pinnedPostRKey returns the rkey of the account's pinned post, or "" if
-// none is pinned or the profile record does not exist. A profile record
-// fetch that fails with an HTTP error status (as opposed to a transport
-// failure) is treated as "no pinned post" rather than propagated, since an
-// account with no customized profile record has none to fetch (3.2
-// architecture note 3).
+// none is pinned or the profile record does not exist (3.2 architecture
+// note 3). See pinnedPostRKeyNotFoundStatus for which failures are treated
+// as "no pinned post" versus propagated as errors.
 func (c *Client) pinnedPostRKey(ctx context.Context) (string, error) {
 	query := url.Values{}
 	query.Set("repo", c.did)
@@ -209,7 +219,7 @@ func (c *Client) pinnedPostRKey(ctx context.Context) (string, error) {
 	var resp getRecordResponse
 	err := doXRPC(ctx, c.httpDoer, c.pdsBaseURL, http.MethodGet, "com.atproto.repo.getRecord", query, nil, &resp, "")
 	if err != nil {
-		if httpErr, ok := errors.AsType[*HTTPError](err); ok && httpErr.StatusCode != 0 {
+		if httpErr, ok := errors.AsType[*HTTPError](err); ok && httpErr.StatusCode == pinnedPostRKeyNotFoundStatus {
 			return "", nil
 		}
 		return "", err
@@ -242,9 +252,14 @@ func classifyPostRecord(rec listRecordsRecord) (Post, error) {
 		return Post{}, fmt.Errorf("list posts: parse createdAt for %s: %w", rec.URI, err)
 	}
 
+	// A present-but-null "reply" field (some PDS implementations may emit
+	// this instead of omitting the key) must not count as a reply -- raw
+	// byte length alone can't distinguish "absent" from "null".
+	hasReply := len(value.Reply) > 0 && strings.TrimSpace(string(value.Reply)) != "null"
+
 	postType := PostTypeOriginal
 	switch {
-	case len(value.Reply) > 0:
+	case hasReply:
 		postType = PostTypeReply
 	case value.Embed != nil && (value.Embed.Type == embedTypeRecord || value.Embed.Type == embedTypeRecordWithMedia):
 		postType = PostTypeQuote
