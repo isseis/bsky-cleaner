@@ -32,7 +32,7 @@ func TestClient_DeleteRecord_Success(t *testing.T) {
 		assert.Equal(t, http.MethodPost, req.Method)
 		assert.Equal(t, "/xrpc/com.atproto.repo.deleteRecord", req.URL.Path)
 		assert.Equal(t, "Bearer test-access-jwt", req.Header.Get("Authorization"))
-		return atprototestutil.JSONResponse(http.StatusOK, `{}`), nil
+		return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.DeleteRecordResponseJSON()), nil
 	})
 
 	err := client.DeleteRecord(context.Background(), "abc123")
@@ -50,7 +50,7 @@ func TestClient_DeleteRecord_Success(t *testing.T) {
 // "not found" response shape to script.
 func TestClient_DeleteRecord_AlreadyDeleted_Idempotent(t *testing.T) {
 	client, _ := newDeleteTestClient(deleteTestSession, func(_ *http.Request) (*http.Response, error) {
-		return atprototestutil.JSONResponse(http.StatusOK, `{}`), nil
+		return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.DeleteRecordResponseJSON()), nil
 	})
 
 	err := client.DeleteRecord(context.Background(), "already-deleted-rkey")
@@ -60,7 +60,7 @@ func TestClient_DeleteRecord_AlreadyDeleted_Idempotent(t *testing.T) {
 
 func TestClient_DeleteRecord_UsesOwnDID(t *testing.T) {
 	client, mock := newDeleteTestClient(deleteTestSession, func(_ *http.Request) (*http.Response, error) {
-		return atprototestutil.JSONResponse(http.StatusOK, `{}`), nil
+		return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.DeleteRecordResponseJSON()), nil
 	})
 
 	err := client.DeleteRecord(context.Background(), "abc123")

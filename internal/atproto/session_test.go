@@ -43,7 +43,7 @@ func TestClient_Login_Success(t *testing.T) {
 		Handler: func(req *http.Request) (*http.Response, error) {
 			assert.Equal(t, http.MethodPost, req.Method)
 			assert.Equal(t, "/xrpc/com.atproto.server.createSession", req.URL.Path)
-			return atprototestutil.JSONResponse(http.StatusOK, `{"did":"did:plc:test123","accessJwt":"secret-access-jwt"}`), nil
+			return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.CreateSessionResponseJSON("did:plc:test123", "secret-access-jwt")), nil
 		},
 	}
 	client := loginTestClient(mock)

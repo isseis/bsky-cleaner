@@ -213,8 +213,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/23）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 6 — テストフィクスチャの lexicon 準拠検証
 
@@ -226,12 +226,12 @@
 - `docs/dev/developer_guide/package_reference.md`（変更）
 
 **作業内容**:
-- [ ] `internal/atproto/testutil/fixtures.go`（`package atprototestutil`）に、`createSession`/`listRecords`（`app.bsky.feed.post`/`app.bsky.feed.repost`）/`getRecord`（`app.bsky.actor.profile`）/`deleteRecord` の各応答 JSON フィクスチャを定義する。Phase 2〜5 のテストがこれらのフィクスチャ（またはその一部を改変したもの）を使用するよう、各テストファイルを本フィクスチャ参照に統一する（Phase 2〜5 の実装時点では各テストファイル内にインラインの JSON を書いても構わないが、Phase 6 でこのファイルへの集約を完了させる）。
-- [ ] `internal/atproto/testutil/fixtures.go` に、各 XRPC レスポンスに対応する lexicon 準拠の Go 構造体を定義する。フィールド名は AT Protocol 公式 lexicon（`com.atproto.server.createSession`, `com.atproto.repo.listRecords`, `com.atproto.repo.getRecord`, `com.atproto.repo.deleteRecord` の lexicon 定義）と突き合わせて確認し、各 lexicon が必須（`required`）と定義するフィールドを構造体コメントに列挙する。
-- [ ] `internal/atproto/testutil/fixtures_test.go` に、各フィクスチャ JSON を対応する構造体へ `json.Decoder.DisallowUnknownFields()` を用いて厳格デコードし、成功することを確認するテスト（`TestFixtures_CreateSessionResponse_MatchesLexicon`, `TestFixtures_ListRecordsResponse_MatchesLexicon`, `TestFixtures_GetRecordResponse_MatchesLexicon`, `TestFixtures_DeleteRecordResponse_MatchesLexicon`）を実装する。
-- [ ] `internal/atproto/testutil/fixtures_test.go` に、`DisallowUnknownFields()` の厳格デコードが実際に機能していることを証明する否定テスト（`TestFixtures_CreateSessionResponse_RejectsUnknownField`）を1件実装する。フィクスチャ JSON に lexicon に存在しないフィールドを追加した文字列を用意し、デコードがエラーになることをアサートする。これは「`json.Unmarshal` に退行してもテストが green のまま」という回帰を検出するためのテストであり、上記の肯定テストだけでは検出できない（`DisallowUnknownFields` は JSON 側の余剰フィールドしか検出せず、構造体側に必須フィールドが欠けているケースは検出しないため、次のタスクで別途カバーする）。
-- [ ] `internal/atproto/testutil/fixtures_test.go` に、各フィクスチャ構造体が対応する lexicon の必須フィールドをすべて宣言していることを確認するテスト（`TestFixtures_RequiredFieldsPresent`）を実装する。各構造体のコメントに列挙した必須フィールド名のリストを、`reflect` で構造体のフィールド一覧（JSON タグ名）と突き合わせ、すべて含まれることをアサートする。これにより `DisallowUnknownFields` では検出できない「lexicon 必須フィールドの欠落」を検出する。
-- [ ] `docs/dev/developer_guide/package_reference.md` の「Package Responsibilities」に `internal/atproto` の責務（本パッケージ概要、アーキテクチャ 1.1節の単一責任の説明を要約したもの）を追記し、「Directory Structure」のツリーに `internal/atproto/` を追加する。
+- [x] `internal/atproto/testutil/fixtures.go`（`package atprototestutil`）に、`createSession`/`listRecords`（`app.bsky.feed.post`/`app.bsky.feed.repost`）/`getRecord`（`app.bsky.actor.profile`）/`deleteRecord` の各応答 JSON フィクスチャを定義する。Phase 2〜5 のテストがこれらのフィクスチャ（またはその一部を改変したもの）を使用するよう、各テストファイルを本フィクスチャ参照に統一する（Phase 2〜5 の実装時点では各テストファイル内にインラインの JSON を書いても構わないが、Phase 6 でこのファイルへの集約を完了させる）。**実装メモ**: 4エンドポイントの envelope 形状（`CreateSessionResponseJSON`/`ListRecordsResponseJSON`/`GetRecordResponseJSON`/`DeleteRecordResponseJSON`）を fixtures.go に集約し、`session_test.go`（ログイン成功）、`posts_test.go`（`listRecords`/`getRecord` の envelope 組み立て、旧 `buildListRecordsBody` を置き換え）、`delete_test.go`（削除成功・冪等応答）の正常系レスポンスをこれらの参照に統一した。各テストが検証対象とするレコード本体（`app.bsky.feed.post` の `reply`/`embed` 形状差異など）は lexicon 準拠検証の対象外（本書 Phase 6 冒頭コメント参照）のためテストファイル側に残置している。401/4xx/5xx 等のエラー応答ボディは lexicon の成功レスポンス定義の対象外のため、フィクスチャ化していない。
+- [x] `internal/atproto/testutil/fixtures.go` に、各 XRPC レスポンスに対応する lexicon 準拠の Go 構造体を定義する。フィールド名は AT Protocol 公式 lexicon（`com.atproto.server.createSession`, `com.atproto.repo.listRecords`, `com.atproto.repo.getRecord`, `com.atproto.repo.deleteRecord` の lexicon 定義）と突き合わせて確認し、各 lexicon が必須（`required`）と定義するフィールドを構造体コメントに列挙する。
+- [x] `internal/atproto/testutil/fixtures_test.go` に、各フィクスチャ JSON を対応する構造体へ `json.Decoder.DisallowUnknownFields()` を用いて厳格デコードし、成功することを確認するテスト（`TestFixtures_CreateSessionResponse_MatchesLexicon`, `TestFixtures_ListRecordsResponse_MatchesLexicon`, `TestFixtures_GetRecordResponse_MatchesLexicon`, `TestFixtures_DeleteRecordResponse_MatchesLexicon`）を実装する。
+- [x] `internal/atproto/testutil/fixtures_test.go` に、`DisallowUnknownFields()` の厳格デコードが実際に機能していることを証明する否定テスト（`TestFixtures_CreateSessionResponse_RejectsUnknownField`）を1件実装する。フィクスチャ JSON に lexicon に存在しないフィールドを追加した文字列を用意し、デコードがエラーになることをアサートする。これは「`json.Unmarshal` に退行してもテストが green のまま」という回帰を検出するためのテストであり、上記の肯定テストだけでは検出できない（`DisallowUnknownFields` は JSON 側の余剰フィールドしか検出せず、構造体側に必須フィールドが欠けているケースは検出しないため、次のタスクで別途カバーする）。
+- [x] `internal/atproto/testutil/fixtures_test.go` に、各フィクスチャ構造体が対応する lexicon の必須フィールドをすべて宣言していることを確認するテスト（`TestFixtures_RequiredFieldsPresent`）を実装する。各構造体のコメントに列挙した必須フィールド名のリストを、`reflect` で構造体のフィールド一覧（JSON タグ名）と突き合わせ、すべて含まれることをアサートする。これにより `DisallowUnknownFields` では検出できない「lexicon 必須フィールドの欠落」を検出する。
+- [x] `docs/dev/developer_guide/package_reference.md` の「Package Responsibilities」に `internal/atproto` の責務（本パッケージ概要、アーキテクチャ 1.1節の単一責任の説明を要約したもの）を追記し、「Directory Structure」のツリーに `internal/atproto/` を追加する。
 
 **完了条件**: `make test`、`make lint`、`make deadcode` が成功する。`internal/atproto` パッケージ全体の AC-01〜AC-15 のテストが green であることを確認する。
 
@@ -243,8 +243,8 @@
 
 **レビュー観点**: フィクスチャのフィールド名が lexicon と一致していること / `DisallowUnknownFields` によって乖離が確実に検出できること / `TestFixtures_RequiredFieldsPresent` が lexicon 必須フィールドの欠落を実際に検出できる網羅性であること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/24）
 - [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
 
 ## 3. 実装順序とマイルストーン
@@ -315,7 +315,7 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 - [x] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2）
 - [x] PR-2 マージ済み（対象ステップ: Phase 3）
 - [x] PR-3 マージ済み（対象ステップ: Phase 4）
-- [ ] PR-4 マージ済み（対象ステップ: Phase 5）
+- [x] PR-4 マージ済み（対象ステップ: Phase 5）
 - [ ] PR-5 マージ済み（対象ステップ: Phase 6）
 - [ ] `make fmt && make test && make lint` が最終的に成功する
 - [ ] `make deadcode` が成功する
