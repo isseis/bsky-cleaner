@@ -53,7 +53,7 @@
 
 **Acceptance Criteria**:
 - **AC-05**: 通常投稿・リプライ・リポスト・引用ポストのそれぞれについて、経過日数条件を満たせば削除対象と判定される
-- **AC-06**: 上記 4 種別以外の想定外のレコード種別が入力された場合、削除対象としない（安全側に倒す）。判定は既知の 4 種別それぞれを明示的に列挙する形で行い、いずれにも一致しない値（ [0002_atproto_client](../0002_atproto_client/01_requirements.md) の `PostType` のゼロ値を含む）はすべて「想定外」として扱う
+- **AC-06**: 上記 4 種別以外の想定外のレコード種別が入力された場合、削除対象としない（安全側に倒す）。判定は既知の 4 種別（[0002_atproto_client](../0002_atproto_client/01_requirements.md) の `PostType` における `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote`/`PostTypeRepost` の4定数）それぞれを明示的に列挙する形で行い、既知4定数のいずれの名前にも一致しない値はすべて「想定外」として扱う
 
 ### F-003: ピン留め投稿の除外
 

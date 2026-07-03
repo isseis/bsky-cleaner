@@ -19,16 +19,16 @@
 - **単一責任**: `internal/cleanup` パッケージは「投稿一覧と保持日数から削除対象を判定する」ことのみを責務とする。投稿一覧の取得・削除の実行そのものは [0002_atproto_client](../0002_atproto_client/01_requirements.md)、dry-run/apply の分岐と CLI からの呼び出しは [0004_cli_entrypoint](../0004_cli_entrypoint/01_requirements.md) の責務であり、本パッケージはどちらにも関与しない（NF-002）。
 - **純粋関数**: 判定ロジックは `[]atproto.Post` と `retentionDays int`、判定基準時刻 `now time.Time` を入力として `[]atproto.Post`（削除対象一覧）を返す純粋関数として実装する。ネットワーク I/O・ファイル I/O・グローバル状態への依存を持たない（NF-002）。
 - **時刻の明示的な受け渡し**: 判定基準となる現在時刻は、パッケージ内部で `time.Now()` を呼ばず、呼び出し側が引数として明示的に渡す（NF-002a）。これにより AC-03 の境界値テストを含め、時刻に依存する判定を決定的に検証できる。
-- **安全側に倒す（fail-closed 相当の判定方針）**: `atproto.PostType` として既知の4種別（`PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote`/`PostTypeRepost`）のいずれにも一致しないレコードは削除対象に含めない（AC-06）。判定は既知の4値を明示的に列挙する形（`switch`)で行い、範囲チェック（例: `0 <= v && v < 4`）は用いない。
+- **安全側に倒す（fail-closed 相当の判定方針）**: `atproto.PostType` として既知の4種別（`PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote`/`PostTypeRepost`）のいずれにも一致しないレコードは削除対象に含めない（AC-06）。判定は既知の4値を明示的に列挙する形（`switch`）で行い、範囲チェック（例: `0 <= v && v < 4`）は用いない。
 - **設定値の再検証はしない**: `retentionDays` の正当性（正の整数であること）は [internal/config](../../dev/developer_guide/package_reference.md) が `Load`/`LoadAppConfig` の時点で検証済みである（`internal/config/validate.go`）。本パッケージはその検証結果を信頼し、再検証を行わない（DRY）。この前提が破られた場合の挙動は 4 節・5.2 節で扱う。
 
-#### AC-06「ゼロ値」の解釈について
+#### AC-06「想定外」の解釈について
 
-`01_requirements.md` の AC-06 は「既知4種別以外の想定外のレコード種別」の例として「`atproto.PostType` のゼロ値を含む」と記載している。しかし `atproto.PostType` のゼロ値は `PostTypeOriginal`（`iota` の最初の値、通常投稿）と数値上一致し、`PostTypeOriginal` 自体は AC-05 が要求する既知4種別の一つである。したがって AC-06 の文言をそのまま「ゼロ値は常に想定外」と読むと、AC-05（通常投稿は削除対象になり得る）と矛盾する。
+`atproto.PostType` は素の `int` ベースの型であり、`PostTypeOriginal` が `iota` の最初の値（0）として定義されているため、型のゼロ値は `PostTypeOriginal`（通常投稿）と数値上一致し、実行時にこの2つを区別することはできない。したがって「ゼロ値」を基準に「想定外」を定義することはできない。
 
-本設計では、AC-06 の「ゼロ値を含む」という記述を「`PostTypeOriginal` という名前で明示的に列挙された値」ではなく「将来 `PostType` の値集合が拡張された場合や、`internal/atproto` 側の分類処理の不備によって意図せず未設定のまま渡された値」を指すものと解釈する。すなわち、判定ロジックは `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote`/`PostTypeRepost` の4つの**定数名**を `switch` で明示的に列挙し、それ以外の値（数値がたまたまゼロ値と一致する未分類の値を含む）はすべて除外側に倒す。この実装であれば AC-05・AC-06 のいずれも矛盾なく満たされる。
+本設計では、`01_requirements.md` の AC-06 における「想定外のレコード種別」を「`PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote`/`PostTypeRepost` の4つの**定数名**のいずれにも一致しない値」として定義する。判定ロジックはこの4つの定数名を `switch` で明示的に列挙し、それ以外の値はすべて除外側に倒す。この定義であれば AC-05（通常投稿は既知4種別の一つとして削除対象になり得る）・AC-06（既知4種別以外は想定外として除外する）のいずれも矛盾なく満たされる。
 
-この解釈は `01_requirements.md` 自体の文言修正（AC-06 の再承認）を伴わない設計上の明確化である。要件文言の曖昧さそのものを解消するにはレビュー時に `01_requirements.md` へ AC-06a 等の補足を追加することが望ましいが、本タスクの判定ロジックの実装方針としては上記の解釈で一意に定まるため、この設計書ではこの解釈を採用して進める。
+この解釈に合わせて `01_requirements.md` の AC-06 の文言も「既知4定数のいずれの名前にも一致しない値」を明示する形に修正済みであり、要件文言と本設計書の記述は整合している。
 
 ### 1.2 概念モデル
 
@@ -189,7 +189,7 @@ func SelectDeletionTargets(posts []atproto.Post, retentionDays int, now time.Tim
 | AC-03 | `CreatedAt` が閾値時刻とちょうど等しい投稿が削除対象に含まれない（境界値） |
 | AC-04 | UTC 以外のオフセットを持つ `CreatedAt` が正しく判定される |
 | AC-05 | 4種別（通常投稿・リプライ・リポスト・引用ポスト）それぞれが削除対象として判定される |
-| AC-06 | 既知4値以外の `PostType`（ゼロ値含む、テストでは既存の4定数以外の値を明示的に構成して検証）が削除対象に含まれない |
+| AC-06 | 既知4定数以外（例: atproto.PostType(99)）の `PostType`（テストでは既存の4定数以外の値を明示的に構成して検証）が削除対象に含まれない |
 | AC-07 | ピン留め投稿が経過日数条件を満たしても削除対象に含まれない |
 | AC-08 | ピン留め解除後の投稿が経過日数条件を満たせば削除対象に含まれる |
 
