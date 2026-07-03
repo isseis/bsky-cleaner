@@ -106,8 +106,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/29）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
 
@@ -154,7 +153,7 @@
 ## 6. 実装チェックリスト
 
 - [x] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2。`internal/cleanup/cleanup.go`・`internal/cleanup/cleanup_test.go` 作成、AC-01〜AC-08 全テストケース追加）
-- [ ] PR-2 マージ済み（対象ステップ: フェーズ3。`package_reference.md` 更新）
+- [x] PR-2 マージ済み（対象ステップ: フェーズ3。`package_reference.md` 更新）
 - [x] `make fmt` / `make test` / `make lint` がすべて通過
 - [x] `make deadcode` で `internal/cleanup` に起因する新規の未使用コードがないことを確認（`cmd/` 未結線に起因する既存の一律 `unreachable` 検出は許容、詳細はフェーズ3参照）
 
