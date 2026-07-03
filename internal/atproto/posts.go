@@ -55,10 +55,10 @@ type Post struct {
 	Pinned    bool
 }
 
-// listRecordsRecord is one entry of a com.atproto.repo.listRecords
-// response. Value is kept raw so callers can decode it into the record
-// shape appropriate for the collection being listed.
-type listRecordsRecord struct {
+// listRecord is one entry of a com.atproto.repo.listRecords response.
+// Value is kept raw so callers can decode it into the record shape
+// appropriate for the collection being listed.
+type listRecord struct {
 	URI   string          `json:"uri"`
 	Value json.RawMessage `json:"value"`
 }
@@ -66,8 +66,8 @@ type listRecordsRecord struct {
 // listRecordsResponse is the subset of the com.atproto.repo.listRecords
 // response body this package needs.
 type listRecordsResponse struct {
-	Cursor  string              `json:"cursor,omitempty"`
-	Records []listRecordsRecord `json:"records"`
+	Cursor  string       `json:"cursor,omitempty"`
+	Records []listRecord `json:"records"`
 }
 
 // feedPostValue is the subset of an app.bsky.feed.post record this package
@@ -166,8 +166,8 @@ func (c *Client) ListPosts(ctx context.Context) ([]Post, error) {
 // protocol misbehavior distinct from a transport failure, 6.2 architecture
 // note), it stops and returns ErrPaginationStalled rather than looping
 // forever.
-func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listRecordsRecord, error) {
-	var all []listRecordsRecord
+func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listRecord, error) {
+	var all []listRecord
 	cursor := ""
 	for {
 		query := url.Values{}
@@ -236,7 +236,7 @@ func (c *Client) pinnedPostRKey(ctx context.Context) (string, error) {
 // also carry a quote embed -- 3.2 architecture note says reply takes
 // priority), an app.bsky.embed.record(WithMedia) embed marks
 // PostTypeQuote, otherwise PostTypeOriginal.
-func classifyPostRecord(rec listRecordsRecord) (Post, error) {
+func classifyPostRecord(rec listRecord) (Post, error) {
 	rkey, err := rkeyFromURI(rec.URI)
 	if err != nil {
 		return Post{}, err
@@ -270,7 +270,7 @@ func classifyPostRecord(rec listRecordsRecord) (Post, error) {
 
 // classifyRepostRecord decodes an app.bsky.feed.repost record. Every
 // record from this collection is a repost regardless of its content.
-func classifyRepostRecord(rec listRecordsRecord) (Post, error) {
+func classifyRepostRecord(rec listRecord) (Post, error) {
 	rkey, err := rkeyFromURI(rec.URI)
 	if err != nil {
 		return Post{}, err
