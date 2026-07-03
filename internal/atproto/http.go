@@ -33,8 +33,6 @@ type HTTPDoer interface {
 // (or returned as the *SSRFError produced by a restricted HTTPDoer), so a
 // raw net/http error or *url.Error -- either of which may embed the
 // request URL/headers -- never reaches the caller.
-//
-//nolint:unused // consumed starting Phase 3 (Login); Phase 1 only defines this shared XRPC helper.
 func doXRPC(ctx context.Context, doer HTTPDoer, base *url.URL, httpMethod, xrpcMethod string, query url.Values, reqBody, out any, authHeader string) error {
 	u := *base
 	u.Path = path.Join(u.Path, "xrpc", xrpcMethod)

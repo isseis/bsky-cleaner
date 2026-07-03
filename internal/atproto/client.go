@@ -18,6 +18,7 @@ type Client struct {
 	pdsBaseURL *url.URL
 	handle     string
 	did        string
+	session    *Session
 }
 
 // NewClient resolves handle to its DID, resolves the DID document to a PDS

@@ -98,8 +98,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/20）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 3 — ログイン
 
@@ -112,16 +112,16 @@
 - `internal/atproto/client.go`（変更: `session` フィールド追加）
 
 **作業内容**:
-- [ ] `internal/atproto/session.go` に非公開型 `secretString`（`value string` フィールド、`String()`/`GoString()`/`LogValue()` で固定文字列 `"[REDACTED]"` を返す）を実装する（`internal/config/secret.go` の `SecretString` と同じマスキング方式、アーキテクチャ 3.1節）。
-- [ ] `internal/atproto/session.go` に `Session` 構造体（`DID string`, `AccessJWT secretString`）を実装する。
-- [ ] `internal/atproto/client.go` の `Client` 構造体に `session *Session` フィールドを追加する。
-- [ ] `internal/atproto/session.go` に `Client.Login(ctx context.Context, appPassword config.SecretString) error` を実装する。`identifier` には `NewClient` で検証済みの `c.handle` を使う（`Login` の引数として別の handle を受け取らない、アーキテクチャ 3.1節）。`appPassword.Reveal()` はリクエストボディ構築の直前でのみ呼び出す。
-- [ ] `com.atproto.server.createSession` への POST リクエストが 401 を返した場合、`HTTPError` を返し `c.session` を更新しない（AC-05）。
-- [ ] 認証成功時、`c.session = &Session{DID: ..., AccessJWT: newSecretString(accessJwt)}` を設定する（AC-04）。
-- [ ] `internal/atproto/test_helpers.go`（`//go:build test`）に `newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, did string, session *Session) *Client` を実装する。`Client` の非公開フィールド（`httpDoer`/`pdsBaseURL`/`did`/`session`）すべてに直接値を設定し、DID 解決・ログインを経由せずに `ListPosts`/`DeleteRecord` を単体テストできるようにする（`pdsBaseURL` を渡さないと `ListPosts`/`DeleteRecord` が XRPC リクエスト URL を組み立てられないため必須。Phase 4・Phase 5 で再利用、test_organization.md の Classification B「非公開フィールドを扱うファクトリ関数」に該当）。
-- [ ] `internal/atproto/session_test.go` に `TestClient_Login_Success`（AC-04: 正しい認証情報でセッション情報が取得できること）を実装する。
-- [ ] `internal/atproto/session_test.go` に `TestClient_Login_InvalidCredentials_NoFurtherCalls`（AC-05: 誤った認証情報でエラーが返り、後続の API 呼び出し用のセッションが設定されないこと）を実装する。
-- [ ] `internal/atproto/session_test.go` に `TestClient_Login_ErrorDoesNotLeakSecrets`（AC-06: エラーオブジェクトの `Error()` 文字列表現に送信した app パスワード・レスポンスに含まれるセッション JWT のいずれも含まれないこと）を実装する。
+- [x] `internal/atproto/session.go` に非公開型 `secretString`（`value string` フィールド、`String()`/`GoString()`/`LogValue()` で固定文字列 `"[REDACTED]"` を返す）を実装する（`internal/config/secret.go` の `SecretString` と同じマスキング方式、アーキテクチャ 3.1節）。
+- [x] `internal/atproto/session.go` に `Session` 構造体（`DID string`, `AccessJWT secretString`）を実装する。
+- [x] `internal/atproto/client.go` の `Client` 構造体に `session *Session` フィールドを追加する。
+- [x] `internal/atproto/session.go` に `Client.Login(ctx context.Context, appPassword config.SecretString) error` を実装する。`identifier` には `NewClient` で検証済みの `c.handle` を使う（`Login` の引数として別の handle を受け取らない、アーキテクチャ 3.1節）。`appPassword.Reveal()` はリクエストボディ構築の直前でのみ呼び出す。
+- [x] `com.atproto.server.createSession` への POST リクエストが 401 を返した場合、`HTTPError` を返し `c.session` を更新しない（AC-05）。
+- [x] 認証成功時、`c.session = &Session{DID: ..., AccessJWT: newSecretString(accessJwt)}` を設定する（AC-04）。
+- [x] `internal/atproto/test_helpers.go`（`//go:build test`）に `newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, handle, did string, session *Session) *Client` を実装する。`Client` の非公開フィールド（`httpDoer`/`pdsBaseURL`/`handle`/`did`/`session`）すべてに直接値を設定し、DID 解決・ログインを経由せずに `Login`/`ListPosts`/`DeleteRecord` を単体テストできるようにする（`pdsBaseURL` を渡さないと `ListPosts`/`DeleteRecord` が XRPC リクエスト URL を組み立てられないため必須。`handle` は `Login` の request-body assertion（`Login` は常に `c.handle` を identifier として送るため）に必要。Phase 4・Phase 5 で再利用、test_organization.md の Classification B「非公開フィールドを扱うファクトリ関数」に該当）。
+- [x] `internal/atproto/session_test.go` に `TestClient_Login_Success`（AC-04: 正しい認証情報でセッション情報が取得できること）を実装する。
+- [x] `internal/atproto/session_test.go` に `TestClient_Login_InvalidCredentials_NoFurtherCalls`（AC-05: 誤った認証情報でエラーが返り、後続の API 呼び出し用のセッションが設定されないこと）を実装する。
+- [x] `internal/atproto/session_test.go` に `TestClient_Login_ErrorDoesNotLeakSecrets`（AC-06: エラーオブジェクトの `Error()` 文字列表現に送信した app パスワード・レスポンスに含まれるセッション JWT のいずれも含まれないこと）を実装する。
 
 **完了条件**: `make test`、`make lint` が成功する。
 
@@ -133,8 +133,8 @@
 
 **レビュー観点**: `appPassword.Reveal()` の呼び出し箇所がリクエストボディ構築の直前に限定されていること / エラー文字列に秘匿情報が含まれないこと / `newTestClient` が非公開フィールドを直接設定するテスト専用ファクトリとして適切に隔離されていること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/21）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -283,7 +283,7 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 | ファイル | 分類 | 理由 |
 |---|---|---|
 | `internal/atproto/testutil/mocks.go`（`package atprototestutil`） | Classification A | `HTTPDoer` は公開インターフェースであり、モック実装はパッケージ外の公開 API のみに依存するため。Phase 2〜6 の全テストファイルが依存する。 |
-| `internal/atproto/test_helpers.go`（`//go:build test`） | Classification B | `Client` の非公開フィールド（`httpDoer`/`pdsBaseURL`/`did`/`session`）へ直接値を設定するファクトリ関数 `newTestClient` が必要なため。Phase 4・Phase 5 のテストが DID 解決・ログインを経由せずに `ListPosts`/`DeleteRecord` を単体テストできるようにする。 |
+| `internal/atproto/test_helpers.go`（`//go:build test`） | Classification B | `Client` の非公開フィールド（`httpDoer`/`pdsBaseURL`/`handle`/`did`/`session`）へ直接値を設定するファクトリ関数 `newTestClient` が必要なため。Phase 3〜5 のテストが DID 解決・ログインを経由せずに `Login`/`ListPosts`/`DeleteRecord` を単体テストできるようにする。 |
 
 **命名の例外について**: [test_organization.md](../../dev/developer_guide/test_organization.md) の Classification A は「ヘルパー関数（setup・utility・fixtures）→ `testutil/helpers.go`」と定め、`fixtures.go` という個別のファイル名は列挙していない。一方、承認済みの [アーキテクチャ設計書](02_architecture.md) 2.1節はファイル名を `testutil/fixtures.go` と明示している。本タスクでは、承認済みアーキテクチャの決定を優先し `fixtures.go` のファイル名を踏襲する（アーキテクチャの再承認なしに実装計画側でファイル名を変更しない）。これは test_organization.md のカテゴリ分類（Classification A、公開 API のみに依存するテストデータ提供ヘルパー）自体からの逸脱ではなく、そのカテゴリ内でのファイル名のみの逸脱である点に注意する。この命名の扱いに疑問がある場合は、実装着手前に test_organization.md 側の改訂（`fixtures.go` を許容ファイル名として追記する等）を検討する。
 
@@ -312,7 +312,7 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 
 （各 PR 作成ポイント（2節）のインラインチェックボックスと対応する。ここでは PR 単位の完了状況のみをまとめて確認する）
 
-- [ ] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2）
+- [x] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2）
 - [ ] PR-2 マージ済み（対象ステップ: Phase 3）
 - [ ] PR-3 マージ済み（対象ステップ: Phase 4）
 - [ ] PR-4 マージ済み（対象ステップ: Phase 5）
