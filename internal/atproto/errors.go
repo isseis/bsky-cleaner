@@ -56,11 +56,12 @@ func (s SSRFStage) String() string {
 type HTTPError struct {
 	Method     string // XRPC method name, e.g. "com.atproto.repo.listRecords"
 	StatusCode int    // 0 for transport-level failures (no response received)
+	ErrorName  string // ATProto XRPC error name (the body's "error" field), e.g. "RecordNotFound"; "" if absent/unparseable or for transport-level failures
 	Err        error
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("%s: HTTP status %d: %v", e.Method, e.StatusCode, e.Err)
+	return fmt.Sprintf("%s: HTTP status %d: %s: %v", e.Method, e.StatusCode, e.ErrorName, e.Err)
 }
 
 func (e *HTTPError) Unwrap() error {

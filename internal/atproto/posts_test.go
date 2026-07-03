@@ -274,7 +274,7 @@ func TestClient_ListPosts_EmptyResult(t *testing.T) {
 
 func mustParseTime(t *testing.T, value string) time.Time {
 	t.Helper()
-	parsed, err := time.Parse(time.RFC3339, value)
+	parsed, err := time.Parse(time.RFC3339Nano, value)
 	require.NoError(t, err)
 	return parsed
 }

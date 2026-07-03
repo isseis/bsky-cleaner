@@ -70,7 +70,7 @@ func doXRPC(ctx context.Context, doer HTTPDoer, base *url.URL, httpMethod, xrpcM
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, Err: ErrHTTPStatus}
+		return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: xrpcErrorName(resp.Body), Err: ErrHTTPStatus}
 	}
 
 	if out != nil {
@@ -79,6 +79,26 @@ func doXRPC(ctx context.Context, doer HTTPDoer, base *url.URL, httpMethod, xrpcM
 		}
 	}
 	return nil
+}
+
+// xrpcErrorBody is the ATProto XRPC error JSON body shape returned
+// alongside a non-2xx status, e.g. {"error":"RecordNotFound","message":"..."}.
+type xrpcErrorBody struct {
+	Error string `json:"error"`
+}
+
+// xrpcErrorName extracts the ATProto "error" field from a non-2xx XRPC
+// response body, so callers can distinguish error variants sharing the
+// same HTTP status (e.g. a 400 with error name "RecordNotFound" versus
+// any other InvalidRequest cause). It returns "" if the body is missing,
+// unparseable, or carries no error name -- callers must not treat that
+// as any specific error variant.
+func xrpcErrorName(body io.Reader) string {
+	var parsed xrpcErrorBody
+	if err := json.NewDecoder(body).Decode(&parsed); err != nil {
+		return ""
+	}
+	return parsed.Error
 }
 
 // restrictedDoer is an HTTPDoer that only ever connects to addresses in a

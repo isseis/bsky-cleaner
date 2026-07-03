@@ -206,10 +206,20 @@ func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listR
 // rule).
 const pinnedPostRKeyNotFoundStatus = http.StatusBadRequest
 
+// pinnedPostRKeyNotFoundErrorName is the ATProto XRPC error name the
+// com.atproto.repo.getRecord endpoint returns, alongside
+// pinnedPostRKeyNotFoundStatus, when the requested record does not exist.
+// A 400 response is only treated as "no pinned post" when it carries this
+// exact error name; any other 400 (including one with a missing or
+// unparseable error name) is a genuine failure and must propagate, per
+// this codebase's fail-closed principle.
+const pinnedPostRKeyNotFoundErrorName = "RecordNotFound"
+
 // pinnedPostRKey returns the rkey of the account's pinned post, or "" if
 // none is pinned or the profile record does not exist (3.2 architecture
-// note 3). See pinnedPostRKeyNotFoundStatus for which failures are treated
-// as "no pinned post" versus propagated as errors.
+// note 3). See pinnedPostRKeyNotFoundStatus/pinnedPostRKeyNotFoundErrorName
+// for which failures are treated as "no pinned post" versus propagated as
+// errors.
 func (c *Client) pinnedPostRKey(ctx context.Context) (string, error) {
 	query := url.Values{}
 	query.Set("repo", c.did)
@@ -219,7 +229,9 @@ func (c *Client) pinnedPostRKey(ctx context.Context) (string, error) {
 	var resp getRecordResponse
 	err := doXRPC(ctx, c.httpDoer, c.pdsBaseURL, http.MethodGet, "com.atproto.repo.getRecord", query, nil, &resp, "")
 	if err != nil {
-		if httpErr, ok := errors.AsType[*HTTPError](err); ok && httpErr.StatusCode == pinnedPostRKeyNotFoundStatus {
+		if httpErr, ok := errors.AsType[*HTTPError](err); ok &&
+			httpErr.StatusCode == pinnedPostRKeyNotFoundStatus &&
+			httpErr.ErrorName == pinnedPostRKeyNotFoundErrorName {
 			return "", nil
 		}
 		return "", err
@@ -247,7 +259,7 @@ func classifyPostRecord(rec listRecord) (Post, error) {
 		return Post{}, fmt.Errorf("list posts: decode %s: %w", rec.URI, err)
 	}
 
-	createdAt, err := time.Parse(time.RFC3339, value.CreatedAt)
+	createdAt, err := time.Parse(time.RFC3339Nano, value.CreatedAt)
 	if err != nil {
 		return Post{}, fmt.Errorf("list posts: parse createdAt for %s: %w", rec.URI, err)
 	}
@@ -281,7 +293,7 @@ func classifyRepostRecord(rec listRecord) (Post, error) {
 		return Post{}, fmt.Errorf("list posts: decode %s: %w", rec.URI, err)
 	}
 
-	createdAt, err := time.Parse(time.RFC3339, value.CreatedAt)
+	createdAt, err := time.Parse(time.RFC3339Nano, value.CreatedAt)
 	if err != nil {
 		return Post{}, fmt.Errorf("list posts: parse createdAt for %s: %w", rec.URI, err)
 	}
