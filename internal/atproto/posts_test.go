@@ -67,14 +67,10 @@ func newListPostsHandler(t *testing.T, postPages, repostPages []string, profileS
 
 // buildListRecordsBody assembles a com.atproto.repo.listRecords response
 // body from pre-built record JSON snippets (see postRecordJSON/
-// repostRecordJSON) and an optional cursor.
+// repostRecordJSON) and an optional cursor, via the lexicon-checked
+// envelope fixture in testutil/fixtures.go (NF-006).
 func buildListRecordsBody(records []string, cursor string) string {
-	body := `{"records":[` + strings.Join(records, ",") + `]`
-	if cursor != "" {
-		body += `,"cursor":"` + cursor + `"`
-	}
-	body += `}`
-	return body
+	return atprototestutil.ListRecordsResponseJSON(records, cursor)
 }
 
 func postRecordJSON(rkey, valueJSON string) string {
@@ -218,7 +214,8 @@ func TestClient_ListPosts_PinnedDetection(t *testing.T) {
 		postRecordJSON("other-post", fmt.Sprintf(`{"$type":"app.bsky.feed.post","createdAt":%q}`, createdAt)),
 	}, "")
 	repostPage := buildListRecordsBody(nil, "")
-	profileBody := fmt.Sprintf(`{"uri":"at://%s/%s/self","cid":"bafyprofile","value":{"$type":"app.bsky.actor.profile","pinnedPost":{"uri":"at://%s/%s/pinned-post","cid":"bafypinned"}}}`, testDID, collectionProfile, testDID, collectionFeedPost)
+	profileValueJSON := fmt.Sprintf(`{"$type":"app.bsky.actor.profile","pinnedPost":{"uri":"at://%s/%s/pinned-post","cid":"bafypinned"}}`, testDID, collectionFeedPost)
+	profileBody := atprototestutil.GetRecordResponseJSON(fmt.Sprintf("at://%s/%s/self", testDID, collectionProfile), "bafyprofile", profileValueJSON)
 
 	t.Run("pinned post marked", func(t *testing.T) {
 		handler := newListPostsHandler(t, []string{postPage}, []string{repostPage}, http.StatusOK, profileBody)
