@@ -74,13 +74,13 @@
 
 ### フェーズ3: 品質確認とドキュメント更新
 
-- [ ] **対象コマンド**: `make fmt` / `make test` / `make lint`
+- [x] **対象コマンド**: `make fmt` / `make test` / `make lint`
   - **作業内容**: 3コマンドを順に実行し、いずれもエラーなく完了することを確認する（NF-001）。
   - **完了基準**: 3コマンドすべてが正常終了する。
-- [ ] **対象コマンド**: `make deadcode`
+- [x] **対象コマンド**: `make deadcode`
   - **作業内容**: 未使用コードが検出されないことを確認する。
   - **完了基準**: `internal/cleanup` に起因する未使用コードの指摘がない。
-- [ ] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
+- [x] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
   - **作業内容**: 以下の2箇所を追記する。この2箇所は既存ファイル内で異なる命名規則を使っているため、それぞれ規則に合わせる（1つ目は `config/`・`atproto/` のようにディレクトリ名のみをそのまま記載する規則、2つ目は `internal/config`・`internal/atproto` のようにフルパスで記載する規則）。
     1. 「Directory Structure」の `internal/` 一覧（`config/`・`atproto/` が並ぶ箇所）に以下の行を追加する。
        ```
