@@ -4,6 +4,8 @@ package atprototestutil
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,12 +16,24 @@ import (
 
 // decodeStrict decodes body into target, rejecting any field body carries
 // that target does not declare -- the mechanism this file uses to detect a
-// fixture that has drifted from the lexicon shape it claims to model.
+// fixture that has drifted from the lexicon shape it claims to model. It
+// also rejects any trailing data left in body after that first JSON value,
+// so a fixture accidentally containing extra JSON (or garbage) after its
+// intended object does not silently pass as if it were a single clean value.
 func decodeStrict(t *testing.T, body string, target any) error {
 	t.Helper()
 	dec := json.NewDecoder(strings.NewReader(body))
 	dec.DisallowUnknownFields()
-	return dec.Decode(target)
+	if err := dec.Decode(target); err != nil {
+		return err
+	}
+	if err := dec.Decode(new(json.RawMessage)); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("decodeStrict: unexpected trailing JSON data in body")
+		}
+		return fmt.Errorf("decodeStrict: expected io.EOF after decoding body, got: %w", err)
+	}
+	return nil
 }
 
 func TestFixtures_CreateSessionResponse_MatchesLexicon(t *testing.T) {

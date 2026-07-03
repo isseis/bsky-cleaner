@@ -108,9 +108,16 @@ type GetRecordResponse struct {
 var GetRecordResponseRequiredFields = []string{"uri", "value"}
 
 // GetRecordResponseJSON returns a lexicon-shaped com.atproto.repo.getRecord
-// success response for the given uri/cid/record value.
+// success response for the given uri/cid/record value. cid is omitted from
+// the body when empty, matching the struct tag's omitempty behavior for
+// this lexicon-optional field.
 func GetRecordResponseJSON(uri, cid, valueJSON string) string {
-	return fmt.Sprintf(`{"uri":%s,"cid":%s,"value":%s}`, jsonString(uri), jsonString(cid), valueJSON)
+	body := fmt.Sprintf(`{"uri":%s`, jsonString(uri))
+	if cid != "" {
+		body += fmt.Sprintf(`,"cid":%s`, jsonString(cid))
+	}
+	body += fmt.Sprintf(`,"value":%s}`, valueJSON)
+	return body
 }
 
 // DeleteRecordCommit is the optional "commit" object a
