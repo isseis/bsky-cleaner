@@ -8,6 +8,20 @@ import (
 	"strings"
 )
 
+// jsonString returns s encoded as a JSON string literal (quotes included).
+// It uses encoding/json rather than fmt's %q verb: %q escapes the way Go
+// source literals do, not the way JSON does, and can emit an escape (e.g.
+// \a, \v) that is invalid JSON for certain control-byte inputs. The
+// fixture builders below take arbitrary caller-supplied strings (DIDs,
+// JWTs, cursors), so they go through this helper instead of %q.
+func jsonString(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		panic(fmt.Sprintf("jsonString: %v", err))
+	}
+	return string(b)
+}
+
 // This file provides response fixtures for the four XRPC endpoints
 // internal/atproto calls (com.atproto.server.createSession,
 // com.atproto.repo.listRecords, com.atproto.repo.getRecord,
@@ -42,7 +56,7 @@ var CreateSessionResponseRequiredFields = []string{"accessJwt", "refreshJwt", "h
 // to the given values; handle/refreshJwt are filled with fixed placeholders
 // a caller can ignore.
 func CreateSessionResponseJSON(did, accessJwt string) string {
-	return fmt.Sprintf(`{"accessJwt":%q,"refreshJwt":"fixture-refresh-jwt","handle":"alice.test","did":%q}`, accessJwt, did)
+	return fmt.Sprintf(`{"accessJwt":%s,"refreshJwt":"fixture-refresh-jwt","handle":"alice.test","did":%s}`, jsonString(accessJwt), jsonString(did))
 }
 
 // ListRecordsRecord is one entry of a com.atproto.repo.listRecords
@@ -75,7 +89,7 @@ var ListRecordsRecordRequiredFields = []string{"uri", "cid", "value"}
 func ListRecordsResponseJSON(records []string, cursor string) string {
 	body := `{"records":[` + strings.Join(records, ",") + `]`
 	if cursor != "" {
-		body += fmt.Sprintf(`,"cursor":%q`, cursor)
+		body += `,"cursor":` + jsonString(cursor)
 	}
 	body += `}`
 	return body
@@ -96,7 +110,7 @@ var GetRecordResponseRequiredFields = []string{"uri", "value"}
 // GetRecordResponseJSON returns a lexicon-shaped com.atproto.repo.getRecord
 // success response for the given uri/cid/record value.
 func GetRecordResponseJSON(uri, cid, valueJSON string) string {
-	return fmt.Sprintf(`{"uri":%q,"cid":%q,"value":%s}`, uri, cid, valueJSON)
+	return fmt.Sprintf(`{"uri":%s,"cid":%s,"value":%s}`, jsonString(uri), jsonString(cid), valueJSON)
 }
 
 // DeleteRecordCommit is the optional "commit" object a
@@ -138,5 +152,5 @@ func DeleteRecordResponseJSON() string {
 // optional commit object, for the lexicon-compliance check that decodes a
 // commit into DeleteRecordCommit.
 func DeleteRecordResponseWithCommitJSON(cid, rev string) string {
-	return fmt.Sprintf(`{"commit":{"cid":%q,"rev":%q}}`, cid, rev)
+	return fmt.Sprintf(`{"commit":{"cid":%s,"rev":%s}}`, jsonString(cid), jsonString(rev))
 }
