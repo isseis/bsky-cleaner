@@ -213,8 +213,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/23）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 6 — テストフィクスチャの lexicon 準拠検証
 
@@ -315,7 +315,7 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 - [x] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2）
 - [x] PR-2 マージ済み（対象ステップ: Phase 3）
 - [x] PR-3 マージ済み（対象ステップ: Phase 4）
-- [ ] PR-4 マージ済み（対象ステップ: Phase 5）
+- [x] PR-4 マージ済み（対象ステップ: Phase 5）
 - [ ] PR-5 マージ済み（対象ステップ: Phase 6）
 - [ ] `make fmt && make test && make lint` が最終的に成功する
 - [ ] `make deadcode` が成功する
