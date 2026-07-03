@@ -71,6 +71,10 @@ func TestErrors_NoSecretLeakage(t *testing.T) {
 			},
 		},
 		{
+			// Exercises the same doXRPC non-2xx branch as "5xx_response"
+			// (the production code does not special-case status class),
+			// but is kept as a separate case so a future change that does
+			// start differentiating 4xx from 5xx is still covered here.
 			name: "4xx_response",
 			run: func(t *testing.T) error {
 				t.Helper()
