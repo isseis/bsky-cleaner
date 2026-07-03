@@ -147,21 +147,21 @@
 - `internal/atproto/posts_test.go`（新設）
 
 **作業内容**:
-- [ ] `internal/atproto/posts.go` に `PostType` 列挙型（`PostTypeOriginal`, `PostTypeReply`, `PostTypeQuote`, `PostTypeRepost`）を実装する。
-- [ ] `internal/atproto/posts.go` に `Post` 構造体（`RKey string`, `Type PostType`, `CreatedAt time.Time`, `Pinned bool`）を実装する。
-- [ ] `internal/atproto/posts.go` に `Client.ListPosts(ctx context.Context) ([]Post, error)` を実装する。アーキテクチャ 3.2節の分類ロジック（`reply` フィールドの有無で `PostTypeReply`、`embed.$type` が `app.bsky.embed.record`/`app.bsky.embed.recordWithMedia` で `PostTypeQuote`、両方に該当しうる場合は `PostTypeReply` を優先、いずれでもなければ `PostTypeOriginal`）に従う。実装時に、`listRecords`/`getRecord` の呼び出しが `c.session`（`Login` で取得したアクセス JWT）を必要とするか（`Authorization` ヘッダーを要求するか）を確認する。必要な場合は `c.session` が `nil` のときリクエストを送信せず `ErrAuthenticationFailed` を返すガードを追加し（`DeleteRecord` にも Phase 5 で同じパターンを適用する）、`TestClient_ListPosts_WithoutSession_ReturnsError` を追加する。不要な場合はこのタスクの完了条件としてその判断根拠を実装コメントか PR 説明に残す。
-- [ ] `com.atproto.repo.listRecords`（`collection=app.bsky.feed.post`）のページネーションループを実装し、`cursor` が空になるまで全件取得する（AC-08）。
-- [ ] `com.atproto.repo.listRecords`（`collection=app.bsky.feed.repost`）のページネーションループを実装し、全件を `PostTypeRepost` として追加する（AC-08）。
-- [ ] 上記2つのページネーションループそれぞれに、直前に使ったカーソルと新たに返されたカーソルが同一の場合にループを打ち切り `ErrPaginationStalled` を返す終端保証を実装する（アーキテクチャ 6.2節「ページネーションの終端保証」）。2箇所のループに同一の停止ロジックを適用する。
-- [ ] `com.atproto.repo.getRecord`（`collection=app.bsky.actor.profile`, `rkey=self`）を呼び出し `pinnedPost` を取得する処理を実装する。レコードが存在しない場合はエラーにせず「ピン留めなし」として継続する（アーキテクチャ 3.2節3）。
-- [ ] `pinnedPost` の rkey と一致する `Post.Pinned` を `true` に設定する処理を実装する（AC-09）。
-- [ ] 投稿0件の場合、空の `[]Post` をエラーなしで返すことを確認する（AC-10。`listRecords` が空配列を返す前提での自然な帰結であり、追加の分岐は不要）。
-- [ ] `internal/atproto/posts_test.go` に `TestClient_ListPosts_ClassifiesPostTypes`（AC-07: 通常投稿・リプライ・引用ポストそれぞれのレコード形状に対する `PostType` 判定、`reply` と `embed.$type` 両方に該当するケースで `PostTypeReply` が優先されることを含む）を表駆動テストとして実装する。`newTestClient`（Phase 3）を使う。
-- [ ] `internal/atproto/posts_test.go` に `TestClient_ListPosts_IncludesReposts`（AC-07: リポストが別コレクションから取得され `PostTypeRepost` になること）を実装する。
-- [ ] `internal/atproto/posts_test.go` に `TestClient_ListPosts_Pagination`（AC-08: 複数ページにまたがる `cursor` の追従。`app.bsky.feed.post`・`app.bsky.feed.repost` 双方のページネーションを検証する）を実装する。
-- [ ] `internal/atproto/posts_test.go` に `TestClient_ListPosts_PaginationStalled`（アーキテクチャ 6.2節: カーソルが進行しない応答に対し `ErrPaginationStalled` で打ち切られること）を実装する。
-- [ ] `internal/atproto/posts_test.go` に `TestClient_ListPosts_PinnedDetection`（AC-09: `pinnedPost` と一致する投稿が `Pinned: true` になること、`profile` レコードが存在しない場合にエラーにならず「ピン留めなし」として継続すること）を実装する。
-- [ ] `internal/atproto/posts_test.go` に `TestClient_ListPosts_EmptyResult`（AC-10: 投稿0件のアカウントに対しエラーにならず空の `[]Post` を返すこと）を実装する。
+- [x] `internal/atproto/posts.go` に `PostType` 列挙型（`PostTypeOriginal`, `PostTypeReply`, `PostTypeQuote`, `PostTypeRepost`）を実装する。
+- [x] `internal/atproto/posts.go` に `Post` 構造体（`RKey string`, `Type PostType`, `CreatedAt time.Time`, `Pinned bool`）を実装する。
+- [x] `internal/atproto/posts.go` に `Client.ListPosts(ctx context.Context) ([]Post, error)` を実装する。アーキテクチャ 3.2節の分類ロジック（`reply` フィールドの有無で `PostTypeReply`、`embed.$type` が `app.bsky.embed.record`/`app.bsky.embed.recordWithMedia` で `PostTypeQuote`、両方に該当しうる場合は `PostTypeReply` を優先、いずれでもなければ `PostTypeOriginal`）に従う。実装時に、`listRecords`/`getRecord` の呼び出しが `c.session`（`Login` で取得したアクセス JWT）を必要とするか（`Authorization` ヘッダーを要求するか）を確認した結果、AT Protocol の lexicon 上 `com.atproto.repo.listRecords`/`getRecord` は認証不要の公開読み取りエンドポイントであり（`createSession`/`deleteRecord` と異なり auth 要件を持たない）、`ListPosts` は `Authorization` ヘッダーを送信せず `c.session` のガードも設けない設計とした。判断根拠は `internal/atproto/posts.go` の `ListPosts` 直上のコメントに記録し、`TestClient_ListPosts_WithoutSession_ReturnsError` は追加していない。
+- [x] `com.atproto.repo.listRecords`（`collection=app.bsky.feed.post`）のページネーションループを実装し、`cursor` が空になるまで全件取得する（AC-08）。
+- [x] `com.atproto.repo.listRecords`（`collection=app.bsky.feed.repost`）のページネーションループを実装し、全件を `PostTypeRepost` として追加する（AC-08）。
+- [x] 上記2つのページネーションループそれぞれに、直前に使ったカーソルと新たに返されたカーソルが同一の場合にループを打ち切り `ErrPaginationStalled` を返す終端保証を実装する（アーキテクチャ 6.2節「ページネーションの終端保証」）。2箇所のループに同一の停止ロジックを適用する。
+- [x] `com.atproto.repo.getRecord`（`collection=app.bsky.actor.profile`, `rkey=self`）を呼び出し `pinnedPost` を取得する処理を実装する。レコードが存在しない場合はエラーにせず「ピン留めなし」として継続する（アーキテクチャ 3.2節3）。
+- [x] `pinnedPost` の rkey と一致する `Post.Pinned` を `true` に設定する処理を実装する（AC-09）。
+- [x] 投稿0件の場合、空の `[]Post` をエラーなしで返すことを確認する（AC-10。`listRecords` が空配列を返す前提での自然な帰結であり、追加の分岐は不要）。
+- [x] `internal/atproto/posts_test.go` に `TestClient_ListPosts_ClassifiesPostTypes`（AC-07: 通常投稿・リプライ・引用ポストそれぞれのレコード形状に対する `PostType` 判定、`reply` と `embed.$type` 両方に該当するケースで `PostTypeReply` が優先されることを含む）を表駆動テストとして実装する。`newTestClient`（Phase 3）を使う。
+- [x] `internal/atproto/posts_test.go` に `TestClient_ListPosts_IncludesReposts`（AC-07: リポストが別コレクションから取得され `PostTypeRepost` になること）を実装する。
+- [x] `internal/atproto/posts_test.go` に `TestClient_ListPosts_Pagination`（AC-08: 複数ページにまたがる `cursor` の追従。`app.bsky.feed.post`・`app.bsky.feed.repost` 双方のページネーションを検証する）を実装する。
+- [x] `internal/atproto/posts_test.go` に `TestClient_ListPosts_PaginationStalled`（アーキテクチャ 6.2節: カーソルが進行しない応答に対し `ErrPaginationStalled` で打ち切られること）を実装する。
+- [x] `internal/atproto/posts_test.go` に `TestClient_ListPosts_PinnedDetection`（AC-09: `pinnedPost` と一致する投稿が `Pinned: true` になること、`profile` レコードが存在しない場合にエラーにならず「ピン留めなし」として継続すること）を実装する。
+- [x] `internal/atproto/posts_test.go` に `TestClient_ListPosts_EmptyResult`（AC-10: 投稿0件のアカウントに対しエラーにならず空の `[]Post` を返すこと）を実装する。
 
 **完了条件**: `make test`、`make lint` が成功する。
 
