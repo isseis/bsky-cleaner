@@ -244,7 +244,7 @@
 **レビュー観点**: フィクスチャのフィールド名が lexicon と一致していること / `DisallowUnknownFields` によって乖離が確実に検出できること / `TestFixtures_RequiredFieldsPresent` が lexicon 必須フィールドの欠落を実際に検出できる網羅性であること
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/24）
 - [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
 
 ## 3. 実装順序とマイルストーン
