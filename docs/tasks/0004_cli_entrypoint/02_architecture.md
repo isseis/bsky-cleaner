@@ -18,7 +18,7 @@
 
 - **YAGNI**: リトライ・タイムアウト（0005）・Slack 通知（0006）・`print-schedule`（0007）はスコープ外とし、それらのための抽象化を先取りしない。
 - **fail-closed**: 設定読み込み・クライアント初期化・ログイン・一覧取得のいずれかが失敗した場合は削除処理に進まず、非 0 の終了コードで停止する（[CLAUDE.md](../../../CLAUDE.md#key-design-patterns) 参照）。
-- **Separation of Concerns**: `cmd/main.go` は「結線」（コンポーネントの呼び出し順序と終了コードの決定）に専念し、削除対象の判定ロジックは持ち込まない（NF-002）。判定は既存の `internal/cleanup.SelectDeletionTargets` に委譲する。
+- **Separation of Concerns**: `cmd/main.go` は「組み立て」（コンポーネントの呼び出し順序と終了コードの決定）に専念し、削除対象の判定ロジックは持ち込まない（NF-002）。判定は既存の `internal/cleanup.SelectDeletionTargets` に委譲する。
 - **再利用性を見据えた構造化**: 実行結果は表示ロジックから独立した構造化データとして保持し（NF-005）、0006_slack_notification が同じデータを Slack 通知の入力として再利用できるようにする。
 
 ### 1.2 概念モデル
@@ -60,8 +60,8 @@ flowchart LR
 | F-001 (AC-01〜03) | `cmd/main.go` のフラグパース（3.2.1） |
 | F-002 (AC-04〜06) | `internal/runner.Run` の dry-run 経路 + `internal/report`（3.2.2） |
 | F-003 (AC-07〜09) | `internal/runner.Run` の apply 経路（3.2.3） |
-| F-004 (AC-10〜11) | `cmd/main.go` の結線順序とエラー時の終了コード制御（3.2.4） |
-| NF-002 | `cmd/main.go` は結線のみ、判定ロジックは `internal/cleanup`（既存）に委譲 |
+| F-004 (AC-10〜11) | `cmd/main.go` の組み立て順序とエラー時の終了コード制御（3.2.4） |
+| NF-002 | `cmd/main.go` は組み立てのみ、判定ロジックは `internal/cleanup`（既存）に委譲 |
 | NF-005 | `internal/report.Result`（表示から独立した構造化データ） |
 | NF-001, NF-004 | 専用の設計要素なし。`make fmt`/`make test`/`make lint`（NF-001）と Go 1.26.2 以上でのビルド（NF-004）は、本タスクが新規の言語機能・外部ツールに依存しないため、既存のビルド設定でそのまま満たされる |
 | NF-003 | 7.2 のテスト戦略で満たし方を記載 |
@@ -122,7 +122,7 @@ flowchart TD
 | `newpkg`（紫） | 新規追加するパッケージ |
 | `process`（オレンジ） | 既存のまま変更しないコンポーネント |
 
-`internal/atproto` の DID 解決・ログイン・一覧取得・削除ロジック自体は 0002_atproto_client で実装済みであり、本タスクはそれらを呼び出す結線のみを追加する。同様に `internal/cleanup.SelectDeletionTargets` の判定ロジックは 0003_cleanup_engine で実装済みである。`internal/runner` から `internal/config` への依存は、`Run` が `Client.Login` に渡す `config.SecretString`（app パスワード）の型を受け取るためだけの狭い依存であり、設定の読み込み・検証ロジック自体には関与しない。
+`internal/atproto` の DID 解決・ログイン・一覧取得・削除ロジック自体は 0002_atproto_client で実装済みであり、本タスクはそれらを呼び出す組み立てのみを追加する。同様に `internal/cleanup.SelectDeletionTargets` の判定ロジックは 0003_cleanup_engine で実装済みである。`internal/runner` から `internal/config` への依存は、`Run` が `Client.Login` に渡す `config.SecretString`（app パスワード）の型を受け取るためだけの狭い依存であり、設定の読み込み・検証ロジック自体には関与しない。
 
 ### 2.2 データフロー
 
@@ -254,7 +254,7 @@ type Client interface {
 func Run(ctx context.Context, client Client, appPassword config.SecretString, retentionDays int, apply bool, now time.Time) (*report.Result, error)
 ```
 
-`Client` の実体は `internal/atproto.Client`（既存、変更なし）であり、`*atproto.Client` は上記 3 メソッドを満たすためそのまま渡せる。テストではこのインターフェースを満たす偽実装、または `internal/atproto/testutil.MockHTTPDoer` を経由した実 `*atproto.Client` のいずれかを注入できる。
+`Client` の実体は `internal/atproto.Client`（既存、変更なし）であり、`*atproto.Client` は上記 3 メソッドを満たすためそのまま渡せる。テストではこのインターフェースを満たすモック実装、または `internal/atproto/testutil.MockHTTPDoer` を経由した実 `*atproto.Client` のいずれかを注入できる。
 
 ### 3.2 判定・処理ロジック
 
@@ -270,7 +270,7 @@ func Run(ctx context.Context, client Client, appPassword config.SecretString, re
 
 `apply == true` の場合、`runner.Run` は `Targets`（`cleanup.SelectDeletionTargets` の判定結果）に含まれる投稿のみを削除対象とする。ピン留め投稿・保持期間内の投稿は `SelectDeletionTargets` の時点で既に除外されているため、`runner.Run` 側で追加のフィルタリングは行わない（判定ロジックの二重実装を避ける、DRY）。`report.FormatText` は `Result.Mode == ModeApply` のとき、`len(Deleted)` と `len(Failed)`（AC-09 が要求する件数）に加え、`Failed` の各要素について rkey とエラー内容を列挙する。本タスクの時点ではリトライ（0005_retry_timeout）も Slack 通知（0006_slack_notification）も実装されておらず、標準出力が失敗の内容を伝える唯一の手段であるため、運用者が件数だけでなく「どの投稿が」「なぜ」失敗したかまで判断できるようにする。
 
-#### 3.2.4 コンポーネントの結線とエラー時の終了コード制御（AC-10〜11）
+#### 3.2.4 コンポーネントの組み立てとエラー時の終了コード制御（AC-10〜11）
 
 `cmd/main.go` の呼び出し順序は `parseFlags` → `config.LoadAppConfig` → `atproto.NewClient` → `runner.Run` である。`config.LoadAppConfig`・`atproto.NewClient`・`runner.Run` のいずれかがエラーを返した場合（`parseFlags` のエラー処理は 3.2.1 の通り別扱い）、後続の呼び出しは行わずエラーメッセージを標準エラー出力に書き、終了コード 1 で終了する（fail-closed）。`runner.Run` 自体がエラーを返すのは `Login`/`ListPosts` の失敗時のみであり、個々の投稿の削除失敗は `Run` のエラーではなく `Result.Failed` に集約される（AC-11）。`main()` は `runner.Run` が `nil` エラーで戻った場合でも `len(result.Failed) > 0` であれば非 0 の終了コードとする。
 
@@ -290,7 +290,7 @@ AC-10 由来の失敗（終了コード 1）と AC-11 由来の失敗（終了�
 ### 3.3 コンポーネントの責務（新規・変更ファイル一覧）
 
 - **`cmd/main.go`（変更）**: フラグ・引数のパース（`--config`/`-c`、`--apply`）、`atproto.NewClient` に渡す `HTTPDoer` の具体実装（`http.DefaultClient` 等、`*http.Client` は `HTTPDoer` を満たす）の構築、判定基準時刻 `now` の取得（`time.Now()` を 1 回）、`config`/`atproto`/`runner`/`report` の呼び出し順序の制御、終了コードの決定。ビジネスロジック（削除対象の判定）は持たない。既存のテストは存在しない（プレースホルダのみだったため、更新が必要な既存挙動はない）。
-- **`internal/runner/runner.go`（新規）**: `Client` インターフェースと `Run` 関数。`config`・`atproto`・`cleanup`・`report` を結線し、`*report.Result` を組み立てる。ネットワーク I/O は行わず、渡された `Client` 経由でのみ `atproto` を呼び出す。
+- **`internal/runner/runner.go`（新規）**: `Client` インターフェースと `Run` 関数。`config`・`atproto`・`cleanup`・`report` を組み立て、`*report.Result` を構築する。ネットワーク I/O は行わず、渡された `Client` 経由でのみ `atproto` を呼び出す。
 - **`internal/report/report.go`（新規）**: `Result`・`Mode`・`DeleteFailure` の型定義と `FormatText`。表示ロジックと結果データを分離し、0006_slack_notification が `Result` を再利用できるようにする。
 
 ## 4. エラーハンドリング設計
@@ -303,7 +303,7 @@ AC-10 由来の失敗（終了コード 1）と AC-11 由来の失敗（終了�
 
 プロジェクト共通のリスクカテゴリは [セキュリティ設計](../../design/security.md) を参照。本タスク固有の考慮事項は以下の通り。
 
-本タスクは「AT Protocol クライアントを呼び出し、削除（不可逆な破壊的操作）を実行する」という [_context.md](../../../.claude/commands/_context.md) の Conditional-guide trigger に該当する。ただし、DID 解決・SSRF 対策・秘密情報マスキングは 0002_atproto_client が、削除対象の判定（ピン留め除外・保持期間判定）は 0003_cleanup_engine が、それぞれ専用の設計ノートに相当する検討を経て、既に実装済みである。本タスクが新たに持ち込む唯一のリスクは「dry-run のつもりが実際に削除してしまう」という誤結線であるため、専用の設計ノートを別途起こす代わりに、その境界を次の 5.1 で明示する。
+本タスクは「AT Protocol クライアントを呼び出し、削除（不可逆な破壊的操作）を実行する」という [_context.md](../../../.claude/commands/_context.md) の Conditional-guide trigger に該当する。ただし、DID 解決・SSRF 対策・秘密情報マスキングは 0002_atproto_client が、削除対象の判定（ピン留め除外・保持期間判定）は 0003_cleanup_engine が、それぞれ専用の設計ノートに相当する検討を経て、既に実装済みである。本タスクが新たに持ち込む唯一のリスクは「dry-run のつもりが実際に削除してしまう」という組み立てミスであるため、専用の設計ノートを別途起こす代わりに、その境界を次の 5.1 で明示する。
 
 本タスクは新規の外部サービス連携を追加しない（既存の `internal/atproto` が提供する XRPC 呼び出しをそのまま利用するのみ）ため、「新規の外部サービス機能の全対象クライアント環境での動作検証」は対象外（N/A）である。
 
@@ -368,7 +368,7 @@ flowchart TD
 ### 7.1 単体テスト
 
 - `internal/report`: `FormatText` を `Result` の各パターン（dry-run・0 件・apply 全件成功・apply 一部失敗）で検証する。apply 一部失敗のパターンでは、失敗件数だけでなく、各失敗の rkey とエラー内容が出力に含まれることを検証する。
-- `internal/runner`: `Client` インターフェースを満たす偽実装（テスト専用、`internal/runner` 配下の `test_helpers.go` または偽 `Client` を返す軽量モック）を注入し、以下を検証する。
+- `internal/runner`: `Client` インターフェースを満たすモック実装（テスト専用、`internal/runner` 配下の `test_helpers.go` に定義する軽量モック）を注入し、以下を検証する。
   - dry-run（`apply=false`）で `DeleteRecord` が一度も呼ばれないこと（AC-05）。
   - apply（`apply=true`）で `Targets` の全件に対して `DeleteRecord` が呼ばれること（AC-07）。
   - 一部の `DeleteRecord` がエラーを返しても残りの呼び出しが継続され、`Result.Failed`/`Result.Deleted` に正しく振り分けられること（AC-11）。
@@ -383,7 +383,7 @@ flowchart TD
 ### 7.2 統合テスト
 
 - NF-003（「dry-run がデフォルト」の明示的な検証）は、7.1 の `parseFlags` テスト（フラグ未指定で `apply=false`）と `internal/runner` テスト（`apply=false` で `DeleteRecord` 呼び出し 0 回）を組み合わせて満たす。両テストが揃って初めて「フラグ未指定 → 実削除が一切発生しない」という一連の振る舞いが検証される。
-- `internal/atproto/testutil.MockHTTPDoer`（既存）を用いて、実 `*atproto.Client` を `runner.Client` として注入するテストを 1 本以上用意し、`runner.Run` が実クライアントの型と実際に結線できることを確認する（インターフェースの形状不一致を検出するための最小限の結合テスト）。
+- `internal/atproto/testutil.MockHTTPDoer`（既存）を用いて、実 `*atproto.Client` を `runner.Client` として注入するテストを 1 本以上用意し、`runner.Run` が実クライアントの型と実際に組み立てられることを確認する（インターフェースの形状不一致を検出するための最小限の結合テスト）。
 
 ### 7.3 セキュリティ・回帰テスト
 
@@ -405,5 +405,5 @@ flowchart TD
 
 - **NF-005 の「構造化データ（interface）」を Go の `interface` 型ではなく `struct`（`report.Result`）として実装した理由**: NF-005 が求めているのは「標準出力への表示ロジックから独立した、再利用可能なデータ」という API 境界としての独立性であり、複数の実装を切り替えるための多態性（Go の `interface` 型）そのものではない。`Result` の形状は単一であり、0006_slack_notification もこの同じ具体型をそのまま入力として再利用する想定であるため、`interface` 型による抽象化を追加することは YAGNI に反する。
 
-- **`Result` を `internal/runner` ではなく独立した `internal/report` に置いた理由**: `runner` は結線ロジック（ネットワーク呼び出しの順序制御）を持つため、0006_slack_notification が「結果の型だけ」を参照したい場合に `runner` パッケージ全体（`Client` インターフェースや `Run` の実装詳細）への依存を強制してしまう。データ型と表示ロジックを結線ロジックから分離することで、NF-005 が意図する「表示ロジックとは独立した構造化データ」という要件をパッケージ境界としても表現した。
+- **`Result` を `internal/runner` ではなく独立した `internal/report` に置いた理由**: `runner` は組み立てロジック（ネットワーク呼び出しの順序制御）を持つため、0006_slack_notification が「結果の型だけ」を参照したい場合に `runner` パッケージ全体（`Client` インターフェースや `Run` の実装詳細）への依存を強制してしまう。データ型と表示ロジックを組み立てロジックから分離することで、NF-005 が意図する「表示ロジックとは独立した構造化データ」という要件をパッケージ境界としても表現した。
 - **`flag.ExitOnError`（標準の `flag.Parse()` の挙動）を採用しなかった理由**: `os.Exit` を直接呼ぶため、NF-003 が要求する「フラグ未指定時に dry-run になること」の統合テストが書けなくなる（プロセスが終了してしまう）。`flag.ContinueOnError` + テスト可能な `parseFlags` 関数に切り出すことで、この要件を満たしながら AC-03（使用方法表示 + 非 0 終了）は `main()` 側で維持した。
