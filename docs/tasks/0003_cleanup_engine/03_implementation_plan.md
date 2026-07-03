@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-04 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-04 |
+| Reviewer | isseis |
 | Comments | - |
 
 関連ドキュメント: [要件定義書](01_requirements.md) / [アーキテクチャ設計書](02_architecture.md)
@@ -36,7 +36,7 @@
 
 ### フェーズ1: `SelectDeletionTargets` の実装（F-001〜F-003、AC-01〜AC-08 全体の実装基盤）
 
-- [ ] **対象ファイル**: `internal/cleanup/cleanup.go`（新規作成）
+- [x] **対象ファイル**: `internal/cleanup/cleanup.go`（新規作成）
   - **作業内容**:
     - `package cleanup` を宣言し、`internal/atproto` パッケージをインポートする。
     - 設計書 3.1 節のシグネチャをそのまま実装する: `func SelectDeletionTargets(posts []atproto.Post, retentionDays int, now time.Time) []atproto.Post`（`error` を返さない）。
@@ -44,28 +44,33 @@
     - 戻り値は `nil` 入力に対しても空スライスを返す（設計書 4節、パニックしないことを保証する）。
   - **完了基準**: `go build ./...` が成功する。フェーズ2のテストがすべて通過する。
 
-**PR-1 作成ポイント**: cleanup engine implementation
-
-- **対象ステップ**: フェーズ1・フェーズ2
-- **推奨タイトル**: `feat(0003-cleanup-engine): implement SelectDeletionTargets`
-- **レビュー観点**: 3条件の判定順序と比較演算子（`Before` のみを使い等号を含まないこと）、`switch` 文が4定数を明示列挙し `default` 側で除外していること
-
 ### フェーズ2: 単体テストの作成（AC-01〜AC-08）
 
-- [ ] **対象ファイル**: `internal/cleanup/cleanup_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/cleanup/cleanup_test.go`（新規作成）
   - **作業内容**: 設計書 7.1 節の表に基づき、以下のテストケースを作成する。`now` はすべてのテストで固定値（例: `time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC)`）を明示的に引数として渡し、`time.Now()` は使用しない（NF-002a）。
-    - [ ] `TestSelectDeletionTargets_OlderThanThreshold_Included`: `CreatedAt` が閾値時刻より古い投稿1件が戻り値に含まれることを検証する（AC-01）。
-    - [ ] `TestSelectDeletionTargets_WithinThreshold_Excluded`: `CreatedAt` が閾値時刻以内（`now` に近い、閾値より新しい）投稿1件が戻り値に含まれないことを検証する（AC-02）。
-    - [ ] `TestSelectDeletionTargets_ExactlyAtThreshold_Excluded`: `CreatedAt` が閾値時刻とちょうど等しい投稿1件が戻り値に含まれないことを検証する境界値テスト（AC-03）。
-    - [ ] `TestSelectDeletionTargets_NonUTCOffset_NormalizedBeforeComparison`: `CreatedAt` に UTC 以外のオフセット（例: `time.FixedZone("JST", 9*60*60)` で構成した、UTC 換算では閾値より古くなる時刻）を持つ投稿が正しく削除対象と判定されることを検証する（AC-04）。合わせて、同じオフセットで UTC 換算後に閾値より新しくなる時刻の投稿が削除対象外と判定されるケースも1件加え、オフセット変換が「常に削除対象」側に偏っていないことを確認する。
-    - [ ] `TestSelectDeletionTargets_AllKnownPostTypes_Included`: `atproto.PostTypeOriginal`/`atproto.PostTypeReply`/`atproto.PostTypeQuote`/`atproto.PostTypeRepost` それぞれについて、経過日数条件を満たす投稿1件ずつが戻り値に含まれることを検証する（AC-05）。4種別をテーブル駆動テスト（`[]struct{ name string; postType atproto.PostType }`）で1関数にまとめてよい。
-    - [ ] `TestSelectDeletionTargets_UnknownPostType_Excluded`: `atproto.PostType(99)` のように既知4定数のいずれにも一致しない値を持つ投稿が、経過日数条件を満たしていても戻り値に含まれないことを検証する（AC-06）。
-    - [ ] `TestSelectDeletionTargets_Pinned_Excluded`: `Pinned: true` かつ経過日数条件を満たす投稿1件が戻り値に含まれないことを検証する（AC-07）。
-    - [ ] `TestSelectDeletionTargets_Unpinned_Included`: `Pinned: false` かつ経過日数条件を満たす投稿1件が戻り値に含まれることを検証する（AC-08。ピン留め解除後の状態を、解除後の `Post` 値をそのまま入力として与えることで表現する。ピン留め状態の時系列変化そのものは本パッケージの関心事ではなく、単に `Pinned` フィールドの現在値に基づく判定であることを確認する）。
-    - [ ] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライスを返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
+    - [x] `TestSelectDeletionTargets_OlderThanThreshold_Included`: `CreatedAt` が閾値時刻より古い投稿1件が戻り値に含まれることを検証する（AC-01）。
+    - [x] `TestSelectDeletionTargets_WithinThreshold_Excluded`: `CreatedAt` が閾値時刻以内（`now` に近い、閾値より新しい）投稿1件が戻り値に含まれないことを検証する（AC-02）。
+    - [x] `TestSelectDeletionTargets_ExactlyAtThreshold_Excluded`: `CreatedAt` が閾値時刻とちょうど等しい投稿1件が戻り値に含まれないことを検証する境界値テスト（AC-03）。
+    - [x] `TestSelectDeletionTargets_NonUTCOffset_NormalizedBeforeComparison`: `CreatedAt` に UTC 以外のオフセット（例: `time.FixedZone("JST", 9*60*60)` で構成した、UTC 換算では閾値より古くなる時刻）を持つ投稿が正しく削除対象と判定されることを検証する（AC-04）。合わせて、同じオフセットで UTC 換算後に閾値より新しくなる時刻の投稿が削除対象外と判定されるケースも1件加え、オフセット変換が「常に削除対象」側に偏っていないことを確認する。
+    - [x] `TestSelectDeletionTargets_AllKnownPostTypes_Included`: `atproto.PostTypeOriginal`/`atproto.PostTypeReply`/`atproto.PostTypeQuote`/`atproto.PostTypeRepost` それぞれについて、経過日数条件を満たす投稿1件ずつが戻り値に含まれることを検証する（AC-05）。4種別をテーブル駆動テスト（`[]struct{ name string; postType atproto.PostType }`）で1関数にまとめてよい。
+    - [x] `TestSelectDeletionTargets_UnknownPostType_Excluded`: `atproto.PostType(99)` のように既知4定数のいずれにも一致しない値を持つ投稿が、経過日数条件を満たしていても戻り値に含まれないことを検証する（AC-06）。
+    - [x] `TestSelectDeletionTargets_Pinned_Excluded`: `Pinned: true` かつ経過日数条件を満たす投稿1件が戻り値に含まれないことを検証する（AC-07）。
+    - [x] `TestSelectDeletionTargets_Unpinned_Included`: `Pinned: false` かつ経過日数条件を満たす投稿1件が戻り値に含まれることを検証する（AC-08。ピン留め解除後の状態を、解除後の `Post` 値をそのまま入力として与えることで表現する。ピン留め状態の時系列変化そのものは本パッケージの関心事ではなく、単に `Pinned` フィールドの現在値に基づく判定であることを確認する）。
+    - [x] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライスを返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
   - **完了基準**: `make test` で `internal/cleanup` パッケージの全テストが成功する。各テストは `assert`/`require`（`github.com/stretchr/testify`）を用いてアサーションを記述する（CLAUDE.md テスト方針）。
 
-**PR-1 作成ポイントに統合**（フェーズ1と同一 PR。理由: 判定ロジックとそのテストは1つの完結した変更単位であり、実装のみを含む中間 PR は動作確認ができないため分割しない）
+### PR-1 作成ポイント: cleanup engine implementation
+
+**対象ステップ**: フェーズ1 / フェーズ2
+
+**推奨タイトル**: `feat(0003-cleanup-engine): implement SelectDeletionTargets`
+
+**レビュー観点**: 3条件の判定順序と比較演算子（`Before` のみを使い等号を含まないこと） / `switch` 文が4定数を明示列挙し `default` 側で除外していること / 判定ロジックとそのテストは1つの完結した変更単位であり分割しないこと
+
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/28）
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ3: 品質確認とドキュメント更新
 
@@ -91,11 +96,18 @@
     - `rg -n "cleanup/" docs/dev/developer_guide/package_reference.md` （Directory Structure への追記を確認）
     - `rg -n "internal/cleanup" docs/dev/developer_guide/package_reference.md` （Package Responsibilities への追記を確認。この2つ目のコマンドは1つ目のディレクトリ構成の行にはヒットしない。その行は `cleanup/` であって `internal/cleanup` という文字列を含まないためである）
 
-**PR-2 作成ポイント**: package reference documentation update
+### PR-2 作成ポイント: package reference documentation update
 
-- **対象ステップ**: フェーズ3
-- **推奨タイトル**: `docs(0003-cleanup-engine): document internal/cleanup in package reference`
-- **レビュー観点**: 追記内容が既存の `internal/atproto`・`internal/config` の記述粒度・文体と一致していること
+**対象ステップ**: フェーズ3
+
+**推奨タイトル**: `docs(0003-cleanup-engine): add internal/cleanup to package reference`
+
+**レビュー観点**: 追記内容が既存の `internal/atproto`・`internal/config` の記述粒度・文体と一致していること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ## 3. 実装順序とマイルストーン
 
@@ -110,7 +122,7 @@
 
 | PR | 対応フェーズ | 概要 |
 |---|---|---|
-| PR-1 | フェーズ1・フェーズ2 | `internal/cleanup` パッケージの新設（実装＋単体テスト） |
+| PR-1 | フェーズ1 / フェーズ2 | `internal/cleanup` パッケージの新設（実装＋単体テスト） |
 | PR-2 | フェーズ3 | 品質確認完了後の `package_reference.md` 更新 |
 
 ## 4. テスト戦略
@@ -141,9 +153,8 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] フェーズ1完了（`internal/cleanup/cleanup.go` 作成）
-- [ ] フェーズ2完了（`internal/cleanup/cleanup_test.go` 作成、AC-01〜AC-08 全テストケース追加）
-- [ ] フェーズ3完了（`package_reference.md` 更新）
+- [ ] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2。`internal/cleanup/cleanup.go`・`internal/cleanup/cleanup_test.go` 作成、AC-01〜AC-08 全テストケース追加）
+- [ ] PR-2 マージ済み（対象ステップ: フェーズ3。`package_reference.md` 更新）
 - [ ] `make fmt` / `make test` / `make lint` がすべて通過
 - [ ] `make deadcode` で未使用コードがないことを確認
 
