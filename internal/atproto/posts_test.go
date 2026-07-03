@@ -257,6 +257,17 @@ func TestClient_ListPosts_PinnedDetection(t *testing.T) {
 		assert.ErrorIs(t, err, ErrHTTPStatus)
 		assert.Nil(t, posts)
 	})
+
+	t.Run("profile fetch returns 400 with a different error name: propagated, not swallowed as no pin", func(t *testing.T) {
+		handler := newListPostsHandler(t, []string{postPage}, []string{repostPage}, http.StatusBadRequest, `{"error":"InvalidRequest"}`)
+		client, _ := newPostsTestClient(handler)
+
+		posts, err := client.ListPosts(context.Background())
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrHTTPStatus)
+		assert.Nil(t, posts)
+	})
 }
 
 func TestClient_ListPosts_EmptyResult(t *testing.T) {
