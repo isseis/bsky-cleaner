@@ -1,7 +1,7 @@
 // Package cleanup selects the subset of an account's post inventory that
 // is eligible for deletion under the retention policy. It has no
-// dependency on the AT Protocol client itself -- only on the atproto.Post/
-// atproto.PostType types -- so it can be tested without mocks.
+// dependency on the AT Protocol client itself -- only on the atproto.Post
+// and atproto.PostType types -- so it can be tested without mocks.
 package cleanup
 
 import (

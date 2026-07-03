@@ -54,8 +54,8 @@ func TestSelectDeletionTargets_NonUTCOffset_NormalizedBeforeComparison(t *testin
 		Type:      atproto.PostTypeOriginal,
 		CreatedAt: threshold.Add(-1 * time.Hour).In(jst),
 	}
-	// Conversely, this looks older in JST wall-clock time but converts to
-	// a UTC time still within (i.e. not before) the threshold.
+	// Conversely, this looks newer in JST wall-clock time, and it also
+	// converts to a UTC time still within (i.e. not before) the threshold.
 	newerInUTC := atproto.Post{
 		RKey:      "newer-after-utc-conversion",
 		Type:      atproto.PostTypeOriginal,
