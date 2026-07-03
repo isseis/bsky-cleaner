@@ -30,8 +30,8 @@ type deleteRecordRequest struct {
 // record, or ensure it doesn't exist"), deleting an already-absent rkey
 // still succeeds with a 200 response -- there is no separate error name
 // for "not found" to special-case, unlike ListPosts's getRecord fallback.
-// DeleteRecord therefore treats any 200 response as success and any other
-// response as a genuine failure.
+// DeleteRecord therefore treats any 2xx response (via doXRPC's shared
+// success check) as success and any other response as a genuine failure.
 func (c *Client) DeleteRecord(ctx context.Context, rkey string) error {
 	if c.session == nil {
 		return fmt.Errorf("delete record: %w", ErrAuthenticationFailed)
