@@ -36,7 +36,7 @@
 
 ### フェーズ1: `SelectDeletionTargets` の実装（F-001〜F-003、AC-01〜AC-08 全体の実装基盤）
 
-- [ ] **対象ファイル**: `internal/cleanup/cleanup.go`（新規作成）
+- [x] **対象ファイル**: `internal/cleanup/cleanup.go`（新規作成）
   - **作業内容**:
     - `package cleanup` を宣言し、`internal/atproto` パッケージをインポートする。
     - 設計書 3.1 節のシグネチャをそのまま実装する: `func SelectDeletionTargets(posts []atproto.Post, retentionDays int, now time.Time) []atproto.Post`（`error` を返さない）。
@@ -46,17 +46,17 @@
 
 ### フェーズ2: 単体テストの作成（AC-01〜AC-08）
 
-- [ ] **対象ファイル**: `internal/cleanup/cleanup_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/cleanup/cleanup_test.go`（新規作成）
   - **作業内容**: 設計書 7.1 節の表に基づき、以下のテストケースを作成する。`now` はすべてのテストで固定値（例: `time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC)`）を明示的に引数として渡し、`time.Now()` は使用しない（NF-002a）。
-    - [ ] `TestSelectDeletionTargets_OlderThanThreshold_Included`: `CreatedAt` が閾値時刻より古い投稿1件が戻り値に含まれることを検証する（AC-01）。
-    - [ ] `TestSelectDeletionTargets_WithinThreshold_Excluded`: `CreatedAt` が閾値時刻以内（`now` に近い、閾値より新しい）投稿1件が戻り値に含まれないことを検証する（AC-02）。
-    - [ ] `TestSelectDeletionTargets_ExactlyAtThreshold_Excluded`: `CreatedAt` が閾値時刻とちょうど等しい投稿1件が戻り値に含まれないことを検証する境界値テスト（AC-03）。
-    - [ ] `TestSelectDeletionTargets_NonUTCOffset_NormalizedBeforeComparison`: `CreatedAt` に UTC 以外のオフセット（例: `time.FixedZone("JST", 9*60*60)` で構成した、UTC 換算では閾値より古くなる時刻）を持つ投稿が正しく削除対象と判定されることを検証する（AC-04）。合わせて、同じオフセットで UTC 換算後に閾値より新しくなる時刻の投稿が削除対象外と判定されるケースも1件加え、オフセット変換が「常に削除対象」側に偏っていないことを確認する。
-    - [ ] `TestSelectDeletionTargets_AllKnownPostTypes_Included`: `atproto.PostTypeOriginal`/`atproto.PostTypeReply`/`atproto.PostTypeQuote`/`atproto.PostTypeRepost` それぞれについて、経過日数条件を満たす投稿1件ずつが戻り値に含まれることを検証する（AC-05）。4種別をテーブル駆動テスト（`[]struct{ name string; postType atproto.PostType }`）で1関数にまとめてよい。
-    - [ ] `TestSelectDeletionTargets_UnknownPostType_Excluded`: `atproto.PostType(99)` のように既知4定数のいずれにも一致しない値を持つ投稿が、経過日数条件を満たしていても戻り値に含まれないことを検証する（AC-06）。
-    - [ ] `TestSelectDeletionTargets_Pinned_Excluded`: `Pinned: true` かつ経過日数条件を満たす投稿1件が戻り値に含まれないことを検証する（AC-07）。
-    - [ ] `TestSelectDeletionTargets_Unpinned_Included`: `Pinned: false` かつ経過日数条件を満たす投稿1件が戻り値に含まれることを検証する（AC-08。ピン留め解除後の状態を、解除後の `Post` 値をそのまま入力として与えることで表現する。ピン留め状態の時系列変化そのものは本パッケージの関心事ではなく、単に `Pinned` フィールドの現在値に基づく判定であることを確認する）。
-    - [ ] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライスを返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
+    - [x] `TestSelectDeletionTargets_OlderThanThreshold_Included`: `CreatedAt` が閾値時刻より古い投稿1件が戻り値に含まれることを検証する（AC-01）。
+    - [x] `TestSelectDeletionTargets_WithinThreshold_Excluded`: `CreatedAt` が閾値時刻以内（`now` に近い、閾値より新しい）投稿1件が戻り値に含まれないことを検証する（AC-02）。
+    - [x] `TestSelectDeletionTargets_ExactlyAtThreshold_Excluded`: `CreatedAt` が閾値時刻とちょうど等しい投稿1件が戻り値に含まれないことを検証する境界値テスト（AC-03）。
+    - [x] `TestSelectDeletionTargets_NonUTCOffset_NormalizedBeforeComparison`: `CreatedAt` に UTC 以外のオフセット（例: `time.FixedZone("JST", 9*60*60)` で構成した、UTC 換算では閾値より古くなる時刻）を持つ投稿が正しく削除対象と判定されることを検証する（AC-04）。合わせて、同じオフセットで UTC 換算後に閾値より新しくなる時刻の投稿が削除対象外と判定されるケースも1件加え、オフセット変換が「常に削除対象」側に偏っていないことを確認する。
+    - [x] `TestSelectDeletionTargets_AllKnownPostTypes_Included`: `atproto.PostTypeOriginal`/`atproto.PostTypeReply`/`atproto.PostTypeQuote`/`atproto.PostTypeRepost` それぞれについて、経過日数条件を満たす投稿1件ずつが戻り値に含まれることを検証する（AC-05）。4種別をテーブル駆動テスト（`[]struct{ name string; postType atproto.PostType }`）で1関数にまとめてよい。
+    - [x] `TestSelectDeletionTargets_UnknownPostType_Excluded`: `atproto.PostType(99)` のように既知4定数のいずれにも一致しない値を持つ投稿が、経過日数条件を満たしていても戻り値に含まれないことを検証する（AC-06）。
+    - [x] `TestSelectDeletionTargets_Pinned_Excluded`: `Pinned: true` かつ経過日数条件を満たす投稿1件が戻り値に含まれないことを検証する（AC-07）。
+    - [x] `TestSelectDeletionTargets_Unpinned_Included`: `Pinned: false` かつ経過日数条件を満たす投稿1件が戻り値に含まれることを検証する（AC-08。ピン留め解除後の状態を、解除後の `Post` 値をそのまま入力として与えることで表現する。ピン留め状態の時系列変化そのものは本パッケージの関心事ではなく、単に `Pinned` フィールドの現在値に基づく判定であることを確認する）。
+    - [x] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライスを返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
   - **完了基準**: `make test` で `internal/cleanup` パッケージの全テストが成功する。各テストは `assert`/`require`（`github.com/stretchr/testify`）を用いてアサーションを記述する（CLAUDE.md テスト方針）。
 
 ### PR-1 作成ポイント: cleanup engine implementation
