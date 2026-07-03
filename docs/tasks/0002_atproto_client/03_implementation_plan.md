@@ -188,18 +188,18 @@
 - `internal/atproto/errors_test.go`（新設。全 Phase のエラーパスが出揃った時点で横断的に確認するため、Phase 5 のこの位置で追加する。4.2節参照）
 
 **作業内容**:
-- [ ] 着手前に、存在しない `rkey` を指定した `com.atproto.repo.deleteRecord` の実際の挙動（200 で成功応答を返すか、`InvalidRequest` 系のエラー名を伴う 400 応答を返すか）を、AT Protocol lexicon 一次資料（`com.atproto.repo.deleteRecord` の lexicon 定義）で確認する（アーキテクチャ 6.3節「冪等性の前提と検証状況」の未検証の仮定を解消するタスク）。lexicon 定義がエラー応答時の挙動を明示していない場合は、[プロジェクト概要](../../overview.md#完了の定義) の手動 dry-run/apply 確認で実際の PDS 応答を確認し、確認結果を本ステップのチェックボックス完了時のコミットメッセージまたは PR 説明に記録する。
-- [ ] 上記調査の結果に応じて、`DeleteRecord` が「正常系」として扱う応答条件（200 のみか、特定のエラー名を伴う 400 も含むか）を確定する。
-- [ ] `internal/atproto/delete.go` に `Client.DeleteRecord(ctx context.Context, rkey string) error` を実装する。`com.atproto.repo.deleteRecord` に `{repo: c.session.DID, collection: "app.bsky.feed.post", rkey}` を POST する（AC-11, AC-13）。`repo` パラメータは常に `c.session.DID`（`Login` で取得した自分自身の DID）を使い、呼び出し元から `repo` を受け取るパラメータは公開しない（AC-13）。`c.session` が `nil`（`Login` が呼ばれていない、または失敗した状態）の場合は、リクエストを送信せず `ErrAuthenticationFailed` を返す（AC-05 が要求する「ログイン失敗後は後続の API 呼び出しが行われない」ことを、呼び出し元の実装ミスに依存せずクライアント自身のガードとして保証する）。
-- [ ] 上記の調査結果で確定した「正常系」条件（200、または特定エラー名を伴う 400）のいずれの場合も `nil` を返す（AC-12）。
-- [ ] それ以外のエラー応答は `HTTPError` として返す。
-- [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_Success`（AC-11: 存在する rkey の削除が成功すること）を実装する。`newTestClient`（Phase 3）を使う。
-- [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_AlreadyDeleted_Idempotent`（AC-12: 既に削除済みの rkey に対してクラッシュせず正常系として扱われること。上記調査で確定した応答条件をモックで再現する）を実装する。
-- [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_UsesOwnDID`（AC-13: リクエストの `repo` パラメータが常に `c.session.DID` であることをモックが記録したリクエストボディでアサートする）を実装する。
-- [ ] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_WithoutSession_ReturnsError`（AC-05: `newTestClient` で `session` に `nil` を渡した `*Client` に対し `DeleteRecord` を呼び出した場合、パニックせず `errors.Is(err, atproto.ErrAuthenticationFailed)` を満たすエラーが返り、モックへのリクエストが1件も発行されていないこと）を実装する。
-- [ ] `internal/atproto/errors_test.go` に `TestHTTPError_ErrorsIs`（AC-14: `errors.Is(err, atproto.ErrHTTPStatus)` 等のセンチネル判定が機能すること）を実装する。この時点で Phase 1〜5 の全エラーパスが出揃っているため、横断確認をこの位置で行う（4.2節参照）。
-- [ ] `internal/atproto/errors_test.go` に `TestHTTPError_AsType`（AC-14: `errors.AsType[*atproto.HTTPError](err)` でステータスコードを取得できること）を実装する。
-- [ ] `internal/atproto/errors_test.go` に `TestErrors_NoSecretLeakage`（AC-15: タイムアウト・5xx・4xx・ログイン失敗の各エラーパスについて、`Error()` の文字列表現に `Authorization` ヘッダーの値・app パスワード・セッション JWT のいずれも含まれないことを表駆動テストで確認する）を実装する。
+- [x] 着手前に、存在しない `rkey` を指定した `com.atproto.repo.deleteRecord` の実際の挙動（200 で成功応答を返すか、`InvalidRequest` 系のエラー名を伴う 400 応答を返すか）を、AT Protocol lexicon 一次資料（`com.atproto.repo.deleteRecord` の lexicon 定義）で確認する（アーキテクチャ 6.3節「冪等性の前提と検証状況」の未検証の仮定を解消するタスク）。**確認結果**: 公式 lexicon（`bluesky-social/atproto` リポジトリの `lexicons/com/atproto/repo/deleteRecord.json`）の説明文は "Delete a repository record, or ensure it doesn't exist." であり、存在しない rkey への削除は明示的に正常系（200 応答、コミットオブジェクトを返す）として定義されている。lexicon が定義するエラーは `InvalidSwap`（`swapRecord`/`swapCommit` の compare-and-swap 検証失敗）のみで、本実装はこれらのパラメータを使わないため、この経路のエラーは発生しえない。手動 dry-run/apply 確認への切り替えは不要だった。
+- [x] 上記調査の結果に応じて、`DeleteRecord` が「正常系」として扱う応答条件（200 のみか、特定のエラー名を伴う 400 も含むか）を確定する。**結論**: 200 応答のみを正常系として扱う。lexicon がエラー名による「対象なし」の区別を定義していないため、特定エラー名を伴う 400 を正常系に含める必要はない。
+- [x] `internal/atproto/delete.go` に `Client.DeleteRecord(ctx context.Context, rkey string) error` を実装する。`com.atproto.repo.deleteRecord` に `{repo: c.session.DID, collection: "app.bsky.feed.post", rkey}` を POST する（AC-11, AC-13）。`repo` パラメータは常に `c.session.DID`（`Login` で取得した自分自身の DID）を使い、呼び出し元から `repo` を受け取るパラメータは公開しない（AC-13）。`c.session` が `nil`（`Login` が呼ばれていない、または失敗した状態）の場合は、リクエストを送信せず `ErrAuthenticationFailed` を返す（AC-05 が要求する「ログイン失敗後は後続の API 呼び出しが行われない」ことを、呼び出し元の実装ミスに依存せずクライアント自身のガードとして保証する）。`deleteRecord` は lexicon 上 auth 必須のエンドポイントであるため（`listRecords`/`getRecord` と異なり）、`c.session.AccessJWT` を `Authorization: Bearer` ヘッダーとして送信する。
+- [x] 上記の調査結果で確定した「正常系」条件（200 のみ）の場合 `nil` を返す（AC-12）。
+- [x] それ以外のエラー応答は `HTTPError` として返す。
+- [x] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_Success`（AC-11: 存在する rkey の削除が成功すること）を実装する。`newTestClient`（Phase 3）を使う。
+- [x] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_AlreadyDeleted_Idempotent`（AC-12: 既に削除済みの rkey に対してクラッシュせず正常系として扱われること。上記調査で確定した応答条件をモックで再現する）を実装する。
+- [x] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_UsesOwnDID`（AC-13: リクエストの `repo` パラメータが常に `c.session.DID` であることをモックが記録したリクエストボディでアサートする）を実装する。
+- [x] `internal/atproto/delete_test.go` に `TestClient_DeleteRecord_WithoutSession_ReturnsError`（AC-05: `newTestClient` で `session` に `nil` を渡した `*Client` に対し `DeleteRecord` を呼び出した場合、パニックせず `errors.Is(err, atproto.ErrAuthenticationFailed)` を満たすエラーが返り、モックへのリクエストが1件も発行されていないこと）を実装する。
+- [x] `internal/atproto/errors_test.go` に `TestHTTPError_ErrorsIs`（AC-14: `errors.Is(err, atproto.ErrHTTPStatus)` 等のセンチネル判定が機能すること）を実装する。この時点で Phase 1〜5 の全エラーパスが出揃っているため、横断確認をこの位置で行う（4.2節参照）。
+- [x] `internal/atproto/errors_test.go` に `TestHTTPError_AsType`（AC-14: `errors.AsType[*atproto.HTTPError](err)` でステータスコードを取得できること）を実装する。
+- [x] `internal/atproto/errors_test.go` に `TestErrors_NoSecretLeakage`（AC-15: タイムアウト・5xx・4xx・ログイン失敗の各エラーパスについて、`Error()` の文字列表現に `Authorization` ヘッダーの値・app パスワード・セッション JWT のいずれも含まれないことを表駆動テストで確認する）を実装する。
 
 **完了条件**: `make test`（`errors_test.go` を含む）、`make lint` が成功する。
 
