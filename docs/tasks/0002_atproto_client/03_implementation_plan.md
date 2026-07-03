@@ -245,7 +245,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/24）
-- [ ] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
+- [x] PR がマージされた（最終 PR のため、次のブランチへの切り替えは不要）
 
 ## 3. 実装順序とマイルストーン
 
@@ -296,8 +296,8 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 
 `internal/atproto` は完全新設パッケージであり、既存シンボルの削除・変更は発生しないため、削除済みシンボルへの残存参照チェックは不要。以下のみ確認する。
 
-- [ ] `rg -n "atprototestutil" -g '*.go' internal` — `testutil/mocks.go` と `testutil/fixtures.go` の両方が同一パッケージ名 `atprototestutil` を使っていること（test_organization.md のドメインプレフィックス命名規則、パッケージ名が分かれていないこと）。期待結果: 両ファイルの `package` 宣言行がいずれも `package atprototestutil` であること。
-- [ ] `docs/dev/developer_guide/package_reference.md` を目視し、以下の2点を確認する（読みやすさ確認、コマンドの成否では判定できないため目視確認とする）: (1) Phase 6 で追記した `internal/atproto` の説明が既存の `internal/config` の記述と重複した文言になっていないこと、(2) 追記内容が Phase 5 完了時点の実際の公開 API（`NewClient`/`Login`/`ListPosts`/`DeleteRecord`）とアーキテクチャ 1.1節の単一責任の説明を正しく反映しており、実装されなかった機能や誤った責務を記載していないこと。
+- [x] `rg -n "atprototestutil" -g '*.go' internal` — `testutil/mocks.go` と `testutil/fixtures.go` の両方が同一パッケージ名 `atprototestutil` を使っていること（test_organization.md のドメインプレフィックス命名規則、パッケージ名が分かれていないこと）。期待結果: 両ファイルの `package` 宣言行がいずれも `package atprototestutil` であること。確認済み。
+- [x] `docs/dev/developer_guide/package_reference.md` を目視し、以下の2点を確認する（読みやすさ確認、コマンドの成否では判定できないため目視確認とする）: (1) Phase 6 で追記した `internal/atproto` の説明が既存の `internal/config` の記述と重複した文言になっていないこと、(2) 追記内容が Phase 5 完了時点の実際の公開 API（`NewClient`/`Login`/`ListPosts`/`DeleteRecord`）とアーキテクチャ 1.1節の単一責任の説明を正しく反映しており、実装されなかった機能や誤った責務を記載していないこと。確認済み。
 
 ## 5. リスク管理
 
@@ -316,9 +316,9 @@ Phase 1〜6 は [アーキテクチャ設計書](02_architecture.md) 8節の優�
 - [x] PR-2 マージ済み（対象ステップ: Phase 3）
 - [x] PR-3 マージ済み（対象ステップ: Phase 4）
 - [x] PR-4 マージ済み（対象ステップ: Phase 5）
-- [ ] PR-5 マージ済み（対象ステップ: Phase 6）
-- [ ] `make fmt && make test && make lint` が最終的に成功する
-- [ ] `make deadcode` が成功する
+- [x] PR-5 マージ済み（対象ステップ: Phase 6）
+- [x] `make fmt && make test && make lint` が最終的に成功する
+- [x] `make deadcode` が成功する（`internal/atproto`/`internal/config` の公開 API が未参照と報告されるが、[0004_cli_entrypoint](../0004_cli_entrypoint/01_requirements.md) から呼び出される予定のスタブであり、意図した状態）
 
 ## 7. 受け入れ基準の検証
 
