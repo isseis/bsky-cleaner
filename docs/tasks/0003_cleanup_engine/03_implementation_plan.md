@@ -44,12 +44,6 @@
     - 戻り値は `nil` 入力に対しても空スライスを返す（設計書 4節、パニックしないことを保証する）。
   - **完了基準**: `go build ./...` が成功する。フェーズ2のテストがすべて通過する。
 
-**PR-1 作成ポイント**: cleanup engine implementation
-
-- **対象ステップ**: フェーズ1・フェーズ2
-- **推奨タイトル**: `feat(0003-cleanup-engine): implement SelectDeletionTargets`
-- **レビュー観点**: 3条件の判定順序と比較演算子（`Before` のみを使い等号を含まないこと）、`switch` 文が4定数を明示列挙し `default` 側で除外していること
-
 ### フェーズ2: 単体テストの作成（AC-01〜AC-08）
 
 - [ ] **対象ファイル**: `internal/cleanup/cleanup_test.go`（新規作成）
@@ -65,7 +59,18 @@
     - [ ] `TestSelectDeletionTargets_NilInput_ReturnsEmpty`: `posts` に `nil` を渡した場合にパニックせず空スライスを返すことを確認する回帰テスト（設計書 4節の前提を保証する。AC には対応しないが、`nil` 安全性は実装が満たすべき前提のため追加する）。
   - **完了基準**: `make test` で `internal/cleanup` パッケージの全テストが成功する。各テストは `assert`/`require`（`github.com/stretchr/testify`）を用いてアサーションを記述する（CLAUDE.md テスト方針）。
 
-**PR-1 作成ポイントに統合**（フェーズ1と同一 PR。理由: 判定ロジックとそのテストは1つの完結した変更単位であり、実装のみを含む中間 PR は動作確認ができないため分割しない）
+### PR-1 作成ポイント: cleanup engine implementation
+
+**対象ステップ**: フェーズ1 / フェーズ2
+
+**推奨タイトル**: `feat(0003-cleanup-engine): implement SelectDeletionTargets`
+
+**レビュー観点**: 3条件の判定順序と比較演算子（`Before` のみを使い等号を含まないこと） / `switch` 文が4定数を明示列挙し `default` 側で除外していること / 判定ロジックとそのテストは1つの完結した変更単位であり分割しないこと
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ3: 品質確認とドキュメント更新
 
@@ -91,11 +96,18 @@
     - `rg -n "cleanup/" docs/dev/developer_guide/package_reference.md` （Directory Structure への追記を確認）
     - `rg -n "internal/cleanup" docs/dev/developer_guide/package_reference.md` （Package Responsibilities への追記を確認。この2つ目のコマンドは1つ目のディレクトリ構成の行にはヒットしない。その行は `cleanup/` であって `internal/cleanup` という文字列を含まないためである）
 
-**PR-2 作成ポイント**: package reference documentation update
+### PR-2 作成ポイント: package reference documentation update
 
-- **対象ステップ**: フェーズ3
-- **推奨タイトル**: `docs(0003-cleanup-engine): document internal/cleanup in package reference`
-- **レビュー観点**: 追記内容が既存の `internal/atproto`・`internal/config` の記述粒度・文体と一致していること
+**対象ステップ**: フェーズ3
+
+**推奨タイトル**: `docs(0003-cleanup-engine): add internal/cleanup to package reference`
+
+**レビュー観点**: 追記内容が既存の `internal/atproto`・`internal/config` の記述粒度・文体と一致していること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ## 3. 実装順序とマイルストーン
 
@@ -110,7 +122,7 @@
 
 | PR | 対応フェーズ | 概要 |
 |---|---|---|
-| PR-1 | フェーズ1・フェーズ2 | `internal/cleanup` パッケージの新設（実装＋単体テスト） |
+| PR-1 | フェーズ1 / フェーズ2 | `internal/cleanup` パッケージの新設（実装＋単体テスト） |
 | PR-2 | フェーズ3 | 品質確認完了後の `package_reference.md` 更新 |
 
 ## 4. テスト戦略
@@ -141,9 +153,8 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] フェーズ1完了（`internal/cleanup/cleanup.go` 作成）
-- [ ] フェーズ2完了（`internal/cleanup/cleanup_test.go` 作成、AC-01〜AC-08 全テストケース追加）
-- [ ] フェーズ3完了（`package_reference.md` 更新）
+- [ ] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2。`internal/cleanup/cleanup.go`・`internal/cleanup/cleanup_test.go` 作成、AC-01〜AC-08 全テストケース追加）
+- [ ] PR-2 マージ済み（対象ステップ: フェーズ3。`package_reference.md` 更新）
 - [ ] `make fmt` / `make test` / `make lint` がすべて通過
 - [ ] `make deadcode` で未使用コードがないことを確認
 
