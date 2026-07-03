@@ -14,6 +14,7 @@ codebase grows.
   - `config/`: reads and validates the TOML configuration file and environment variables, returning validated configuration values
   - `atproto/`: thin, self-written AT Protocol (XRPC) client for login, post listing, and post deletion (see docs/tasks/0002_atproto_client)
     - `testutil/`: `HTTPDoer` test double and lexicon-checked response fixtures for `internal/atproto`'s own tests
+  - `cleanup/`: filters an account's post inventory down to deletion targets based on retention days, post type, and pinned status (see docs/tasks/0003_cleanup_engine)
 - `docs/`: Project documentation with requirements and architecture
 ```
 
@@ -26,6 +27,10 @@ codebase grows.
 **AT Protocol Client**
 
 - `internal/atproto`: resolves an account's DID and PDS endpoint (SSRF-guarded, `NewClient`), authenticates with an app password (`Client.Login`), lists the account's posts/reposts with type classification and pinned-post detection (`Client.ListPosts`), and deletes a post by rkey (`Client.DeleteRecord`). HTTP access is abstracted behind the `HTTPDoer` interface so all tests run without real network I/O; retries, dry-run/apply switching, and post-age/type filtering are out of scope and left to other packages (see docs/tasks/0002_atproto_client/01_requirements.md).
+
+**Cleanup Engine**
+
+- `internal/cleanup`: a pure function (`SelectDeletionTargets`) that filters an account's post inventory (`[]atproto.Post`) down to deletion targets, based on retention-day age (UTC), known post type, and pinned status. No network/file I/O, no dependency on the AT Protocol client itself (see docs/tasks/0003_cleanup_engine/01_requirements.md).
 
 ## Key Design Patterns
 
