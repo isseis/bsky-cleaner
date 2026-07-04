@@ -90,12 +90,13 @@ flowchart TD
     DID --> RDOER
     RDOER --> RCLOCK
     ERRORS -.->|"Permanent() bool<br>で retry に暗黙適合"| RDOER
+    HTTP -.->|"newPDSDoer 内で<br>戻り値をラップされる"| RDOER
 
     class RDOER,RCLOCK newpkg
     class CLIENT,ERRORS,DID,HTTP,MAIN process
 ```
 
-**凡例**: 実線矢印 A → B は「A が B に依存する（import する）」ことを表す。破線矢印は「B が定義する非公開インターフェースに、A 側の型がメソッドを実装することで暗黙に適合する」構造的部分型（structural typing）の関係を表す。紫（`newpkg`）は本タスクで新設するパッケージ、橙（`process`）は既存コンポーネント（一部ファイルは変更あり）を示す。
+**凡例**: 実線矢印 A → B は「A が B に依存する（import する）」ことを表す。破線矢印は、ラベルに応じて次の2種類のいずれかを表す。「〜に暗黙適合」というラベル（`ERRORS` → `RDOER`）は「B が定義する非公開インターフェースに、A 側の型がメソッドを実装することで暗黙に適合する」構造的部分型（structural typing）の関係を表す。「〜ラップされる」というラベル（`HTTP` → `RDOER`）は「B が A の戻り値をラップする」関係を表す（`client.go` の `newPDSDoer` が `http.go` の `newRestrictedDoer` の戻り値を `retry.NewDoer` に渡してラップする、3.3節参照）。どちらの破線矢印も `client.go`・`errors.go` が `internal/retry` を import する関係を表すものではない点に注意する（`http.go`・`errors.go` はいずれも `internal/retry` を import しない。実際に import するのは `client.go` のみであり、それは実線矢印 `CLIENT --> RDOER` が表す）。紫（`newpkg`）は本タスクで新設するパッケージ、橙（`process`）は既存コンポーネント（一部ファイルは変更あり）を示す。
 
 `internal/retry` は `internal/atproto` に依存しない（`net/http`/`context`/`time` のみに依存する）。依存の向きは `atproto` → `retry` の一方向のみであり、循環依存は生じない。`SSRFError`（`atproto/errors.go`）に `Permanent() bool` メソッドを追加する変更は、`retry` パッケージ側が定義する非公開インターフェース `permanentError` に構造的に適合させるためのものであり、この適合自体は `atproto` 側でのメソッド実装だけで成立し、`retry` の公開 API を呼び出す必要はない（2.3節で詳述）。`NewClient` が `retry.NewDoer`（公開コンストラクタ）を呼び出して `HTTPDoer` をラップする配線は、これとは別の依存であり、3.3節で扱う。
 
