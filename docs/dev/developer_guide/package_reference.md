@@ -36,7 +36,7 @@ codebase grows.
 
 **Runner**
 
-- `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual failures. Depends on `atproto`/`cleanup`/`config`/`report` only through the package-local `Client` interface, so tests inject a fake instead of a real network client (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
+- `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual delete failures (a `Login`/`ListPosts` error still aborts the run immediately). Depends on `atproto` only through the package-local `Client` interface, so tests inject a fake instead of a real network client; `cleanup`, `config`, and `report` are used directly as concrete packages (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
 
 **Report**
 
