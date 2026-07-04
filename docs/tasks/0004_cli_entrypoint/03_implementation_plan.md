@@ -150,20 +150,22 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/36）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ4: 品質確認とドキュメント更新
 
-- [ ] **対象コマンド**: `make fmt` / `make test` / `make lint`
+- [x] **対象コマンド**: `make fmt` / `make test` / `make lint`
   - **作業内容**: 3コマンドを順に実行し、いずれもエラーなく完了することを確認する（NF-001）。
   - **完了基準**: 3コマンドすべてが正常終了する。
-- [ ] **対象コマンド**: `make deadcode`
+  - **実行結果**: `make fmt && make test && make lint` を実行し、3コマンドすべて正常終了（`golangci-lint run` は `0 issues`）。
+- [x] **対象コマンド**: `make deadcode`
   - **作業内容**: `internal/report`・`internal/runner`・`cmd/main.go` に起因する新規の未使用コードが検出されないことを確認する。
   - **完了基準**: `cmd/main.go` が本タスクで初めて `config`/`atproto`/`cleanup`/`runner`/`report` を実際に呼び出すため、0003 フェーズ3で許容していた「`cmd/` 未結線に起因する一律 `unreachable` 検出」は本タスク完了後に解消されているはずである。解消されていない公開関数が残っている場合は、その関数が本タスクのスコープ外（0005〜0008 で使用予定）であることをコメントではなくこの完了基準の実行結果として明記する。
-- [ ] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
+  - **実行結果**: `make deadcode` を実行し、検出0件（出力なし）。本タスクに起因する未使用コードは存在しない。
+- [x] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
   - **作業内容**: 以下を更新する。
-    1. 「Directory Structure」の `cmd/` の説明行を次のように更新する（変更前: `` `main.go`: placeholder only, no config loading logic yet (see docs/tasks/0004_cli_entrypoint) ``、変更後: `` `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires config/atproto/cleanup/runner/report into a runnable CLI (see docs/tasks/0004_cli_entrypoint) ``）。
+    1. 「Directory Structure」の `cmd/` の説明行を次のように更新する（変更前: `` `main.go`: placeholder only, no config loading logic yet (see docs/tasks/0004_cli_entrypoint) ``、変更後: `` `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires `internal/config`/`internal/atproto`/`internal/runner`/`internal/report` into a runnable CLI; `internal/cleanup` is used inside `internal/runner`, not directly by `main.go` (see docs/tasks/0004_cli_entrypoint) ``。実装時判明: パッケージ名を素の `runner`/`report` ではなく `` `internal/runner` ``/`` `internal/report` `` の完全パス表記にした。これは直後の完了基準が `rg -n "internal/runner"` の2件以上ヒットを要求しており、素の `runner`/`report` 表記のままだと Directory Structure 側の1件が拾えず基準を満たせないため）。さらにレビュー指摘を受け、`main.go` が直接 import するのは `config`/`atproto`/`runner`/`report` のみで `cleanup` は `internal/runner` 内部からのみ使われる点を明記した。
     2. 同じく「Directory Structure」の `internal/` 一覧に以下の2行を追加する（`cleanup/` の行に続けて）。
        ```
        - `runner/`: wires config/atproto/cleanup together into a single dry-run/apply run, producing a report.Result (see docs/tasks/0004_cli_entrypoint)
@@ -173,7 +175,7 @@
        ```
        **Runner**
 
-       - `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual failures. Depends on `atproto`/`cleanup`/`config`/`report` only through the package-local `Client` interface, so tests inject a fake instead of a real network client (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
+       - `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual failures. Depends on `atproto` only through the package-local `Client` interface, so tests inject a fake instead of a real network client; `cleanup`, `config`, and `report` are used directly as concrete packages (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
 
        **Report**
 
@@ -192,8 +194,8 @@
 
 **レビュー観点**: 追記内容が既存の `internal/atproto`・`internal/cleanup` の記述粒度・文体と一致していること / `cmd/main.go` の説明が実装後の実態と一致していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/37）
 - [ ] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
@@ -251,11 +253,11 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2。`internal/report`・`internal/runner` パッケージ新設、AC-04〜AC-11 関連の単体・結合テスト追加）
-- [ ] PR-2 マージ済み（対象ステップ: フェーズ3。`cmd/main.go` 実装、AC-01〜AC-03・AC-10・AC-11 関連テスト追加）
+- [x] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2。`internal/report`・`internal/runner` パッケージ新設、AC-04〜AC-11 関連の単体・結合テスト追加）
+- [x] PR-2 マージ済み（対象ステップ: フェーズ3。`cmd/main.go` 実装、AC-01〜AC-03・AC-10・AC-11 関連テスト追加）
 - [ ] PR-3 マージ済み（対象ステップ: フェーズ4。`package_reference.md` 更新）
-- [ ] `make fmt` / `make test` / `make lint` がすべて通過
-- [ ] `make deadcode` で本タスクに起因する新規の未使用コードがないことを確認
+- [x] `make fmt` / `make test` / `make lint` がすべて通過
+- [x] `make deadcode` で本タスクに起因する新規の未使用コードがないことを確認
 
 ## 7. 受け入れ基準の検証（Acceptance Criteria Verification）
 

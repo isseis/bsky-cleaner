@@ -9,12 +9,14 @@ codebase grows.
 
 ```
 - `cmd/`: Command-line entry points
-  - `main.go`: placeholder only, no config loading logic yet (see docs/tasks/0004_cli_entrypoint)
+  - `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires `internal/config`/`internal/atproto`/`internal/runner`/`internal/report` into a runnable CLI; `internal/cleanup` is used inside `internal/runner`, not directly by `main.go` (see docs/tasks/0004_cli_entrypoint)
 - `internal/`: Core implementation
   - `config/`: reads and validates the TOML configuration file and environment variables, returning validated configuration values
   - `atproto/`: thin, self-written AT Protocol (XRPC) client for login, post listing, and post deletion (see docs/tasks/0002_atproto_client)
     - `testutil/`: `HTTPDoer` test double and lexicon-checked response fixtures for `internal/atproto`'s own tests
   - `cleanup/`: filters an account's post inventory down to deletion targets based on retention days, post type, and pinned status (see docs/tasks/0003_cleanup_engine)
+  - `runner/`: wires config/atproto/cleanup together into a single dry-run/apply run, producing a report.Result (see docs/tasks/0004_cli_entrypoint)
+  - `report/`: structured run result (Result/Mode/DeleteFailure) and its stdout text rendering (FormatText), independent of how the result was produced (see docs/tasks/0004_cli_entrypoint)
 - `docs/`: Project documentation with requirements and architecture
 ```
 
@@ -31,6 +33,14 @@ codebase grows.
 **Cleanup Engine**
 
 - `internal/cleanup`: a pure function (`SelectDeletionTargets`) that filters an account's post inventory (`[]atproto.Post`) down to deletion targets, based on retention-day age (UTC), known post type, and pinned status. No network/file I/O, no dependency on the AT Protocol client itself (see docs/tasks/0003_cleanup_engine/01_requirements.md).
+
+**Runner**
+
+- `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual delete failures (a `Login`/`ListPosts` error still aborts the run immediately). Depends on `atproto` only through the package-local `Client` interface, so tests inject a fake instead of a real network client; `cleanup`, `config`, and `report` are used directly as concrete packages (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
+
+**Report**
+
+- `internal/report`: the structured outcome of a run (`Result`/`Mode`/`DeleteFailure`), independent of how it is rendered, plus `FormatText` for stdout rendering. Reused as-is by a future Slack formatter (see docs/tasks/0006_slack_notification/01_requirements.md).
 
 ## Key Design Patterns
 
