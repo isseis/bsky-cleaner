@@ -194,7 +194,7 @@
 
 **レビュー観点**: 追記内容が既存の `internal/atproto`・`internal/cleanup` の記述粒度・文体と一致していること / `cmd/main.go` の説明が実装後の実態と一致していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 
