@@ -45,14 +45,14 @@
 
 ### フェーズ1: `internal/retry` パッケージの実装（F-001、AC-01〜AC-04、NF-002）
 
-- [ ] **対象ファイル**: `internal/retry/clock.go`（新規作成）
+- [x] **対象ファイル**: `internal/retry/clock.go`（新規作成）
   - **作業内容**:
     - `package retry` を宣言する。
     - 設計書 3.1節の `Clock` インターフェースをそのまま定義する: `Sleep(ctx context.Context, d time.Duration) error`。
     - `RealClock` 構造体（フィールドなし）を定義し、`Sleep` を実装する。`time.NewTimer(d)` と `ctx.Done()` の両方を `select` で待ち受け、いずれか早い方で返る。タイマー経由で返る場合は `nil`、`ctx.Done()` 経由で返る場合は `ctx.Err()` を返す。`d <= 0` の場合は `select` の競合に頼らず、まず `ctx.Err()` を確認してから（非 `nil` ならそれを返し）、そうでなければ待機なしで `nil` を返す（設計書 3.1節の防御的な扱い）。タイマーは `defer timer.Stop()` で確実に解放する。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/retry/doer.go`（新規作成）
+- [x] **対象ファイル**: `internal/retry/doer.go`（新規作成）
   - **作業内容**:
     - `package retry` を宣言する。
     - 設計書 3.1節の `HTTPDoer` インターフェース、`Policy` 構造体（`MaxRetries int`・`BaseDelay time.Duration`・`MaxDelay time.Duration`）をそのまま定義する。
@@ -68,25 +68,25 @@
     - 再試行が発生するたび（打ち切りも含む）に `log/slog` のデフォルトロガーへ1行出力する: 試行回数・待機時間・HTTP メソッド・URL を含む（設計書 3.1節「リトライの可観測性」）。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/retry/test_helpers.go`（新規作成、`//go:build test`）
+- [x] **対象ファイル**: `internal/retry/test_helpers.go`（新規作成、`//go:build test`）
   - **作業内容**: `package retry` を宣言し、`//go:build test` タグを付与する。`fakeClock` 構造体を実装する: `Sleep(ctx context.Context, d time.Duration) error` は実際の待機を行わず、まず `ctx.Err()` を確認して非 `nil` ならそれを即座に返し、そうでなければ呼び出された `d` を記録用フィールド `SleepCalls []time.Duration` に追記して `nil` を返す（NF-002: 実待機なしで `Policy.MaxDelay` 頭打ちの検証・ctx キャンセルの即時検知の両方を同じ実装でシミュレートできる）。
   - **完了基準**: `internal/retry` パッケージ配下のテストからのみ参照され、`//go:build test` タグにより本番ビルドに含まれないことを `go build ./...`（タグなし）でも確認する。
 
-- [ ] **対象ファイル**: `internal/retry/doer_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/retry/doer_test.go`（新規作成）
   - **作業内容**: 設計書 7.1節が要求するシナリオを、`fakeClock` と、`retry.HTTPDoer` を満たす軽量なテスト専用モック（本ファイル内に定義する非公開の関数型アダプタ、例: `type mockDoerFunc func(*http.Request) (*http.Response, error)` とそのレシーバ `Do`。`internal/retry` 自身のテストでのみ使用し他パッケージから参照されないため、`testutil/` サブディレクトリは不要）を用いて検証する。応答ボディは `io.ReadCloser` の `Close()` 呼び出し回数を数えるラッパー（同じく本ファイル内に定義）で包む。
-    - [ ] `TestDoer_Do_SuccessOnFirstAttempt_NoRetry`: 初回で2xxが返る場合、リトライせずそのまま応答を返すこと（回帰確認、`fakeClock.SleepCalls` が空であること）。
-    - [ ] `TestDoer_Do_TransientFailures_RetriesThenSucceeds`: 通信エラー・429・5xxの3パターンをテーブル駆動で検証し、いずれも指数バックオフで再試行した後、成功応答が得られ次第それを返すこと（AC-01）。
-    - [ ] `TestDoer_Do_MaxRetriesExceeded_ReturnsLastFailure`: `Policy.MaxRetries` 到達後は再試行を打ち切り、最後の失敗（エラーまたは非2xx応答）をそのまま返すこと（AC-02）。
-    - [ ] `TestDoer_Do_PermanentFailures_NotRetried`: 401、429以外の4xx（例: 403）、および `Permanent() bool` を実装するテスト用エラー型の3パターンをテーブル駆動で検証し、いずれも再試行せず即座に返ること（AC-03）。
-    - [ ] `TestDoer_Do_ExponentialBackoffCappedAtMaxDelay`: 連続する一時的エラーに対する待機時間が指数的に増加しつつ `Policy.MaxDelay` を超えないこと（`fakeClock.SleepCalls` の各要素をアサートする、AC-04）。
-    - [ ] `TestDoer_Do_LargeRetryAfterCappedAtMaxDelay`: 429応答が `Policy.MaxDelay` を大幅に超える `Retry-After` を返した場合も、実際の待機時間が `Policy.MaxDelay` で頭打ちになること（AC-04）。
-    - [ ] `TestDoer_Do_NonPositiveRetryAfterFallsBackToExponential`: 429応答の `Retry-After` が負の秒数、または過去日時の場合、待機なしでの再試行にはならず指数バックオフの計算値にフォールバックすること（設計書 3.1節）。
-    - [ ] `TestDoer_Do_DrainsAndClosesIntermediateBody_OnNormalEOF`: 再試行対象と判定した中間応答の `Body` が、次の試行に進む前に EOF まで読み切られたうえで `Close()` されること（`Close()` 呼び出し回数をアサート、設計書 3.1節パターン(a)）。
-    - [ ] `TestDoer_Do_DiscardCapExceeded_ClosesWithoutFullDrain`: 中間応答の `Body` が `maxDrainBytes` を超える場合、EOF を待たずに読み捨てを打ち切って `Close()` すること（設計書 3.1節パターン(b)）。
-    - [ ] `TestDoer_Do_CtxCanceledDuringBodyDrain_ReturnsCtxErrImmediately`: 中間応答の読み捨て中に `req` の `ctx` がキャンセルされた場合、読み捨てエラーを無視せず、以降のリトライをスケジュールせずに ctx 由来のエラーを即座に返すこと（設計書 3.1節パターン(c)、AC-08 の前提）。
-    - [ ] `TestDoer_Do_RetriesResendFreshBodyFromGetBody`: `req.GetBody` を設定したPOSTリクエストで再試行が発生した場合、2回目以降の送信でも `req.GetBody()` から取得した新しいボディが送信されること（1回目の送信でボディが消費済みでも空にならないこと）。
-    - [ ] `TestDoer_Do_CtxCanceledDuringSleep_ReturnsImmediately`: `fakeClock.Sleep` に渡す `ctx` を事前にキャンセルしておき、`Doer.Do` が実際の待機（`fakeClock.SleepCalls` への記録）を行わずに即座に `ctx.Err()` を返すこと（AC-08 の前提となる 3.5節の性質）。
-    - [ ] `TestDoer_Do_LogsRetryAttempt`: `slog.SetDefault` を `slog.NewTextHandler` でバッファ書き込みするロガーに差し替え（`t.Cleanup` で元に戻す）、再試行が発生した場合にログ出力へ試行回数・待機時間・HTTPメソッド・URLに相当する情報が含まれることを検証する（設計書 3.1節「リトライの可観測性」）。
+    - [x] `TestDoer_Do_SuccessOnFirstAttempt_NoRetry`: 初回で2xxが返る場合、リトライせずそのまま応答を返すこと（回帰確認、`fakeClock.SleepCalls` が空であること）。
+    - [x] `TestDoer_Do_TransientFailures_RetriesThenSucceeds`: 通信エラー・429・5xxの3パターンをテーブル駆動で検証し、いずれも指数バックオフで再試行した後、成功応答が得られ次第それを返すこと（AC-01）。
+    - [x] `TestDoer_Do_MaxRetriesExceeded_ReturnsLastFailure`: `Policy.MaxRetries` 到達後は再試行を打ち切り、最後の失敗（エラーまたは非2xx応答）をそのまま返すこと（AC-02）。
+    - [x] `TestDoer_Do_PermanentFailures_NotRetried`: 401、429以外の4xx（例: 403）、および `Permanent() bool` を実装するテスト用エラー型の3パターンをテーブル駆動で検証し、いずれも再試行せず即座に返ること（AC-03）。
+    - [x] `TestDoer_Do_ExponentialBackoffCappedAtMaxDelay`: 連続する一時的エラーに対する待機時間が指数的に増加しつつ `Policy.MaxDelay` を超えないこと（`fakeClock.SleepCalls` の各要素をアサートする、AC-04）。
+    - [x] `TestDoer_Do_LargeRetryAfterCappedAtMaxDelay`: 429応答が `Policy.MaxDelay` を大幅に超える `Retry-After` を返した場合も、実際の待機時間が `Policy.MaxDelay` で頭打ちになること（AC-04）。
+    - [x] `TestDoer_Do_NonPositiveRetryAfterFallsBackToExponential`: 429応答の `Retry-After` が負の秒数、または過去日時の場合、待機なしでの再試行にはならず指数バックオフの計算値にフォールバックすること（設計書 3.1節）。
+    - [x] `TestDoer_Do_DrainsAndClosesIntermediateBody_OnNormalEOF`: 再試行対象と判定した中間応答の `Body` が、次の試行に進む前に EOF まで読み切られたうえで `Close()` されること（`Close()` 呼び出し回数をアサート、設計書 3.1節パターン(a)）。
+    - [x] `TestDoer_Do_DiscardCapExceeded_ClosesWithoutFullDrain`: 中間応答の `Body` が `maxDrainBytes` を超える場合、EOF を待たずに読み捨てを打ち切って `Close()` すること（設計書 3.1節パターン(b)）。
+    - [x] `TestDoer_Do_CtxCanceledDuringBodyDrain_ReturnsCtxErrImmediately`: 中間応答の読み捨て中に `req` の `ctx` がキャンセルされた場合、読み捨てエラーを無視せず、以降のリトライをスケジュールせずに ctx 由来のエラーを即座に返すこと（設計書 3.1節パターン(c)、AC-08 の前提）。
+    - [x] `TestDoer_Do_RetriesResendFreshBodyFromGetBody`: `req.GetBody` を設定したPOSTリクエストで再試行が発生した場合、2回目以降の送信でも `req.GetBody()` から取得した新しいボディが送信されること（1回目の送信でボディが消費済みでも空にならないこと）。
+    - [x] `TestDoer_Do_CtxCanceledDuringSleep_ReturnsImmediately`: `fakeClock.Sleep` に渡す `ctx` を事前にキャンセルしておき、`Doer.Do` が実際の待機（`fakeClock.SleepCalls` への記録）を行わずに即座に `ctx.Err()` を返すこと（AC-08 の前提となる 3.5節の性質）。
+    - [x] `TestDoer_Do_LogsRetryAttempt`: `slog.SetDefault` を `slog.NewTextHandler` でバッファ書き込みするロガーに差し替え（`t.Cleanup` で元に戻す）、再試行が発生した場合にログ出力へ試行回数・待機時間・HTTPメソッド・URLに相当する情報が含まれることを検証する（設計書 3.1節「リトライの可観測性」）。
   - **完了基準**: `make test` で `internal/retry` パッケージの全テストが成功する。各テストは `assert`/`require`（`github.com/stretchr/testify`）でアサーションを記述する（CLAUDE.md テスト方針）。すべてのテストが `fakeClock` を用い、実際の `time.Sleep` を行わないため、パッケージ全体の実行時間が数百ミリ秒以内に収まることを目視確認する（NF-002）。
 
 ### フェーズ2: `internal/atproto` への組み込み（F-001の適用、既存テストの回帰確認）
