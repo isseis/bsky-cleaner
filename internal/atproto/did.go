@@ -201,6 +201,15 @@ func isUnsafeIP(ip net.IP) bool {
 // make this process issue requests to internal network addresses (blind
 // SSRF) even though no credentials are sent at this stage. Callers reach
 // this via newHostSafetyCheckedDoer below, not by calling it directly.
+//
+// A DNS lookup failure (lookupErr) is returned as a plain wrapped error,
+// not an *SSRFError: since newHostSafetyCheckedDoer is wrapped in
+// retry.NewDoer (client.go), and *SSRFError.Permanent() is always true, an
+// *SSRFError here would make a merely transient resolver hiccup
+// permanently fail the whole call instead of being retried like any other
+// transient failure. Only an address that actually resolved and is unsafe
+// (private/loopback/link-local/unspecified) represents a genuine,
+// non-retryable policy violation.
 func checkRequestHostSafety(ctx context.Context, targetURL string) error {
 	u, parseErr := url.Parse(targetURL)
 	if parseErr != nil || u.Scheme != "https" {
@@ -209,7 +218,7 @@ func checkRequestHostSafety(ctx context.Context, targetURL string) error {
 
 	addrs, lookupErr := lookupIPAddr(ctx, u.Hostname())
 	if lookupErr != nil {
-		return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: fmt.Errorf("%w: %w", ErrDIDResolutionFailed, lookupErr)}
+		return fmt.Errorf("check request host safety: %w: %w", ErrDIDResolutionFailed, lookupErr)
 	}
 	if len(addrs) == 0 {
 		return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: ErrUntrustedPDSEndpoint}

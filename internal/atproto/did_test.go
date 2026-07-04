@@ -264,6 +264,27 @@ func TestNewHostSafetyCheckedDoer_RevalidatesOnEveryCall(t *testing.T) {
 	assert.Equal(t, 1, mock.CallCount(), "second call to an unsafe host must not reach the inner doer")
 }
 
+// TestCheckRequestHostSafety_LookupFailureIsNotPermanent guards against a
+// transient DNS lookup failure being classified as a permanent SSRF
+// rejection: since newHostSafetyCheckedDoer is wrapped in retry.NewDoer
+// (client.go), an *SSRFError here (Permanent() == true, errors.go) would
+// make a mere resolver hiccup during DID resolution fail the whole call
+// immediately instead of being retried like any other transient failure.
+func TestCheckRequestHostSafety_LookupFailureIsNotPermanent(t *testing.T) {
+	prev := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = prev })
+	lookupIPAddr = func(_ context.Context, _ string) ([]net.IPAddr, error) {
+		return nil, errors.New("temporary resolver failure")
+	}
+
+	err := checkRequestHostSafety(context.Background(), "https://alice.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+	_, isSSRFError := errors.AsType[*SSRFError](err)
+	assert.False(t, isSSRFError, "a DNS lookup failure must not be classified as a permanent SSRF rejection")
+}
+
 func TestResolveHandleToDID_RejectsMalformedHandle(t *testing.T) {
 	tests := []struct {
 		name   string
