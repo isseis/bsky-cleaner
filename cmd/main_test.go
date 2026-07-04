@@ -251,7 +251,7 @@ func readDeleteRecordRKey(req *http.Request) (string, error) {
 
 // deleteRecordHandler wraps listRecordsHandler, additionally answering
 // com.atproto.repo.deleteRecord requests via deleteResp (keyed by rkey
-// extracted from the request path) so apply-mode tests can script
+// extracted from the JSON request body) so apply-mode tests can script
 // per-post success/failure.
 func deleteRecordHandler(t *testing.T, postsPage string, deleteStatus map[string]int) func(req *http.Request) (*http.Response, error) {
 	t.Helper()
@@ -260,10 +260,10 @@ func deleteRecordHandler(t *testing.T, postsPage string, deleteStatus map[string
 		if !strings.HasSuffix(req.URL.Path, "com.atproto.repo.deleteRecord") {
 			return base(req)
 		}
-		body, err := readDeleteRecordRKey(req)
+		rkey, err := readDeleteRecordRKey(req)
 		require.NoError(t, err)
-		status, ok := deleteStatus[body]
-		require.True(t, ok, "unexpected deleteRecord rkey: %s", body)
+		status, ok := deleteStatus[rkey]
+		require.True(t, ok, "unexpected deleteRecord rkey: %s", rkey)
 		if status >= 200 && status < 300 {
 			return atprototestutil.JSONResponse(status, atprototestutil.DeleteRecordResponseJSON()), nil
 		}

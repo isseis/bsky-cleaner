@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -20,11 +21,12 @@ import (
 	"github.com/isseis/bsky-cleaner/internal/runner"
 )
 
-// Exit codes. usage/config/init/login/list failures (1) are distinguished
-// from partial-delete failures (3) because the former means no deletion
-// happened at all, while the latter means some posts are already
-// irreversibly gone -- cron/monitoring must be able to tell those apart
-// without parsing stdout.
+// Exit codes. Usage/flag errors (2, exitUsageError) are distinguished from
+// other setup-or-run failures such as config/init/login/list (1,
+// exitSetupOrRunFail), which are in turn distinguished from partial-delete
+// failures (3) because the latter means some posts are already irreversibly
+// gone -- cron/monitoring must be able to tell all of these apart without
+// parsing stdout.
 const (
 	exitOK             = 0
 	exitUsageError     = 2
@@ -37,9 +39,12 @@ const (
 // whenever flag.FlagSet.Parse fails, --config/-c is missing, or unexpected
 // positional arguments remain, so main's exit-code behavior stays testable
 // without ending the test process.
-func parseFlags(args []string, stderr io.Writer) (configPath string, apply bool, err error) {
+func parseFlags(args []string, _ io.Writer) (configPath string, apply bool, err error) {
 	fs := flag.NewFlagSet("bsky-cleaner", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	// Discard flag's own error+usage output: fs.Parse would otherwise write
+	// the same error message that main prints via the returned err, so this
+	// avoids printing it twice.
+	fs.SetOutput(io.Discard)
 
 	fs.StringVar(&configPath, "config", "", "path to the TOML configuration file")
 	fs.StringVar(&configPath, "c", "", "path to the TOML configuration file (shorthand for --config)")
@@ -76,6 +81,12 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 		return exitSetupOrRunFail
 	}
 
+	// Bound the whole network-calling pass by cfg.ExecutionTimeout so a
+	// stuck PDS request cannot hang the CLI (and thus a cron invocation)
+	// indefinitely.
+	ctx, cancel := context.WithTimeout(ctx, cfg.ExecutionTimeout)
+	defer cancel()
+
 	client, err := atproto.NewClient(ctx, cfg.Handle, httpDoer)
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
@@ -99,6 +110,9 @@ func main() {
 	configPath, apply, err := parseFlags(os.Args[1:], os.Stderr)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(exitOK)
+		}
 		os.Exit(exitUsageError)
 	}
 
