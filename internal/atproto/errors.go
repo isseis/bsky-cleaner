@@ -88,3 +88,10 @@ func (e *SSRFError) Error() string {
 func (e *SSRFError) Unwrap() error {
 	return e.Err
 }
+
+// Permanent reports that an SSRFError must never be retried: retrying
+// would not help, since the same verified-address check would reject the
+// same endpoint again. This implements the internal/retry package's
+// unexported permanentError interface via structural typing, without
+// atproto importing internal/retry.
+func (e *SSRFError) Permanent() bool { return true }

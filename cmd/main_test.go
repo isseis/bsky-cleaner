@@ -139,6 +139,38 @@ func TestRun_ClientInitFailure_ReturnsExitCode1(t *testing.T) {
 	assert.Equal(t, exitSetupOrRunFail, code)
 }
 
+// TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1 verifies that
+// exceeding the configured execution timeout aborts the run with a
+// non-zero exit code: no prior test in this file actually drives the
+// execution timeout to completion. execution_timeout_seconds is set to 1
+// (the minimum config.LoadAppConfig accepts), and every request hangs
+// until its ctx is canceled, forcing the timeout to fire during DID
+// resolution. The resulting ctx error is retried once by internal/retry
+// (a transient error, from retry's point of view), but
+// retry.RealClock.Sleep sees the ctx is already done and returns
+// immediately without actually waiting out defaultRetryPolicy.BaseDelay
+// (1s) -- so this test still completes in about 1 second, not 1+1
+// seconds, which the elapsed-time assertion below locks in.
+func TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1(t *testing.T) {
+	setEnvCredentials(t)
+	path := t.TempDir() + "/config.toml"
+	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 1\n"
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+
+	mock := &atprototestutil.MockHTTPDoer{Handler: func(req *http.Request) (*http.Response, error) {
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	}}
+
+	var stdout, stderr bytes.Buffer
+	start := time.Now()
+	code := run(path, false, time.Now(), mock, &stdout, &stderr)
+	elapsed := time.Since(start)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Less(t, elapsed, 2*time.Second)
+}
+
 func TestRun_LoginFailure_ReturnsExitCode1(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
 	setEnvCredentials(t)
