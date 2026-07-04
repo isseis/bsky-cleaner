@@ -109,7 +109,7 @@
 **レビュー観点**: `apply` 分岐が `runner.Run` 内の1箇所に限定されていること（5.1 節の副作用契約） / dry-run で `DeleteRecord` が呼ばれないことのテストが実際に存在すること / 部分失敗時にループが継続すること / `internal/atproto/runner_integration_test.go` が import 循環を起こさずビルドできること
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
