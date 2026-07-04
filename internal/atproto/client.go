@@ -24,9 +24,10 @@ type Client struct {
 
 // newPDSDoer builds the HTTPDoer NewClient installs for every request sent
 // after PDS-endpoint validation succeeds (Login/ListPosts/DeleteRecord).
-// Production always wraps httpDoer in the dial-pinned restrictedDoer
-// (SSRF/DNS-rebinding protection, see newRestrictedDoer in http.go); this
-// default is only ever reassigned by a //go:build test file
+// Production always replaces httpDoer with a newly constructed, dial-pinned
+// restrictedDoer that does not delegate to it (SSRF/DNS-rebinding
+// protection, see newRestrictedDoer in http.go); this default is only ever
+// reassigned by a //go:build test file
 // (StubPassthroughPDSDoer in test_helpers.go), which installs the original
 // httpDoer unchanged so a mock can drive those calls without requiring
 // genuine network reachability to the resolved PDS endpoint. That override

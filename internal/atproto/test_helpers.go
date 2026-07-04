@@ -26,13 +26,13 @@ func newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, handle, did string, s
 
 // StubPassthroughPDSDoer overrides NewClient's post-validation HTTPDoer
 // construction (newPDSDoer in client.go) to install the original httpDoer
-// unchanged instead of wrapping it in the dial-pinned restrictedDoer, for
-// the duration of t. This lets a test's mock HTTPDoer drive
-// Login/ListPosts/DeleteRecord through a real *Client built via NewClient,
-// without requiring genuine network reachability to the resolved PDS
-// endpoint. It does not relax the SSRF checks that already ran by this
-// point (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint) --
-// only the final "which HTTPDoer sends the request" step changes.
+// unchanged instead of replacing it with a newly constructed, non-delegating
+// dial-pinned restrictedDoer, for the duration of t. This lets a test's mock
+// HTTPDoer drive Login/ListPosts/DeleteRecord through a real *Client built
+// via NewClient, without requiring genuine network reachability to the
+// resolved PDS endpoint. It does not relax the SSRF checks that already ran
+// by this point (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint)
+// -- only the final "which HTTPDoer sends the request" step changes.
 // Exported (unlike newTestClient above) so packages that cannot see
 // atproto's unexported identifiers -- cmd, or a cross-package integration
 // test importing internal/runner -- can still install it; only exists in
