@@ -196,7 +196,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/37）
-- [ ] PR がマージされた
+- [x] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
 
@@ -255,7 +255,7 @@
 
 - [x] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2。`internal/report`・`internal/runner` パッケージ新設、AC-04〜AC-11 関連の単体・結合テスト追加）
 - [x] PR-2 マージ済み（対象ステップ: フェーズ3。`cmd/main.go` 実装、AC-01〜AC-03・AC-10・AC-11 関連テスト追加）
-- [ ] PR-3 マージ済み（対象ステップ: フェーズ4。`package_reference.md` 更新）
+- [x] PR-3 マージ済み（対象ステップ: フェーズ4。`package_reference.md` 更新）
 - [x] `make fmt` / `make test` / `make lint` がすべて通過
 - [x] `make deadcode` で本タスクに起因する新規の未使用コードがないことを確認
 
