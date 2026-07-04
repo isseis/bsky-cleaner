@@ -92,7 +92,7 @@ flowchart TD
         CONFIG["LoadAppConfig()"]
     end
 
-    subgraph pkg_atproto ["internal/atproto/ (既存・変更なし)"]
+    subgraph pkg_atproto ["internal/atproto/ (既存・テスト専用の差し替え口のみ追加)"]
         ATPROTO["NewClient()・Login()・ListPosts()・DeleteRecord()"]
     end
 
@@ -123,6 +123,10 @@ flowchart TD
 | `process`（オレンジ） | 既存のまま変更しないコンポーネント |
 
 `internal/atproto` の DID 解決・ログイン・一覧取得・削除ロジック自体は 0002_atproto_client で実装済みであり、本タスクはそれらを呼び出す組み立てのみを追加する。同様に `internal/cleanup.SelectDeletionTargets` の判定ロジックは 0003_cleanup_engine で実装済みである。`internal/runner` から `internal/config` への依存は、`Run` が `Client.Login` に渡す `config.SecretString`（app パスワード）の型を受け取るためだけの狭い依存であり、設定の読み込み・検証ロジック自体には関与しない。
+
+**実装時に判明した `internal/atproto` への追加（決定履歴として記録）**: `atproto.NewClient` は DID 解決フェーズでのみ呼び出し元が渡した `HTTPDoer` を使い、PDS エンドポイント検証成功後は `Client.httpDoer` を `newRestrictedDoer`（検証済みIPにピン留めし、実際に TCP 接続する SSRF 対策用の実装）に差し替える。このため、`atproto.NewClient` を経由して構築した `*Client` の `Login`/`ListPosts`/`DeleteRecord` は、モック `HTTPDoer` を渡していても実際のネットワーク接続を試みてしまい、フェーズ2の結合テスト（7.2 節）がオフライン環境で失敗することが実装中に判明した（`newRestrictedDoer` はループバック・プライベートアドレスへの接続を安全上の理由で拒否するため、`httptest.Server` で代替することもできない）。この問題を、本番の安全性を弱めずに解消するため、`internal/atproto` に次のテスト専用の差し替え口を追加した。
+- `internal/atproto/client.go`: `httpDoer` を最終的に組み立てる処理をパッケージ変数 `newPDSDoer`（デフォルトは従来通り `newRestrictedDoer` を返す）に切り出した。
+- `internal/atproto/test_helpers.go`（既存、`//go:build test`）: `StubPassthroughPDSDoer(t *testing.T)` を追加し、テスト実行中のみ `newPDSDoer` を「元の `httpDoer` をそのまま返す」実装に差し替える。DID 解決・PDS エンドポイント検証（`resolveHandleToDID`/`resolveDIDDocument`/`validatePDSEndpoint`）はこの差し替えの影響を受けず、本番の SSRF 対策はそのまま維持される。既存の `newTestClient` と異なりこの関数はエクスポートされている。`cmd`（`package main`）や `internal/runner` をインポートする結合テスト（`internal/atproto` の外の別パッケージとして書く必要があるファイル、2.2 節参照）から呼び出すためである。
 
 ### 2.2 データフロー
 
