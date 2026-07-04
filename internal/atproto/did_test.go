@@ -228,11 +228,40 @@ func TestResolveDIDDocument_RejectsUnsafeDidWebHost(t *testing.T) {
 		},
 	}
 
-	_, err := resolveDIDDocument(context.Background(), mock, "did:web:127.0.0.1")
+	_, err := resolveDIDDocument(context.Background(), newHostSafetyCheckedDoer(mock), "did:web:127.0.0.1")
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrUntrustedPDSEndpoint)
 	assert.Equal(t, 0, mock.CallCount(), "must not send a request to an unsafe did:web host")
+}
+
+// TestNewHostSafetyCheckedDoer_RevalidatesOnEveryCall verifies that
+// checkRequestHostSafety runs on every Do call, not only before the first
+// attempt -- the property retry.Doer's retries depend on to keep the
+// DNS-rebinding protection intact across retried attempts of the same
+// logical call.
+func TestNewHostSafetyCheckedDoer_RevalidatesOnEveryCall(t *testing.T) {
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(_ *http.Request) (*http.Response, error) {
+			return atprototestutil.JSONResponse(http.StatusOK, `{}`), nil
+		},
+	}
+	doer := newHostSafetyCheckedDoer(mock)
+
+	safeReq, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://"+publicIPLiteral+"/xrpc/test", nil)
+	require.NoError(t, err)
+	resp, err := doer.Do(safeReq)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, 1, mock.CallCount(), "first call to a safe host must reach the inner doer")
+
+	unsafeReq, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://10.0.0.1/xrpc/test", nil)
+	require.NoError(t, err)
+	_, err = doer.Do(unsafeReq)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrUntrustedPDSEndpoint)
+	assert.Equal(t, 1, mock.CallCount(), "second call to an unsafe host must not reach the inner doer")
 }
 
 func TestResolveHandleToDID_RejectsMalformedHandle(t *testing.T) {

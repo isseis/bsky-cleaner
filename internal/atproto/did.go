@@ -44,9 +44,6 @@ func resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (
 		return "", fmt.Errorf("resolve handle to DID: invalid handle %q: %w", handle, ErrDIDResolutionFailed)
 	}
 	reqURL := "https://" + handle + "/.well-known/atproto-did"
-	if err := checkRequestHostSafety(ctx, reqURL); err != nil {
-		return "", err
-	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
@@ -99,9 +96,6 @@ type didService struct {
 func resolveDIDDocument(ctx context.Context, httpDoer HTTPDoer, did string) (serviceEndpoint string, err error) {
 	docURL, err := didDocumentURL(did)
 	if err != nil {
-		return "", err
-	}
-	if err := checkRequestHostSafety(ctx, docURL); err != nil {
 		return "", err
 	}
 
@@ -199,13 +193,14 @@ func isUnsafeIP(ip net.IP) bool {
 }
 
 // checkRequestHostSafety resolves targetURL's host and rejects it if any
-// resolved address is unsafe per isUnsafeIP. It is applied to every host
-// this package sends an unauthenticated GET to during DID resolution
-// (handle resolution and DID document fetch), not only to the final
-// validated PDS endpoint: a malicious or compromised handle server, or a
-// did:web DID whose domain segment is itself untrusted response data, could
-// otherwise make this process issue requests to internal network addresses
-// (blind SSRF) even though no credentials are sent at this stage.
+// resolved address is unsafe per isUnsafeIP. It guards every host this
+// package sends an unauthenticated GET to during DID resolution (handle
+// resolution and DID document fetch), not only to the final validated PDS
+// endpoint: a malicious or compromised handle server, or a did:web DID
+// whose domain segment is itself untrusted response data, could otherwise
+// make this process issue requests to internal network addresses (blind
+// SSRF) even though no credentials are sent at this stage. Callers reach
+// this via newHostSafetyCheckedDoer below, not by calling it directly.
 func checkRequestHostSafety(ctx context.Context, targetURL string) error {
 	u, parseErr := url.Parse(targetURL)
 	if parseErr != nil || u.Scheme != "https" {
@@ -225,6 +220,27 @@ func checkRequestHostSafety(ctx context.Context, targetURL string) error {
 		}
 	}
 	return nil
+}
+
+// newHostSafetyCheckedDoer wraps inner so that every Do call re-validates
+// the request's target host via checkRequestHostSafety before delegating,
+// rather than checking once before the first attempt. This keeps the
+// DNS-rebinding protection intact even when a retrying HTTPDoer (see
+// internal/retry) retries the same logical call multiple times: each
+// retried attempt is a fresh Do call and therefore triggers a fresh check.
+func newHostSafetyCheckedDoer(inner HTTPDoer) HTTPDoer {
+	return &hostSafetyCheckedDoer{inner: inner}
+}
+
+type hostSafetyCheckedDoer struct {
+	inner HTTPDoer
+}
+
+func (d *hostSafetyCheckedDoer) Do(req *http.Request) (*http.Response, error) {
+	if err := checkRequestHostSafety(req.Context(), req.URL.String()); err != nil {
+		return nil, err
+	}
+	return d.inner.Do(req)
 }
 
 // validatePDSEndpoint checks that serviceEndpoint is safe to send

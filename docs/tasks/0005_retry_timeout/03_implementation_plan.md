@@ -91,18 +91,18 @@
 
 ### フェーズ2: `internal/atproto` への組み込み（F-001の適用、既存テストの回帰確認）
 
-- [ ] **対象ファイル**: `internal/atproto/errors.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/atproto/errors.go`（既存ファイルの変更）
   - **作業内容**: 設計書 4節のコード例の通り、`*SSRFError` に `Permanent() bool { return true }` を追加する。`atproto` パッケージは `internal/retry` を import しない（構造的部分型による暗黙適合、設計書 2.3節）。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/atproto/did.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/atproto/did.go`（既存ファイルの変更）
   - **作業内容**:
     - 設計書 2.3.1節のシグネチャの通り `newHostSafetyCheckedDoer(inner HTTPDoer) HTTPDoer` を追加する。返す `HTTPDoer` の `Do(req *http.Request)` は、`checkRequestHostSafety(req.Context(), req.URL.String())` を呼び出し、エラーがあればそれをそのまま返し、なければ `inner.Do(req)` に委譲する。
     - `resolveHandleToDID` から `checkRequestHostSafety(ctx, reqURL)` の呼び出し（現行 `did.go:47-49` 相当）を削除する。ハンドル文字列の構文検証（`invalidHandleChars` チェック）はそのまま残す。
     - `resolveDIDDocument` から `checkRequestHostSafety(ctx, docURL)` の呼び出し（現行 `did.go:104-106` 相当）を削除する。
   - **完了基準**: `go build ./...` が成功する（この時点では `internal/atproto` の呼び出し元がまだ `newHostSafetyCheckedDoer` を組み込んでいないため、以降の `client.go` の変更と合わせて初めてホスト安全性検証が有効になる。次のタスクと同一コミット内で完結させ、中間状態でホスト安全性検証が欠落したビルドを残さないこと）。
 
-- [ ] **対象ファイル**: `internal/atproto/client.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/atproto/client.go`（既存ファイルの変更）
   - **作業内容**:
     - `internal/retry` パッケージを import する。
     - `defaultRetryPolicy`（`retry.Policy{MaxRetries: 5, BaseDelay: time.Second, MaxDelay: 30 * time.Second}`、設計書 3.4節の既定値）をパッケージレベルの変数として定義する。
@@ -110,21 +110,21 @@
     - `newPDSDoer` のデフォルト実装（現行 `client.go:37-39`）を、`newRestrictedDoer(verifiedAddrs, host)` の戻り値を `retry.NewDoer(..., defaultRetryPolicy, retry.RealClock{})` でラップして返すよう変更する（設計書 2.1節の凡例「`newPDSDoer` 内で戻り値をラップされる」、3.3節）。`newPDSDoer` 変数のシグネチャ自体は変更しない。
   - **完了基準**: `go build ./...` が成功する。`internal/atproto` のうち `did_test.go`・`session_test.go`・`posts_test.go`・`delete_test.go`・`errors_test.go`・`http_test.go`・`runner_integration_test.go` の既存テストが、次のタスク（`did_test.go` の更新）を除いて無変更のまま `make test` で成功する（1.3節の既存コード調査結果の通り）。
 
-- [ ] **対象ファイル**: `internal/atproto/did_test.go`（既存ファイルの変更・追加）
+- [x] **対象ファイル**: `internal/atproto/did_test.go`（既存ファイルの変更・追加）
   - **作業内容**:
-    - [ ] `TestResolveDIDDocument_RejectsUnsafeDidWebHost`（既存）を修正する: `resolveDIDDocument(context.Background(), mock, "did:web:127.0.0.1")` の呼び出しを `resolveDIDDocument(context.Background(), newHostSafetyCheckedDoer(mock), "did:web:127.0.0.1")` に変更し、`mock.CallCount() == 0` の期待が `newHostSafetyCheckedDoer` 経由でも成立することを確認する（1.3節で洗い出した回帰ギャップの解消）。
-    - [ ] `TestNewHostSafetyCheckedDoer_RevalidatesOnEveryCall`（新規）: `newHostSafetyCheckedDoer` でラップした `HTTPDoer` の `Do` を複数回呼び出すモックを用意し、1回目の呼び出し時は安全なホスト（`publicIPLiteral`）への `req`、2回目の呼び出し時は不正なアドレス（例: `10.0.0.1`）への `req` を渡す。1回目は `mock` に到達し成功応答が返ること、2回目は `mock` に到達せず `*SSRFError` が返ることを検証し、`Do` が呼ばれるたびに独立して `checkRequestHostSafety` が再実行されることを確認する（設計書 2.3.1節、DNS リバインディング対策とリトライの両立）。
+    - [x] `TestResolveDIDDocument_RejectsUnsafeDidWebHost`（既存）を修正する: `resolveDIDDocument(context.Background(), mock, "did:web:127.0.0.1")` の呼び出しを `resolveDIDDocument(context.Background(), newHostSafetyCheckedDoer(mock), "did:web:127.0.0.1")` に変更し、`mock.CallCount() == 0` の期待が `newHostSafetyCheckedDoer` 経由でも成立することを確認する（1.3節で洗い出した回帰ギャップの解消）。
+    - [x] `TestNewHostSafetyCheckedDoer_RevalidatesOnEveryCall`（新規）: `newHostSafetyCheckedDoer` でラップした `HTTPDoer` の `Do` を複数回呼び出すモックを用意し、1回目の呼び出し時は安全なホスト（`publicIPLiteral`）への `req`、2回目の呼び出し時は不正なアドレス（例: `10.0.0.1`）への `req` を渡す。1回目は `mock` に到達し成功応答が返ること、2回目は `mock` に到達せず `*SSRFError` が返ることを検証し、`Do` が呼ばれるたびに独立して `checkRequestHostSafety` が再実行されることを確認する（設計書 2.3.1節、DNS リバインディング対策とリトライの両立）。
   - **完了基準**: `make test` で `internal/atproto` パッケージの全テストが成功する。
 
-- [ ] **対象ファイル**: `internal/atproto/client_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/atproto/client_test.go`（新規作成）
   - **作業内容**:
-    - [ ] `TestNewClient_WrapsHTTPDoerWithRetry`（新規）を実装する。`stubSymbolicHostLookup`（`did_test.go`、既存）と `handleResolutionHandler`（`did_test.go`、既存）を再利用して `NewClient` を成功させ、返った `*Client` の非公開フィールド `httpDoer` を `_, ok := client.httpDoer.(*retry.Doer)` で型アサーションし、`ok` が `true` であることを検証する（設計書 7.1節「`NewClient` が返す `*Client` の `httpDoer` がリトライでラップされていることの確認」）。
-    - [ ] `TestClient_DeleteRecord_CtxDeadlineDuringRetry_ReturnsCtxErrWithoutFullBackoff`（新規）を実装する。AC-08・AC-09 が要求する「実行タイムアウトの deadline が個々の削除 API 呼び出しの `context.Context` に伝播し、リトライ待機中もその deadline 到達を遅延なく検知する」という一連の経路を、`internal/retry`（フェーズ1で単体テスト済み）・`doXRPC` によるエラーラップ（`internal/atproto/http.go`、既存）・`DeleteRecord` の3層を実際に通して確認する、`internal/retry` 単体テストと `internal/runner` の既存テストだけでは検証できない結合的な性質を埋めるテストである（1.3節参照）。`newTestClient`（既存）を用い、`httpDoer` に `retry.NewDoer(mock, defaultRetryPolicy, retry.RealClock{})` を設定する（`RealClock` を用いる。`fakeClock` は `internal/retry` 自身の非公開ヘルパーであり `internal/atproto` からは参照できないため、`internal/atproto` 側のこの結合確認では実クロックを使う）。`mock.Handler` は呼び出しごとに `<-req.Context().Done()` を待ってから `nil, req.Context().Err()` を返すブロッキングハンドラとする。`context.WithTimeout(context.Background(), 100*time.Millisecond)` で短い deadline を持つ `ctx` を作り、`client.DeleteRecord(ctx, "abc123")` を呼び出す。戻り値のエラーが `errors.Is(err, context.DeadlineExceeded)` を満たすこと（`retry.Doer` が返す `ctx.Err()` が `doXRPC` の `*HTTPError` ラップを経ても `errors.Is` で追跡できること）、かつテストの実行時間が `defaultRetryPolicy.BaseDelay`（1秒）を大きく下回る一定時間（例: 500ミリ秒未満）に収まることを検証する。
+    - [x] `TestNewClient_WrapsHTTPDoerWithRetry`（新規）を実装する。`stubSymbolicHostLookup`（`did_test.go`、既存）と `handleResolutionHandler`（`did_test.go`、既存）を再利用して `NewClient` を成功させ、返った `*Client` の非公開フィールド `httpDoer` を `_, ok := client.httpDoer.(*retry.Doer)` で型アサーションし、`ok` が `true` であることを検証する（設計書 7.1節「`NewClient` が返す `*Client` の `httpDoer` がリトライでラップされていることの確認」）。
+    - [x] `TestClient_DeleteRecord_CtxDeadlineDuringRetry_ReturnsCtxErrWithoutFullBackoff`（新規）を実装する。AC-08・AC-09 が要求する「実行タイムアウトの deadline が個々の削除 API 呼び出しの `context.Context` に伝播し、リトライ待機中もその deadline 到達を遅延なく検知する」という一連の経路を、`internal/retry`（フェーズ1で単体テスト済み）・`doXRPC` によるエラーラップ（`internal/atproto/http.go`、既存）・`DeleteRecord` の3層を実際に通して確認する、`internal/retry` 単体テストと `internal/runner` の既存テストだけでは検証できない結合的な性質を埋めるテストである（1.3節参照）。`newTestClient`（既存）を用い、`httpDoer` に `retry.NewDoer(mock, defaultRetryPolicy, retry.RealClock{})` を設定する（`RealClock` を用いる。`fakeClock` は `internal/retry` 自身の非公開ヘルパーであり `internal/atproto` からは参照できないため、`internal/atproto` 側のこの結合確認では実クロックを使う）。`mock.Handler` は呼び出しごとに `<-req.Context().Done()` を待ってから `nil, req.Context().Err()` を返すブロッキングハンドラとする。`context.WithTimeout(context.Background(), 100*time.Millisecond)` で短い deadline を持つ `ctx` を作り、`client.DeleteRecord(ctx, "abc123")` を呼び出す。戻り値のエラーが `errors.Is(err, context.DeadlineExceeded)` を満たすこと（`retry.Doer` が返す `ctx.Err()` が `doXRPC` の `*HTTPError` ラップを経ても `errors.Is` で追跡できること）、かつテストの実行時間が `defaultRetryPolicy.BaseDelay`（1秒）を大きく下回る一定時間（例: 500ミリ秒未満）に収まることを検証する。
 
     後者が満たされない場合、`retry.Doer` がリトライ待機中の ctx 期限切れを遅延なく検知できていないことを意味する（`cmd/main_test.go::TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` と同じ理由づけ、フェーズ2の当該タスク参照）。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。`go test -tags test -run TestClient_DeleteRecord_CtxDeadlineDuringRetry_ReturnsCtxErrWithoutFullBackoff ./internal/atproto -v` の実行時間が1秒未満であることを確認する。
 
-- [ ] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更）
   - **作業内容**: `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1`（新規）を追加する。1.3節で洗い出した通り、AC-05（実行タイムアウト超過時に処理を中断し非0の終了コードで終了すること）を実際に検証する既存テストが存在しないための追加である。`execution_timeout_seconds = 1`（`internal/config` が許容する最小値）を含む設定ファイルを用意し、DID解決用のレスポンス（`.well-known/atproto-did`）を返すハンドラの代わりに、`<-req.Context().Done()` を待ってから `nil, req.Context().Err()` を返すブロッキングハンドラを設定した `MockHTTPDoer` を用いる。`run(configPath, false, time.Now(), mock, io.Discard, io.Discard)` を呼び出し、戻り値が `exitSetupOrRunFail`（`1`）であること、かつテスト自体が数秒以内（`execution_timeout_seconds` 到達までの1秒 + `internal/retry` の初回バックオフによる余分な待機が発生しないこと、後述）に完了することを検証する。`retry.Doer` はこのブロッキングハンドラが返す `ctx.Err()` を一時的な通信エラーとして扱い、一度は再試行を試みる。しかし `Clock.Sleep`（`RealClock`）に渡す `ctx` が既にキャンセル済みのため、`select` が即座に `ctx.Done()` 側で復帰し、実際の1秒間の追加バックオフ待機は発生しない（`internal/retry/clock.go` の実装、フェーズ1参照）。この性質により、テスト全体の実行時間は `execution_timeout_seconds` の1秒程度に収まる。
   - **完了基準**: `make test` で本テストが成功し、かつ `go test -tags test -run TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1 ./cmd -v` の実行時間が2秒未満であることを確認する（実際の `RealClock`・実行タイムアウトを用いる数少ないテストであるため、想定通り高速に完了することを明示的に確認する）。
 

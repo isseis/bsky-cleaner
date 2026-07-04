@@ -10,7 +10,23 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"time"
+
+	"github.com/isseis/bsky-cleaner/internal/retry"
 )
+
+// defaultRetryPolicy bounds the exponential backoff this package applies
+// to every outbound HTTPDoer it builds (DID resolution and the
+// post-validation PDS client): up to 5 retries beyond the first attempt,
+// starting at a 1-second backoff and doubling up to a 30-second cap. At
+// these values, a single API call that continually hits a transient error
+// (429/5xx/timeout) waits about 31 seconds total (1+2+4+8+16, none capped)
+// before giving up.
+var defaultRetryPolicy = retry.Policy{
+	MaxRetries: 5,
+	BaseDelay:  time.Second,
+	MaxDelay:   30 * time.Second,
+}
 
 // Client is an AT Protocol XRPC client bound to a single PDS endpoint,
 // resolved and validated by NewClient before any request is sent.
@@ -35,7 +51,7 @@ type Client struct {
 // (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint) -- only the
 // "which HTTPDoer actually sends the request" step changes.
 var newPDSDoer = func(_ HTTPDoer, verifiedAddrs []net.IP, host string) HTTPDoer {
-	return newRestrictedDoer(verifiedAddrs, host)
+	return retry.NewDoer(newRestrictedDoer(verifiedAddrs, host), defaultRetryPolicy, retry.RealClock{})
 }
 
 // NewClient resolves handle to its DID, resolves the DID document to a PDS
@@ -44,12 +60,14 @@ var newPDSDoer = func(_ HTTPDoer, verifiedAddrs []net.IP, host string) HTTPDoer 
 // here, so a *Client can never be constructed in a state that would let
 // Login send credentials to an unverified host.
 func NewClient(ctx context.Context, handle string, httpDoer HTTPDoer) (*Client, error) {
-	did, err := resolveHandleToDID(ctx, httpDoer, handle)
+	didResolutionDoer := retry.NewDoer(newHostSafetyCheckedDoer(httpDoer), defaultRetryPolicy, retry.RealClock{})
+
+	did, err := resolveHandleToDID(ctx, didResolutionDoer, handle)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceEndpoint, err := resolveDIDDocument(ctx, httpDoer, did)
+	serviceEndpoint, err := resolveDIDDocument(ctx, didResolutionDoer, did)
 	if err != nil {
 		return nil, err
 	}
