@@ -165,7 +165,7 @@
   - **実行結果**: `make deadcode` を実行し、検出0件（出力なし）。本タスクに起因する未使用コードは存在しない。
 - [x] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
   - **作業内容**: 以下を更新する。
-    1. 「Directory Structure」の `cmd/` の説明行を次のように更新する（変更前: `` `main.go`: placeholder only, no config loading logic yet (see docs/tasks/0004_cli_entrypoint) ``、変更後: `` `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires config/atproto/cleanup/`internal/runner`/`internal/report` into a runnable CLI (see docs/tasks/0004_cli_entrypoint) ``。実装時判明: パッケージ名を素の `runner`/`report` ではなく `` `internal/runner` ``/`` `internal/report` `` の完全パス表記にした。これは直後の完了基準が `rg -n "internal/runner"` の2件以上ヒットを要求しており、素の `runner`/`report` 表記のままだと Directory Structure 側の1件が拾えず基準を満たせないため）。
+    1. 「Directory Structure」の `cmd/` の説明行を次のように更新する（変更前: `` `main.go`: placeholder only, no config loading logic yet (see docs/tasks/0004_cli_entrypoint) ``、変更後: `` `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires `internal/config`/`internal/atproto`/`internal/runner`/`internal/report` into a runnable CLI; `internal/cleanup` is used inside `internal/runner`, not directly by `main.go` (see docs/tasks/0004_cli_entrypoint) ``。実装時判明: パッケージ名を素の `runner`/`report` ではなく `` `internal/runner` ``/`` `internal/report` `` の完全パス表記にした。これは直後の完了基準が `rg -n "internal/runner"` の2件以上ヒットを要求しており、素の `runner`/`report` 表記のままだと Directory Structure 側の1件が拾えず基準を満たせないため）。さらにレビュー指摘を受け、`main.go` が直接 import するのは `config`/`atproto`/`runner`/`report` のみで `cleanup` は `internal/runner` 内部からのみ使われる点を明記した。
     2. 同じく「Directory Structure」の `internal/` 一覧に以下の2行を追加する（`cleanup/` の行に続けて）。
        ```
        - `runner/`: wires config/atproto/cleanup together into a single dry-run/apply run, producing a report.Result (see docs/tasks/0004_cli_entrypoint)
@@ -175,7 +175,7 @@
        ```
        **Runner**
 
-       - `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual failures. Depends on `atproto`/`cleanup`/`config`/`report` only through the package-local `Client` interface, so tests inject a fake instead of a real network client (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
+       - `internal/runner`: performs one wiring pass (`Run`) -- login, list posts, judge deletion targets via `cleanup.SelectDeletionTargets`, and (apply mode only) delete each target, continuing past individual failures. Depends on `atproto` only through the package-local `Client` interface, so tests inject a fake instead of a real network client; `cleanup`, `config`, and `report` are used directly as concrete packages (see docs/tasks/0004_cli_entrypoint/01_requirements.md).
 
        **Report**
 

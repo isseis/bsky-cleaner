@@ -9,7 +9,7 @@ codebase grows.
 
 ```
 - `cmd/`: Command-line entry points
-  - `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires config/atproto/cleanup/`internal/runner`/`internal/report` into a runnable CLI (see docs/tasks/0004_cli_entrypoint)
+  - `main.go`: parses CLI flags (`--config`/`-c`, `--apply`) and wires `internal/config`/`internal/atproto`/`internal/runner`/`internal/report` into a runnable CLI; `internal/cleanup` is used inside `internal/runner`, not directly by `main.go` (see docs/tasks/0004_cli_entrypoint)
 - `internal/`: Core implementation
   - `config/`: reads and validates the TOML configuration file and environment variables, returning validated configuration values
   - `atproto/`: thin, self-written AT Protocol (XRPC) client for login, post listing, and post deletion (see docs/tasks/0002_atproto_client)
