@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -52,6 +53,39 @@ type canceledBodyReader struct{}
 
 func (canceledBodyReader) Read(_ []byte) (int, error) {
 	return 0, context.Canceled
+}
+
+// failingReader always fails with a plain (non-ctx-derived) error,
+// simulating a dropped connection while draining an intermediate response
+// body -- as opposed to canceledBodyReader, which simulates the ctx dying.
+type failingReader struct{ err error }
+
+func (r failingReader) Read(_ []byte) (int, error) { return 0, r.err }
+
+// closeSensitiveBody fails subsequent reads once Close has been called, as
+// a real net/http response body does. countingBody's io.NopCloser-backed
+// readers don't model this, so a bug that reads a response body after
+// closing it would go unnoticed with them.
+type closeSensitiveBody struct {
+	content string
+	reader  *strings.Reader
+	closed  bool
+}
+
+func newCloseSensitiveBody(content string) *closeSensitiveBody {
+	return &closeSensitiveBody{content: content, reader: strings.NewReader(content)}
+}
+
+func (b *closeSensitiveBody) Read(p []byte) (int, error) {
+	if b.closed {
+		return 0, errors.New("read on closed response body")
+	}
+	return b.reader.Read(p)
+}
+
+func (b *closeSensitiveBody) Close() error {
+	b.closed = true
+	return nil
 }
 
 func newTestRequest(ctx context.Context, t *testing.T, method string, body io.Reader) *http.Request {
@@ -143,6 +177,54 @@ func TestDoer_Do_MaxRetriesExceeded_ReturnsLastFailure(t *testing.T) {
 	assert.Len(t, clock.SleepCalls, policy.MaxRetries)
 }
 
+// TestDoer_Do_MaxRetriesExceeded_PreservesFinalResponseBody guards against
+// the give-up path draining/closing the very response it returns to the
+// caller: only intermediate (retried) responses may be drained and closed,
+// never the final one whose body ownership passes to the caller.
+func TestDoer_Do_MaxRetriesExceeded_PreservesFinalResponseBody(t *testing.T) {
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: time.Millisecond, MaxDelay: time.Second}
+	calls := 0
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		calls++
+		body := newCloseSensitiveBody(fmt.Sprintf("attempt-%d-body", calls))
+		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: body}, nil
+	}), policy, clock)
+
+	resp, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	require.Equal(t, policy.MaxRetries+1, calls)
+	data, readErr := io.ReadAll(resp.Body)
+	require.NoError(t, readErr)
+	assert.Equal(t, "attempt-2-body", string(data))
+}
+
+// TestDoer_Do_NonCtxBodyDrainError_StillRetries guards against treating
+// every drain error as grounds to abort the retry loop: only a
+// ctx-derived drain error should abort immediately; an unrelated
+// transient read error (e.g. a dropped connection) should still allow the
+// next attempt to proceed.
+func TestDoer_Do_NonCtxBodyDrainError_StillRetries(t *testing.T) {
+	body := &countingBody{Reader: failingReader{err: errors.New("connection reset by peer")}}
+	calls := 0
+	clock := &fakeClock{}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: body}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("ok"))}, nil
+	}), Policy{MaxRetries: 2, BaseDelay: time.Millisecond, MaxDelay: time.Second}, clock)
+
+	resp, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 2, calls)
+	assert.Equal(t, 1, body.closeCount)
+}
+
 // permanentTestError is a test-only error implementing the unexported
 // permanentError interface (Permanent() bool), representing a failure like
 // *atproto.SSRFError that must never be retried.
@@ -232,6 +314,30 @@ func TestDoer_Do_LargeRetryAfterCappedAtMaxDelay(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, clock.SleepCalls, 1)
 	assert.Equal(t, policy.MaxDelay, clock.SleepCalls[0])
+}
+
+// TestDoer_Do_FutureRetryAfterHTTPDate_UsesParsedDelay guards the
+// http.ParseTime branch of parseRetryAfter: a valid future HTTP-date
+// Retry-After value must be honored as the wait, not just the numeric
+// seconds form (covered elsewhere) or the past-date rejection form
+// (covered by TestDoer_Do_NonPositiveRetryAfterFallsBackToExponential).
+func TestDoer_Do_FutureRetryAfterHTTPDate_UsesParsedDelay(t *testing.T) {
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: time.Second, MaxDelay: time.Hour}
+	retryAfter := time.Now().Add(2 * time.Minute).UTC().Format(http.TimeFormat)
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}
+		resp.Header.Set("Retry-After", retryAfter)
+		return resp, nil
+	}), policy, clock)
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	require.Len(t, clock.SleepCalls, 1)
+	// Allow a small tolerance since parseRetryAfter computes time.Until
+	// at call time, not exactly at the deadline set above.
+	assert.InDelta(t, 2*time.Minute, clock.SleepCalls[0], float64(5*time.Second))
 }
 
 func TestDoer_Do_NonPositiveRetryAfterFallsBackToExponential(t *testing.T) {

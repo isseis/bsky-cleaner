@@ -1,6 +1,7 @@
 package retry
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -78,22 +79,27 @@ func (d *Doer) Do(req *http.Request) (*http.Response, error) {
 			return outcomeResp, outcomeErr
 		}
 
-		if resp != nil {
-			if drainErr := drainAndClose(resp.Body); drainErr != nil {
-				return nil, drainErr
-			}
-		}
-
 		if attempt >= d.policy.MaxRetries {
+			// Give up: outcomeResp/outcomeErr is the final outcome, and
+			// its body (if any) must reach the caller unread and unclosed
+			// -- it must not be drained/closed like the intermediate
+			// responses below.
+			logGivingUp(req, attempt+1)
 			return outcomeResp, outcomeErr
 		}
 
+		if resp != nil {
+			if abortErr := drainAndClose(resp.Body); abortErr != nil {
+				return nil, abortErr
+			}
+		}
+
 		wait := backoffDelay(d.policy, attempt, retryAfter)
-		logRetry(req, attempt+1, wait)
 
 		if sleepErr := d.clock.Sleep(ctx, wait); sleepErr != nil {
 			return nil, sleepErr
 		}
+		logRetrying(req, attempt+1, wait)
 	}
 }
 
@@ -144,23 +150,23 @@ func classify(resp *http.Response, doErr error) (retryable bool, retryAfter time
 // attempt (net/http.Transport keep-alive requires the body be read to EOF
 // and closed), then closes it. Reading past maxDrainBytes without reaching
 // EOF still closes the body but forgoes connection reuse -- a deliberate
-// trade-off against unbounded drain time/memory for an oversized body. If
-// the read fails because req's ctx was canceled/expired mid-drain, that
-// error is returned so the caller aborts immediately instead of scheduling
-// a retry (the same "stop without delay" treatment as a Clock.Sleep
-// cancellation).
+// trade-off against unbounded drain time/memory for an oversized body. A
+// non-EOF read error that is not ctx-derived (e.g. the connection dropping
+// mid-drain) is likewise treated as forgoing reuse only, since it says
+// nothing about whether a fresh attempt would succeed. Only a ctx
+// cancellation/deadline observed via the read (as net/http surfaces it) is
+// returned, so the caller aborts the whole retry loop immediately instead
+// of scheduling another attempt (the same "stop without delay" treatment
+// as a Clock.Sleep cancellation) -- retrying would just repeat into the
+// same dead ctx.
 func drainAndClose(body io.ReadCloser) error {
 	_, err := io.CopyN(io.Discard, body, maxDrainBytes+1)
 	closeErr := body.Close()
 
-	if err == nil || errors.Is(err, io.EOF) {
-		// Either fully drained (EOF, possibly exactly at the cap) or the
-		// cap was reached without EOF (CopyN returns nil error only when
-		// it copies the full n bytes) -- both are the "give up on reuse,
-		// but not a failure" case.
-		return closeErr
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
 	}
-	return err
+	return closeErr
 }
 
 // backoffDelay computes the wait before the next attempt (attempt is
@@ -205,16 +211,29 @@ func parseRetryAfter(value string) time.Duration {
 	return 0
 }
 
-// logRetry emits a single observability line for a scheduled retry
-// (including a final one that will be abandoned once MaxRetries is hit),
-// so an on-call responder can tell an immediate failure apart from one
-// that exhausted retries. The URL never carries secrets: XRPC callers
-// always send credentials via the request body or Authorization header,
-// never as a query parameter.
-func logRetry(req *http.Request, nextAttempt int, wait time.Duration) {
+// logRetrying emits a single observability line once a backoff wait has
+// actually completed and another attempt will follow, so an on-call
+// responder can tell an immediate failure apart from one that retried.
+// completedAttempt is the 1-indexed attempt number that just failed. The
+// URL never carries secrets: XRPC callers always send credentials via the
+// request body or Authorization header, never as a query parameter.
+func logRetrying(req *http.Request, completedAttempt int, wait time.Duration) {
 	slog.Default().Warn("retrying HTTP request",
-		"attempt", nextAttempt,
+		"attempt", completedAttempt,
 		"wait", wait,
+		"method", req.Method,
+		"url", req.URL.String(),
+	)
+}
+
+// logGivingUp emits a single observability line when MaxRetries is
+// exhausted and Do is about to return the last failure to the caller, so
+// "retried until it succeeded" and "retried until it gave up" are each
+// unambiguously visible in logs. completedAttempt is the 1-indexed attempt
+// number of that final failure.
+func logGivingUp(req *http.Request, completedAttempt int) {
+	slog.Default().Warn("giving up retrying HTTP request",
+		"attempt", completedAttempt,
 		"method", req.Method,
 		"url", req.URL.String(),
 	)
