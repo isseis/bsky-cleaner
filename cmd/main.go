@@ -98,6 +98,7 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 func main() {
 	configPath, apply, err := parseFlags(os.Args[1:], os.Stderr)
 	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 		os.Exit(exitUsageError)
 	}
 
