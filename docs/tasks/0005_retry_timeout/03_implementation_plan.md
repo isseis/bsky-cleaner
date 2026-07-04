@@ -137,7 +137,7 @@
 **レビュー観点**: `Doer.Do` の再試行対象分類（429/5xx/通信エラー vs 401/429以外の4xx/`Permanent()`）が設計書 3.2節の表と一致していること / バックオフ待機時間が常に `Policy.MaxDelay` で頭打ちになっていること（`Retry-After` 由来・指数計算由来のどちらも） / `Clock.Sleep` の ctx キャンセルが実際の待機を待たずに即座に検知されること / `newHostSafetyCheckedDoer` の導入によって DID 解決の既存テスト（`did_test.go`）が退行していないこと（特に `TestResolveDIDDocument_RejectsUnsafeDidWebHost` の更新箇所） / `StubPassthroughPDSDoer` を使う既存の結合テストが本タスクの変更後も無修正のまま成功すること
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/42）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
