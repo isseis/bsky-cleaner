@@ -218,7 +218,7 @@ func checkRequestHostSafety(ctx context.Context, targetURL string) error {
 
 	addrs, lookupErr := lookupIPAddr(ctx, u.Hostname())
 	if lookupErr != nil {
-		return fmt.Errorf("check request host safety: %w: %w", ErrDIDResolutionFailed, lookupErr)
+		return fmt.Errorf("check request host safety for %q: %w: %w", targetURL, ErrDIDResolutionFailed, lookupErr)
 	}
 	if len(addrs) == 0 {
 		return &SSRFError{Endpoint: targetURL, Stage: SSRFStageInitialValidation, Err: ErrUntrustedPDSEndpoint}

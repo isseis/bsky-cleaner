@@ -281,6 +281,7 @@ func TestCheckRequestHostSafety_LookupFailureIsNotPermanent(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+	assert.ErrorContains(t, err, "https://alice.test")
 	_, isSSRFError := errors.AsType[*SSRFError](err)
 	assert.False(t, isSSRFError, "a DNS lookup failure must not be classified as a permanent SSRF rejection")
 }
