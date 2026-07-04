@@ -33,14 +33,19 @@
 - `internal/config.LoadAppConfig(path string) (*AppConfig, error)`（`internal/config/app_config.go:13`）は `Config`（`RetentionDays` 等）と `Credentials`（`Handle`・`AppPassword`）を1回の呼び出しで取得できる、既に完成した唯一のエントリポイントである。本タスクはこれをそのまま呼び出し、`Load`/`LoadCredentials` を個別に呼び出さない。
 - `config.SecretString`（`internal/config/secret.go:14`）はエクスポートされたコンストラクタを持たず、非公開フィールド `value` を直接組み立てられるのは `package config` 内のみである。`internal/runner`・`cmd` のテストで `config.SecretString` の値が必要な場合は、既存の `config.LoadCredentials()`（`t.Setenv` で環境変数を設定した上で呼び出す、`internal/config/credentials_test.go` と同じパターン）を再利用して取得し、新規のコンストラクタや `testutil` ヘルパーは追加しない。
 - `internal/atproto/testutil.MockHTTPDoer`（`internal/atproto/testutil/mocks.go`）と `internal/atproto/testutil` のレスポンスフィクスチャ関数群（`fixtures.go` の `CreateSessionResponseJSON`・`ListRecordsResponseJSON`・`GetRecordResponseJSON`・`DeleteRecordResponseJSON` 等）は既存かつ公開 API のみに依存しており、`internal/runner`・`cmd` の統合テストからそのまま再利用できる。新規モックは不要。
-- `internal/atproto` の DID 解決（`resolveHandleToDID`・`resolveDIDDocument`）は非公開関数 `lookupIPAddr`（パッケージ変数）をテスト用に差し替える `stubSymbolicHostLookup`（`internal/atproto/did_test.go:29`、`//go:build test` 配下ではなく通常の `_test.go` だが `package atproto` 内でのみ参照可能）に依存しており、`internal/atproto` パッケージの外からは差し替えられない。同様に `newTestClient`（`internal/atproto/test_helpers.go:13`、`//go:build test`）も `package atproto` 内限定の非公開ヘルパーである。設計書 7.2 節が要求する「`MockHTTPDoer` を用いて実 `*atproto.Client` を `runner.Client` として注入する結合テスト」は、`atproto.NewClient` を経由した DID解決からの一連のフローを検証するため、`internal/runner` ではなく `internal/atproto` パッケージ内（`package atproto`、`internal/runner` をインポートする新規テストファイル）に置く。`internal/runner` は本番コードとして `internal/atproto` に依存するのみで、`internal/atproto` の本番コードが `internal/runner` に依存することはないため、これは import 循環にはならない。
+- `internal/atproto` の DID 解決（`resolveHandleToDID`・`resolveDIDDocument`）は非公開関数 `lookupIPAddr`（パッケージ変数）をテスト用に差し替える `stubSymbolicHostLookup`（`internal/atproto/did_test.go:29`、`//go:build test` 配下ではなく通常の `_test.go` だが `package atproto` 内でのみ参照可能）に依存しており、`internal/atproto` パッケージの外からは差し替えられない。同様に `newTestClient`（`internal/atproto/test_helpers.go:13`、`//go:build test`）も `package atproto` 内限定の非公開ヘルパーである。設計書 7.2 節が要求する「`MockHTTPDoer` を用いて実 `*atproto.Client` を `runner.Client` として注入する結合テスト」を置く場所について、当初は `internal/runner` は本番コードとして `internal/atproto` に依存するのみで逆方向の依存がないため、`internal/atproto` パッケージ内（`package atproto`、`internal/runner` をインポートする新規テストファイル）に置いても import 循環にならないと想定していた。しかし実装時に、`package atproto` の内部テストファイルが `internal/runner`（`internal/atproto` に依存する）をインポートすると、`go test` のパッケージ間循環検出（"import cycle not allowed in test"）に実際に抵触することが判明した（`go vet`/`go test` で再現確認済み）。これは Go の内部テストファイル（`package atproto` のままの `_test.go`）が「テスト対象パッケージ自身の拡張版」として扱われるためで、外部テストパッケージ（`package atproto_test`）であれば同じ組み合わせでも問題にならない。そのため、この結合テストは `internal/atproto/runner_integration_test.go` に `package atproto_test` として置く（詳細は設計書 2.1 節・本計画書フェーズ2の該当タスクを参照）。
+- 上記の調査の過程で、`atproto.NewClient` は DID 解決フェーズでのみ呼び出し元の `HTTPDoer` を使い、PDS エンドポイント検証成功後は `Client.httpDoer` を実際に TCP 接続する `newRestrictedDoer`（SSRF/DNS リバインディング対策）に差し替えることも判明した。このため `atproto.NewClient` 経由で構築した `*Client` は、モック `HTTPDoer` を渡していても `Login`/`ListPosts`/`DeleteRecord` の段階で実ネットワーク接続を試みてしまい（`newRestrictedDoer` はループバック・プライベートアドレスへの接続を拒否するため `httptest.Server` でも代替できない）、上記の結合テストに加え、後述する `cmd/main_test.go` の `TestRun_LoginFailure_ReturnsExitCode1` 以降のテストも同じ理由でオフライン実行できないことが分かった。この問題を本番の安全性を弱めずに解消するため、`internal/atproto` に次のテスト専用の差し替え口を追加した（設計書 2.1 節「実装時に判明した `internal/atproto` への追加」参照）。
+  - `internal/atproto/client.go`: `httpDoer` の最終組み立てをパッケージ変数 `newPDSDoer`（デフォルトは従来通り `newRestrictedDoer` を返す）に切り出した。
+  - `internal/atproto/test_helpers.go`（既存、`//go:build test`）: エクスポートされた `StubPassthroughPDSDoer(t *testing.T)` を追加し、テスト実行中のみ `newPDSDoer` を「元の `httpDoer` をそのまま返す」実装に差し替える。DID 解決・PDS エンドポイント検証（`resolveHandleToDID`/`resolveDIDDocument`/`validatePDSEndpoint`）はこの差し替えの影響を受けない。`newTestClient` と異なりエクスポートされているため、`cmd`（`package main`）や `internal/atproto/runner_integration_test.go`（`package atproto_test`）など `internal/atproto` の外からも呼び出せる。
 - `docs/dev/developer_guide/package_reference.md` はまだ `cmd/main.go` を「プレースホルダのみ」と記載しており（1行目）、`internal/runner`・`internal/report` も未記載である。フェーズ4でこれらを更新する。
 - `cmd/main_test.go` は `package main` であり、`internal/atproto/did_test.go` の `stubSymbolicHostLookup`（非公開のパッケージ変数 `lookupIPAddr` を差し替える）にも `test_helpers.go` の `newTestClient`（`atproto.NewClient` を経由せず内部フィールドを直接組み立てる）にも一切アクセスできない。したがって `cmd/main_test.go` から `run`（`atproto.NewClient` を呼ぶ）を実行するテストは、`atproto.NewClient` が内部で行う DNS 解決（`internal/atproto/did.go` の `checkRequestHostSafety`/`validatePDSEndpoint` が呼ぶ `net.DefaultResolver.LookupIPAddr`）を実際に発生させてしまい、ネットワーク未接続の CI 環境では失敗する。この問題は、次の挙動を利用して回避する。`netip.ParseAddr` はホスト文字列を先に判定し、渡された文字列が IP リテラルであれば実際の名前解決を一切行わずに即座にそのアドレスを返す（Go 標準ライブラリ `net/lookup.go` の `lookupIPAddr` の実装。`internal/atproto/did_test.go` の `publicIPLiteral`/`stubSymbolicHostLookup` のコメントも同じ前提に依拠している）。具体的には、`cmd/main_test.go` のテストで用いる `BSKY_HANDLE`（`config.LoadCredentials()` 経由で `Credentials.Handle` に渡る値）を `did_test.go` と同じ RFC 5737 の公開 IP リテラル（例: `203.0.113.5`）にし、`MockHTTPDoer` に次の2レスポンスを固定で返させる。`validatePDSEndpoint` は HTTP リクエストを送らず DNS 解決のみを行うため、モックすべき HTTP レスポンスはこの2つで足りる（ただし2つ目を省略すると、DID ドキュメントに PDS サービスエントリが含まれないため `validatePDSEndpoint` が「PDSサービスが見つからない」エラーで失敗し、意図と異なる理由でテストが失敗する）。
   1. `GET https://203.0.113.5/.well-known/atproto-did` → ボディ `did:web:203.0.113.5`（`did:plc:...` にしない。`did:plc:` は固定のシンボリックホスト `plc.directory` の DID ドキュメント URL になり DNS 解決が必要になるため）。
   2. `GET https://203.0.113.5/.well-known/did.json` → `serviceEndpoint` が `https://203.0.113.5` である `AtprotoPersonalDataServer` サービスエントリを含む DID ドキュメント JSON（`atprototestutil` に相当するビルダーがないため、この JSON はテストコード内にリテラルで組み立てる）。
   上記 `serviceEndpoint`（`https://203.0.113.5`）に対する `validatePDSEndpoint` のホスト解決は同じ IP リテラルであるため DNS 解決のみで完結し、追加の HTTP レスポンスをモックする必要はない。
 
-この3点がすべて揃って初めて、DID 解決からログイン・一覧取得・削除に至るまで一切の実 DNS 解決なしに `cmd/main_test.go` から `run` を駆動できる。フェーズ3の各テストタスクはこの構成を前提とし、`hermeticHandler` ヘルパー（後述）が1・2を常に自動応答し、テストごとに `createSession`/`listRecords`/`getRecord`/`deleteRecord` のレスポンスのみを追加設定できるようにする。
+上記の DNS 解決の回避に加え、`TestRun_ClientInitFailure_ReturnsExitCode1`（DID解決・PDS検証失敗で止まる）以外の `TestRun_*` テスト（`TestRun_LoginFailure_ReturnsExitCode1` 以降、`Login`/`ListPosts`/`DeleteRecord` に到達するもの）は、上述の「実装時に判明した `internal/atproto` への追加」で導入した `atproto.StubPassthroughPDSDoer(t)` を各テストの冒頭で呼び出す必要がある。これを呼ばない場合、`run` 内部で構築される `*atproto.Client` は `NewClient` が差し替える実ネットワーク接続の `httpDoer`（`newRestrictedDoer`）を使ってしまい、`MockHTTPDoer` に設定したレスポンスが一切使われずに実接続を試みて失敗する。
+
+この4点（IP リテラルベースの `did:web` 構成、`hermeticHandler` による1・2の自動応答、`StubPassthroughPDSDoer`）がすべて揃って初めて、DID 解決からログイン・一覧取得・削除に至るまで一切の実ネットワーク I/O なしに `cmd/main_test.go` から `run` を駆動できる。フェーズ3の各テストタスクはこの構成を前提とし、`hermeticHandler` ヘルパー（後述）が1・2を常に自動応答し、テストごとに `createSession`/`listRecords`/`getRecord`/`deleteRecord` のレスポンスのみを追加設定できるようにする。
 
 ## 2. 実装ステップ
 
@@ -48,24 +53,24 @@
 
 ### フェーズ1: `internal/report` パッケージの実装（NF-005 の実装基盤、AC-04・AC-06・AC-09 の表示ロジック）
 
-- [ ] **対象ファイル**: `internal/report/report.go`（新規作成）
+- [x] **対象ファイル**: `internal/report/report.go`（新規作成）
   - **作業内容**:
     - `package report` を宣言する。
     - 設計書 3.1 節の型定義をそのまま実装する: `Mode`（`ModeDryRun`/`ModeApply` の2値）、`DeleteFailure{ Post atproto.Post; Err error }`、`Result{ Mode Mode; Targets, Deleted []atproto.Post; Failed []DeleteFailure }`。
     - `FormatText(r Result) string` を実装する。`r.Mode == ModeDryRun` の場合は `r.Targets` の一覧（rkey を含む）を表示し、`len(r.Targets) == 0` のときは「削除対象なし」に相当する文言を出力する（AC-06）。`r.Mode == ModeApply` の場合は `len(r.Deleted)` と `len(r.Failed)` の件数に加え、`r.Failed` の各要素について rkey と `Err.Error()` を1件ずつ列挙する（AC-09、設計書 3.2.3）。
   - **完了基準**: `go build ./...` が成功する。フェーズ1のテストがすべて通過する。
 
-- [ ] **対象ファイル**: `internal/report/report_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/report/report_test.go`（新規作成）
   - **作業内容**: 設計書 7.1 節の4パターンをテストする。
-    - [ ] `TestFormatText_DryRun_WithTargets`: `Mode: ModeDryRun`、`Targets` に2件以上の投稿を設定し、出力に各投稿の rkey が含まれることを検証する（AC-04）。
-    - [ ] `TestFormatText_DryRun_NoTargets`: `Mode: ModeDryRun`、`Targets: nil` の場合、エラーにならず「削除対象なし」に相当する文言が出力に含まれることを検証する（AC-06）。
-    - [ ] `TestFormatText_Apply_AllSucceeded`: `Mode: ModeApply`、`Deleted` に2件、`Failed` が空の場合、出力に削除件数 `2` が含まれ、失敗件数が `0`（または失敗なしを示す文言）であることを検証する（AC-09 の一部）。
-    - [ ] `TestFormatText_Apply_WithFailures`: `Mode: ModeApply`、`Deleted` に1件、`Failed` に rkey・`error` の異なる2件を設定し、出力に失敗件数 `2` に加え、各失敗の rkey と対応するエラーメッセージの両方が個別に含まれることを検証する（AC-09、設計書 3.2.3 が要求する「件数だけでなく個々の失敗内容」）。
+    - [x] `TestFormatText_DryRun_WithTargets`: `Mode: ModeDryRun`、`Targets` に2件以上の投稿を設定し、出力に各投稿の rkey が含まれることを検証する（AC-04）。
+    - [x] `TestFormatText_DryRun_NoTargets`: `Mode: ModeDryRun`、`Targets: nil` の場合、エラーにならず「削除対象なし」に相当する文言が出力に含まれることを検証する（AC-06）。
+    - [x] `TestFormatText_Apply_AllSucceeded`: `Mode: ModeApply`、`Deleted` に2件、`Failed` が空の場合、出力に削除件数 `2` が含まれ、失敗件数が `0`（または失敗なしを示す文言）であることを検証する（AC-09 の一部）。
+    - [x] `TestFormatText_Apply_WithFailures`: `Mode: ModeApply`、`Deleted` に1件、`Failed` に rkey・`error` の異なる2件を設定し、出力に失敗件数 `2` に加え、各失敗の rkey と対応するエラーメッセージの両方が個別に含まれることを検証する（AC-09、設計書 3.2.3 が要求する「件数だけでなく個々の失敗内容」）。
   - **完了基準**: `make test` で `internal/report` パッケージの全テストが成功する。各テストは `assert`/`require`（`github.com/stretchr/testify`）でアサーションを記述する（CLAUDE.md テスト方針）。
 
 ### フェーズ2: `internal/runner` パッケージの実装（F-002・F-003、AC-05・AC-07・AC-08・AC-09（データ生成側）・AC-10・AC-11）
 
-- [ ] **対象ファイル**: `internal/runner/runner.go`（新規作成）
+- [x] **対象ファイル**: `internal/runner/runner.go`（新規作成）
   - **作業内容**:
     - `package runner` を宣言し、設計書 3.1 節の `Client` インターフェースをそのまま定義する: `Login(ctx context.Context, appPassword config.SecretString) error`・`ListPosts(ctx context.Context) ([]atproto.Post, error)`・`DeleteRecord(ctx context.Context, rkey string) error`。
     - `Run(ctx context.Context, client Client, appPassword config.SecretString, retentionDays int, apply bool, now time.Time) (*report.Result, error)` を実装する。処理順序は設計書 2.2 節のシーケンス図の通り: `client.Login` → `client.ListPosts` → `cleanup.SelectDeletionTargets` → (`apply` が `false` ならここで終了、`true` なら `Targets` の各要素に対して `client.DeleteRecord` をループ呼び出し)。
@@ -75,24 +80,24 @@
     - `Run` 自体はネットワーク I/O を行わず、渡された `Client` 経由でのみ `atproto` を呼び出す（設計書 3.3 節）。
   - **完了基準**: `go build ./...` が成功する。以下のテストがすべて通過する。
 
-- [ ] **対象ファイル**: `internal/runner/test_helpers.go`（新規作成、`//go:build test`）
+- [x] **対象ファイル**: `internal/runner/test_helpers.go`（新規作成、`//go:build test`）
   - **作業内容**: 設計書 7.1 節が指定する「テスト専用の軽量モック」を実装する。`Client` インターフェースを満たす `fakeClient` 構造体を定義し、次を設定可能にする: `LoginErr error`（`Login` が返すエラー）、`ListPostsResult []atproto.Post`・`ListPostsErr error`、`DeleteRecordErrs map[string]error`（rkey ごとに返すエラー。マップに存在しない rkey は成功として扱う）。呼び出された `DeleteRecord` の rkey を呼び出し順に記録するフィールド（例: `DeleteRecordCalls []string`）も持たせ、テストが「どの rkey に対して呼ばれたか」「呼ばれた回数」の両方をアサートできるようにする。
   - **完了基準**: `internal/runner` 配下のテストからのみ参照され、`//go:build test` タグにより本番ビルドに含まれないことを `go build ./...`（タグなし）でも確認する。
 
-- [ ] **対象ファイル**: `internal/runner/runner_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/runner/runner_test.go`（新規作成）
   - **作業内容**: `fakeClient` を注入し、以下を検証する。
-    - [ ] `TestRun_DryRun_DoesNotCallDeleteRecord`: `apply=false`、`fakeClient.ListPostsResult` に削除対象条件を満たす投稿を含めた上で `Run` を実行し、`fakeClient.DeleteRecordCalls` が空であることを検証する（AC-05）。
-    - [ ] `TestRun_Apply_CallsDeleteRecordForAllTargets`: `apply=true`、`SelectDeletionTargets` が複数件を削除対象と判定するような投稿一覧を与え、`fakeClient.DeleteRecordCalls` が判定された対象全件の rkey を含むことを検証する（AC-07）。
-    - [ ] `TestRun_Apply_RespectsCleanupExclusions_PinnedAndRetention`: ピン留め投稿・保持期間内の投稿・削除対象条件を満たす投稿を混在させた一覧を与え、`fakeClient.DeleteRecordCalls` にピン留め投稿・保持期間内投稿の rkey が含まれず、削除対象条件を満たす投稿の rkey のみが含まれることを検証する（AC-08。`Run` は実際の `cleanup.SelectDeletionTargets` をそのまま呼び出すため、このテストは `runner` が判定結果を追加でフィルタしていないことの確認である）。
-    - [ ] `TestRun_Apply_PartialFailure_ContinuesAndRecordsFailure`: `fakeClient.DeleteRecordErrs` で複数件中の一部にエラーを設定し、`Run` がエラーを返さず（`err == nil`）、`Result.Deleted`・`Result.Failed` に成功・失敗それぞれの投稿が正しく振り分けられること、かつ全対象に対して `DeleteRecord` が呼ばれた（失敗後も処理が継続した）ことを検証する（AC-11、AC-09 のデータ生成側）。
-    - [ ] `TestRun_LoginError_ReturnsErrorWithoutListingOrDeleting`: `fakeClient.LoginErr` を設定し、`Run` がそのエラーをそのまま返すこと（`errors.Is`/`errors.AsType[T]` ではなく `assert.Equal`/`assert.ErrorIs` で同一性を確認する。同一の `error` 値をラップせず返す設計のため）、かつ `ListPosts`/`DeleteRecord` が一度も呼ばれていないことを検証する（AC-10 の一部）。
-    - [ ] `TestRun_ListPostsError_ReturnsErrorWithoutDeleting`: `fakeClient.ListPostsErr` を設定し、`Run` がそのエラーをそのまま返すこと、かつ `DeleteRecord` が一度も呼ばれていないことを検証する（AC-10 の一部）。
-    - [ ] `TestRun_LogsEachDeleteRecordOutcome`: `apply=true`、成功・失敗それぞれ1件以上を含む対象一覧で `Run` を実行する前に `slog.SetDefault` を `slog.NewTextHandler` でバッファ書き込みするロガーに差し替え（`t.Cleanup` で元に戻す）、実行後のログ出力に各 rkey と成否を示す文字列が含まれることを検証する（設計書 6節。特定の AC には対応しないが、クラッシュ耐性のための逐次ログという設計上の要求を退行させないための回帰テストとして追加する）。
-    - [ ] `appPassword` が必要なテストでは、`t.Setenv` で `BSKY_HANDLE`/`BSKY_APP_PASSWORD`/`BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` を設定した上で `config.LoadCredentials()` を呼び出し、その戻り値の `AppPassword` フィールドを利用する（1.3 節、新規ヘルパー不要）。
+    - [x] `TestRun_DryRun_DoesNotCallDeleteRecord`: `apply=false`、`fakeClient.ListPostsResult` に削除対象条件を満たす投稿を含めた上で `Run` を実行し、`fakeClient.DeleteRecordCalls` が空であることを検証する（AC-05）。
+    - [x] `TestRun_Apply_CallsDeleteRecordForAllTargets`: `apply=true`、`SelectDeletionTargets` が複数件を削除対象と判定するような投稿一覧を与え、`fakeClient.DeleteRecordCalls` が判定された対象全件の rkey を含むことを検証する（AC-07）。
+    - [x] `TestRun_Apply_RespectsCleanupExclusions_PinnedAndRetention`: ピン留め投稿・保持期間内の投稿・削除対象条件を満たす投稿を混在させた一覧を与え、`fakeClient.DeleteRecordCalls` にピン留め投稿・保持期間内投稿の rkey が含まれず、削除対象条件を満たす投稿の rkey のみが含まれることを検証する（AC-08。`Run` は実際の `cleanup.SelectDeletionTargets` をそのまま呼び出すため、このテストは `runner` が判定結果を追加でフィルタしていないことの確認である）。
+    - [x] `TestRun_Apply_PartialFailure_ContinuesAndRecordsFailure`: `fakeClient.DeleteRecordErrs` で複数件中の一部にエラーを設定し、`Run` がエラーを返さず（`err == nil`）、`Result.Deleted`・`Result.Failed` に成功・失敗それぞれの投稿が正しく振り分けられること、かつ全対象に対して `DeleteRecord` が呼ばれた（失敗後も処理が継続した）ことを検証する（AC-11、AC-09 のデータ生成側）。
+    - [x] `TestRun_LoginError_ReturnsErrorWithoutListingOrDeleting`: `fakeClient.LoginErr` を設定し、`Run` がそのエラーをそのまま返すこと（`errors.Is`/`errors.AsType[T]` ではなく `assert.Equal`/`assert.ErrorIs` で同一性を確認する。同一の `error` 値をラップせず返す設計のため）、かつ `ListPosts`/`DeleteRecord` が一度も呼ばれていないことを検証する（AC-10 の一部）。
+    - [x] `TestRun_ListPostsError_ReturnsErrorWithoutDeleting`: `fakeClient.ListPostsErr` を設定し、`Run` がそのエラーをそのまま返すこと、かつ `DeleteRecord` が一度も呼ばれていないことを検証する（AC-10 の一部）。
+    - [x] `TestRun_LogsEachDeleteRecordOutcome`: `apply=true`、成功・失敗それぞれ1件以上を含む対象一覧で `Run` を実行する前に `slog.SetDefault` を `slog.NewTextHandler` でバッファ書き込みするロガーに差し替え（`t.Cleanup` で元に戻す）、実行後のログ出力に各 rkey と成否を示す文字列が含まれることを検証する（設計書 6節。特定の AC には対応しないが、クラッシュ耐性のための逐次ログという設計上の要求を退行させないための回帰テストとして追加する）。
+    - [x] `appPassword` が必要なテストでは、`t.Setenv` で `BSKY_HANDLE`/`BSKY_APP_PASSWORD`/`BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` を設定した上で `config.LoadCredentials()` を呼び出し、その戻り値の `AppPassword` フィールドを利用する（1.3 節、新規ヘルパー不要）。
   - **完了基準**: `make test` で `internal/runner` パッケージの全テストが成功する。
 
-- [ ] **対象ファイル**: `internal/atproto/runner_integration_test.go`（新規作成、`package atproto`）
-  - **作業内容**: 設計書 7.2 節が要求する「実 `*atproto.Client` を `runner.Client` として注入する結合テスト」を実装する。`internal/runner` をインポートし、`atprototestutil.MockHTTPDoer` と `stubSymbolicHostLookup`（`did_test.go` の既存ヘルパー、同一パッケージ内のため直接呼び出し可能）を用いて DID 解決・ログイン・投稿一覧取得・投稿削除の一連のレスポンスをスクリプトし、`atproto.NewClient` で得た `*Client` をそのまま `runner.Run` の `client` 引数として渡して実行する。この結合テストの目的はインターフェースの形状不一致の検出（設計書 7.2 節）であり、判定ロジックや異常系の網羅は `internal/runner/runner_test.go`（`fakeClient` 使用）側の責務とするため、正常系1パターン（dry-run または apply いずれか1件成功）のみで十分とする。
+- [x] **対象ファイル**: `internal/atproto/runner_integration_test.go`（新規作成、`package atproto_test`）
+  - **作業内容**: 設計書 7.2 節が要求する「実 `*atproto.Client` を `runner.Client` として注入する結合テスト」を実装する。`internal/runner` をインポートするため、`package atproto`（内部テスト）ではなく `package atproto_test`（外部テストパッケージ）とする（実装時に判明: `internal/runner` は `internal/atproto` に依存するため、`package atproto` のテストファイルが `internal/runner` をインポートすると `go test` レベルの import cycle になる。詳細は 1.3 節・設計書 2.1 節「実装時に判明した `internal/atproto` への追加」を参照）。`atprototestutil.MockHTTPDoer` に DID 解決（`.well-known/atproto-did`・`.well-known/did.json`、1.3 節と同じ IP リテラルベースの `did:web` 構成を使い実 DNS 解決を避ける）・ログイン・投稿一覧取得・投稿削除の一連のレスポンスをスクリプトし、`atproto.NewClient` で得た `*Client` に対して `atproto.StubPassthroughPDSDoer(t)`（新規追加のテスト専用エクスポート関数、設計書 2.1 節参照）を適用した上で、そのまま `runner.Run` の `client` 引数として渡して実行する。`StubPassthroughPDSDoer` を使わない場合、`NewClient` が内部で `httpDoer` を実ネットワーク接続する `restrictedDoer` に差し替えてしまい、モックが素通りされてしまう。この結合テストの目的はインターフェースの形状不一致の検出（設計書 7.2 節）であり、判定ロジックや異常系の網羅は `internal/runner/runner_test.go`（`fakeClient` 使用）側の責務とするため、正常系1パターン（dry-run または apply いずれか1件成功）のみで十分とする。
   - **完了基準**: `make test` で本テストが成功する。
 
 ### PR-1 作成ポイント: report and runner packages
@@ -118,7 +123,7 @@
   - **完了基準**: `go build ./cmd` が成功する。以下のテストがすべて通過する。
 
 - [ ] **対象ファイル**: `cmd/main_test.go`（新規作成、`package main`）
-  - **作業内容**: `parseFlags`・`run` を直接呼び出し、以下を検証する。`run` を経由して `atproto.NewClient` の DID 解決まで実行するテスト（`TestRun_ClientInitFailure_ReturnsExitCode1` 以降すべて）は、1.3 節に記載した「`BSKY_HANDLE` を公開 IP リテラル（例: `203.0.113.5`、`internal/atproto/did_test.go` の `publicIPLiteral` と同じ RFC 5737 アドレス）にし、`.well-known/atproto-did` のレスポンスを `did:web:203.0.113.5` にすることで DID ドキュメント URL・PDS エンドポイントの双方のホストを同じ IP リテラルに揃える」という構成を用い、実 DNS 解決が一切発生しないようにする。この一連のレスポンスのうち、1.3 節の1・2（`.well-known/atproto-did` と `.well-known/did.json`、常に固定値を返す）を自動応答する非公開ヘルパー関数（例: `hermeticHandler(t *testing.T, next func(*http.Request) (*http.Response, error)) func(*http.Request) (*http.Response, error)`、`cmd/main_test.go` 内に定義。他パッケージから参照されないため `testutil/`・`test_helpers.go` は不要）を用意する。`next` には各テストが `createSession`/`listRecords`/`getRecord`/`deleteRecord` のリクエストだけをハンドルする関数を渡し、`hermeticHandler` は自身が応答すべき2つのURL（1.3 節の1・2）以外のリクエストを `next` にそのまま委譲する。
+  - **作業内容**: `parseFlags`・`run` を直接呼び出し、以下を検証する。`run` を経由して `atproto.NewClient` の DID 解決まで実行するテスト（`TestRun_ClientInitFailure_ReturnsExitCode1` 以降すべて）は、1.3 節に記載した「`BSKY_HANDLE` を公開 IP リテラル（例: `203.0.113.5`、`internal/atproto/did_test.go` の `publicIPLiteral` と同じ RFC 5737 アドレス）にし、`.well-known/atproto-did` のレスポンスを `did:web:203.0.113.5` にすることで DID ドキュメント URL・PDS エンドポイントの双方のホストを同じ IP リテラルに揃える」という構成を用い、実 DNS 解決が一切発生しないようにする。この一連のレスポンスのうち、1.3 節の1・2（`.well-known/atproto-did` と `.well-known/did.json`、常に固定値を返す）を自動応答する非公開ヘルパー関数（例: `hermeticHandler(t *testing.T, next func(*http.Request) (*http.Response, error)) func(*http.Request) (*http.Response, error)`、`cmd/main_test.go` 内に定義。他パッケージから参照されないため `testutil/`・`test_helpers.go` は不要）を用意する。`next` には各テストが `createSession`/`listRecords`/`getRecord`/`deleteRecord` のリクエストだけをハンドルする関数を渡し、`hermeticHandler` は自身が応答すべき2つのURL（1.3 節の1・2）以外のリクエストを `next` にそのまま委譲する。`createSession`/`listRecords`/`deleteRecord` に到達するテスト（`TestRun_LoginFailure_ReturnsExitCode1` 以降すべて）は、`run` を呼び出す前に `atproto.StubPassthroughPDSDoer(t)`（1.3 節参照）を呼び、`NewClient` が `httpDoer` を実ネットワーク接続する `restrictedDoer` に差し替えないようにする。
     - [ ] `TestParseFlags_ConfigLongFlag_Accepted`: `["--config", "path/to.toml"]` で `configPath == "path/to.toml"` が返ることを検証する（AC-01）。
     - [ ] `TestParseFlags_ConfigShortFlag_Accepted`: `["-c", "path/to.toml"]` でも同様に受理されることを検証する（AC-01、エイリアス）。
     - [ ] `TestParseFlags_ApplyNotSpecified_DefaultsToFalse`: `--config` のみを指定し `apply == false` が返ることを検証する（AC-02、NF-003 の一部）。
