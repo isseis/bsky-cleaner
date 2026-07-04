@@ -32,8 +32,7 @@ func TestFormatText_Apply_AllSucceeded(t *testing.T) {
 
 	got := report.FormatText(report.Result{Mode: report.ModeApply, Deleted: deleted, Failed: nil})
 
-	assert.Contains(t, got, "2")
-	assert.Contains(t, got, "0")
+	assert.Contains(t, got, "Deleted 2 post(s), 0 failure(s).")
 }
 
 func TestFormatText_Apply_WithFailures(t *testing.T) {

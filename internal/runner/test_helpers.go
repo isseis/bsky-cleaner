@@ -16,6 +16,9 @@ type fakeClient struct {
 
 	ListPostsResult []atproto.Post
 	ListPostsErr    error
+	// ListPostsCalls counts ListPosts invocations, so tests can assert it
+	// was never called (e.g. after a Login failure).
+	ListPostsCalls int
 
 	// DeleteRecordErrs maps rkey to the error DeleteRecord should return
 	// for it. An rkey absent from the map succeeds.
@@ -32,6 +35,7 @@ func (c *fakeClient) Login(_ context.Context, _ config.SecretString) error {
 }
 
 func (c *fakeClient) ListPosts(_ context.Context) ([]atproto.Post, error) {
+	c.ListPostsCalls++
 	return c.ListPostsResult, c.ListPostsErr
 }
 

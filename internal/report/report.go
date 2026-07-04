@@ -55,7 +55,7 @@ func FormatText(r Result) string {
 	case ModeApply:
 		fmt.Fprintf(&b, "Deleted %d post(s), %d failure(s).\n", len(r.Deleted), len(r.Failed))
 		for _, failure := range r.Failed {
-			fmt.Fprintf(&b, "  %s: %s\n", failure.Post.RKey, failure.Err.Error())
+			fmt.Fprintf(&b, "  %s: %v\n", failure.Post.RKey, failure.Err)
 		}
 	}
 

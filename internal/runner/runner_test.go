@@ -107,6 +107,7 @@ func TestRun_LoginError_ReturnsErrorWithoutListingOrDeleting(t *testing.T) {
 
 	assert.ErrorIs(t, err, loginErr)
 	assert.Nil(t, result)
+	assert.Zero(t, client.ListPostsCalls)
 	assert.Empty(t, client.DeleteRecordCalls)
 }
 
