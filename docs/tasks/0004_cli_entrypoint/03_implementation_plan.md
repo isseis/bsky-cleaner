@@ -115,29 +115,29 @@
 
 ### フェーズ3: `cmd/main.go` の実装（F-001・F-004、AC-01〜AC-03・AC-10・AC-11 の組み立て）
 
-- [ ] **対象ファイル**: `cmd/main.go`（変更、プレースホルダを置き換え）
+- [x] **対象ファイル**: `cmd/main.go`（変更、プレースホルダを置き換え）
   - **作業内容**:
     - `parseFlags(args []string, stderr io.Writer) (configPath string, apply bool, err error)` を実装する。`flag.NewFlagSet` を `flag.ContinueOnError` で構築し `SetOutput(stderr)` を設定した上で、`--config`/`-c`（同じ変数を指す2つの `StringVar`）と `--apply`（`BoolVar`、デフォルト `false`）を登録し `fs.Parse(args)` する。`fs.Parse` 自体がエラーを返した場合はそのエラーをそのまま返す（`ContinueOnError` モードでは `fs.Parse` が使用方法を `stderr` に書き込み済みのため、追加の出力は不要）。`fs.Parse` が成功しても `fs.NArg() > 0`（未知の位置引数が残っている）場合、または `configPath == ""`（`--config`/`-c` 未指定）の場合は、`fs.Usage()` を呼んでから独自のエラーを返す（AC-01・AC-02・AC-03）。
     - `run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer, stdout, stderr io.Writer) int` を実装する。処理順序は設計書 3.2.4 節の通り: `config.LoadAppConfig(configPath)` → `atproto.NewClient(ctx, cfg.Handle, httpDoer)` → `runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)`。3呼び出しのいずれかがエラーを返した場合、`err.Error()` を `stderr` にそのまま書き込み、終了コード `1` を返す（AC-10、設計書 4節よりマスキングは既存エラー型が担うため追加処理不要）。`runner.Run` が `nil` エラーで戻った場合は `report.FormatText(*result)` を `stdout` に書き込み、`len(result.Failed) > 0` なら終了コード `3`、それ以外は `0` を返す（AC-11、設計書 3.2.4 の終了コード表）。
     - `main()` を、`parseFlags(os.Args[1:], os.Stderr)` の呼び出し（失敗時は `os.Exit(2)`）、`time.Now()` の1回だけの呼び出し、`run(configPath, apply, now, http.DefaultClient, os.Stdout, os.Stderr)` の呼び出し、その戻り値での `os.Exit` のみに専念させる（NF-002、設計書 3.2.4 が要求する「`time.Now()` を1回だけ呼び出しループ中に再取得しない」ことも満たす）。
   - **完了基準**: `go build ./cmd` が成功する。以下のテストがすべて通過する。
 
-- [ ] **対象ファイル**: `cmd/main_test.go`（新規作成、`package main`）
+- [x] **対象ファイル**: `cmd/main_test.go`（新規作成、`package main`）
   - **作業内容**: `parseFlags`・`run` を直接呼び出し、以下を検証する。`run` を経由して `atproto.NewClient` の DID 解決まで実行するテスト（`TestRun_ClientInitFailure_ReturnsExitCode1` 以降すべて）は、1.3 節に記載した「`BSKY_HANDLE` を公開 IP リテラル（例: `203.0.113.5`、`internal/atproto/did_test.go` の `publicIPLiteral` と同じ RFC 5737 アドレス）にし、`.well-known/atproto-did` のレスポンスを `did:web:203.0.113.5` にすることで DID ドキュメント URL・PDS エンドポイントの双方のホストを同じ IP リテラルに揃える」という構成を用い、実 DNS 解決が一切発生しないようにする。この一連のレスポンスのうち、1.3 節の1・2（`.well-known/atproto-did` と `.well-known/did.json`、常に固定値を返す）を自動応答する非公開ヘルパー関数（例: `hermeticHandler(t *testing.T, next func(*http.Request) (*http.Response, error)) func(*http.Request) (*http.Response, error)`、`cmd/main_test.go` 内に定義。他パッケージから参照されないため `testutil/`・`test_helpers.go` は不要）を用意する。`next` には各テストが `createSession`/`listRecords`/`getRecord`/`deleteRecord` のリクエストだけをハンドルする関数を渡し、`hermeticHandler` は自身が応答すべき2つのURL（1.3 節の1・2）以外のリクエストを `next` にそのまま委譲する。`createSession`/`listRecords`/`deleteRecord` に到達するテスト（`TestRun_LoginFailure_ReturnsExitCode1` 以降すべて）は、`run` を呼び出す前に `atproto.StubPassthroughPDSDoer(t)`（1.3 節参照）を呼び、`NewClient` が `httpDoer` を実ネットワーク接続する `restrictedDoer` に差し替えないようにする。
-    - [ ] `TestParseFlags_ConfigLongFlag_Accepted`: `["--config", "path/to.toml"]` で `configPath == "path/to.toml"` が返ることを検証する（AC-01）。
-    - [ ] `TestParseFlags_ConfigShortFlag_Accepted`: `["-c", "path/to.toml"]` でも同様に受理されることを検証する（AC-01、エイリアス）。
-    - [ ] `TestParseFlags_ApplyNotSpecified_DefaultsToFalse`: `--config` のみを指定し `apply == false` が返ることを検証する（AC-02、NF-003 の一部）。
-    - [ ] `TestParseFlags_ApplySpecified_True`: `--apply` を追加指定した場合に `apply == true` が返ることを検証する（AC-02 の対照ケース）。
-    - [ ] `TestParseFlags_MissingConfig_ReturnsError`: `--config`/`-c` のいずれも指定しない場合にエラーが返り、`err != nil` であることを検証する（AC-03）。
-    - [ ] `TestParseFlags_UnknownFlag_ReturnsError`: 未定義のフラグ（例: `--unknown`）を指定した場合にエラーが返ることを検証する（AC-03）。
-    - [ ] `TestParseFlags_UnexpectedPositionalArgument_ReturnsError`: `["--config", "path/to.toml", "extra-arg"]` のように余分な位置引数を渡した場合にエラーが返ることを検証する（AC-03）。
-    - [ ] `TestRun_ConfigLoadFailure_ReturnsExitCode1`: 存在しないパスを `configPath` に渡し、`run` の戻り値が `1` であることを検証する（AC-10。実ファイルシステムに対する `config.LoadAppConfig` の既存の失敗パスをそのまま利用し、モック不要。`atproto.NewClient` に到達する前に失敗するため、上記のハンドル解決用ヘルパーも不要）。
-    - [ ] `TestRun_ClientInitFailure_ReturnsExitCode1`: 上記のハンドル解決用ヘルパーを使わず、`.well-known/atproto-did` が非2xxを返す（またはDIDドキュメントの `serviceEndpoint` が存在しない）レスポンスを設定し、`run` の戻り値が `1` であることを検証する（AC-10）。
-    - [ ] `TestRun_LoginFailure_ReturnsExitCode1`: ハンドル解決用ヘルパーでDID解決・PDS検証は成功させつつ、`createSession` が非2xxを返すレスポンスを追加設定し、`run` の戻り値が `1` であることを検証する（AC-10）。
-    - [ ] `TestRun_DryRunWithTargets_ReturnsExitCode0AndPrintsTargets`: `apply=false`、削除対象を含む投稿一覧が返るようレスポンスを設定し、`run` の戻り値が `0`、`stdout` に対象の rkey が含まれることを検証する（AC-04）。
-    - [ ] `TestRun_DryRunNoTargets_ReturnsExitCode0AndPrintsNoTargetsMessage`: 削除対象が0件になるレスポンスを設定し、`run` の戻り値が `0`、`stdout` に「削除対象なし」に相当する文言が含まれることを検証する（AC-06）。
-    - [ ] `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`: `apply=true`、`deleteRecord` が全件2xxを返すレスポンスを設定し、`run` の戻り値が `0`、`stdout` に削除件数が含まれることを検証する（AC-07・AC-09）。
-    - [ ] `TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures`: `apply=true`、`deleteRecord` の一部が非2xxを返すレスポンスを設定し、`run` の戻り値が `3`、`stdout` に失敗件数と失敗した rkey が含まれることを検証する（AC-11・AC-09）。
+    - [x] `TestParseFlags_ConfigLongFlag_Accepted`: `["--config", "path/to.toml"]` で `configPath == "path/to.toml"` が返ることを検証する（AC-01）。
+    - [x] `TestParseFlags_ConfigShortFlag_Accepted`: `["-c", "path/to.toml"]` でも同様に受理されることを検証する（AC-01、エイリアス）。
+    - [x] `TestParseFlags_ApplyNotSpecified_DefaultsToFalse`: `--config` のみを指定し `apply == false` が返ることを検証する（AC-02、NF-003 の一部）。
+    - [x] `TestParseFlags_ApplySpecified_True`: `--apply` を追加指定した場合に `apply == true` が返ることを検証する（AC-02 の対照ケース）。
+    - [x] `TestParseFlags_MissingConfig_ReturnsError`: `--config`/`-c` のいずれも指定しない場合にエラーが返り、`err != nil` であることを検証する（AC-03）。
+    - [x] `TestParseFlags_UnknownFlag_ReturnsError`: 未定義のフラグ（例: `--unknown`）を指定した場合にエラーが返ることを検証する（AC-03）。
+    - [x] `TestParseFlags_UnexpectedPositionalArgument_ReturnsError`: `["--config", "path/to.toml", "extra-arg"]` のように余分な位置引数を渡した場合にエラーが返ることを検証する（AC-03）。
+    - [x] `TestRun_ConfigLoadFailure_ReturnsExitCode1`: 存在しないパスを `configPath` に渡し、`run` の戻り値が `1` であることを検証する（AC-10。実ファイルシステムに対する `config.LoadAppConfig` の既存の失敗パスをそのまま利用し、モック不要。`atproto.NewClient` に到達する前に失敗するため、上記のハンドル解決用ヘルパーも不要）。
+    - [x] `TestRun_ClientInitFailure_ReturnsExitCode1`: 上記のハンドル解決用ヘルパーを使わず、`.well-known/atproto-did` が非2xxを返す（またはDIDドキュメントの `serviceEndpoint` が存在しない）レスポンスを設定し、`run` の戻り値が `1` であることを検証する（AC-10）。
+    - [x] `TestRun_LoginFailure_ReturnsExitCode1`: ハンドル解決用ヘルパーでDID解決・PDS検証は成功させつつ、`createSession` が非2xxを返すレスポンスを追加設定し、`run` の戻り値が `1` であることを検証する（AC-10）。
+    - [x] `TestRun_DryRunWithTargets_ReturnsExitCode0AndPrintsTargets`: `apply=false`、削除対象を含む投稿一覧が返るようレスポンスを設定し、`run` の戻り値が `0`、`stdout` に対象の rkey が含まれることを検証する（AC-04）。
+    - [x] `TestRun_DryRunNoTargets_ReturnsExitCode0AndPrintsNoTargetsMessage`: 削除対象が0件になるレスポンスを設定し、`run` の戻り値が `0`、`stdout` に「削除対象なし」に相当する文言が含まれることを検証する（AC-06）。
+    - [x] `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`: `apply=true`、`deleteRecord` が全件2xxを返すレスポンスを設定し、`run` の戻り値が `0`、`stdout` に削除件数が含まれることを検証する（AC-07・AC-09）。
+    - [x] `TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures`: `apply=true`、`deleteRecord` の一部が非2xxを返すレスポンスを設定し、`run` の戻り値が `3`、`stdout` に失敗件数と失敗した rkey が含まれることを検証する（AC-11・AC-09）。
   - **完了基準**: `make test` で `cmd` パッケージの全テストが成功する（ネットワーク未接続の環境でも成功すること。実 DNS 解決が発生していないことは、テスト実行環境のネットワークを切断した状態で再実行しても結果が変わらないことで確認できる）。AC-10 の3テスト（設定読み込み・クライアント初期化・ログイン）はいずれも同じ終了コード `1` を返すことを検証し、AC-11 のテストとは異なる終了コード（`3`）であることを対比できるようにする。
 
 ### PR-2 作成ポイント: main.go wiring
