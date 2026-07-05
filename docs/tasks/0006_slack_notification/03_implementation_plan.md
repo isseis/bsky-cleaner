@@ -56,7 +56,7 @@
 
 ### フェーズ1: `internal/retry` — Webhook URL 秘匿のための拡張（設計書 3.6.1節）
 
-- [ ] **対象ファイル**: `internal/retry/doer.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/retry/doer.go`（既存ファイルの変更）
   - **作業内容**:
     - 設計書 3.6.1節の型定義通り、`Option func(*Doer)` 型と `WithURLRedactor(redact func(*http.Request) string) Option` 関数を追加する。
     - `Doer` 構造体に非公開フィールド `redact func(*http.Request) string` を追加する。
@@ -64,11 +64,11 @@
     - `logRetrying`・`logGivingUp`（214〜240行目）を変更し、`d.redact` が非 `nil` の場合はログの `url` フィールドに `d.redact(req)` の戻り値を、`nil` の場合は従来通り `req.URL.String()` を使う。
   - **完了基準**: `go build ./...` が成功する。`internal/atproto/client.go` の既存2箇所・`internal/atproto/client_test.go` の既存1箇所（計3箇所、1.3節参照）の `retry.NewDoer(...)` 呼び出し（`opts` を渡さない）が無変更のままビルド・テストが通ることを確認する。
 
-- [ ] **対象ファイル**: `internal/retry/doer_test.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/retry/doer_test.go`（既存ファイルの変更）
   - **作業内容**:
-    - [ ] `TestDoer_Do_WithURLRedactor_RetryLogUsesRedactedURL`（新規）: `WithURLRedactor` を指定して構築した `Doer` が再試行ログ（`logRetrying`）を出力する際、`url` フィールドの値が `redact` 関数の戻り値になり、`req.URL.String()`（生のURL）が含まれないことを検証する（既存の `TestDoer_Do_LogsRetryAttempt` と同じ `slog.SetDefault`/`bytes.Buffer` パターンを用いる）。
-    - [ ] `TestDoer_Do_WithURLRedactor_GivingUpLogUsesRedactedURL`（新規）: `Policy.MaxRetries` 到達により `logGivingUp` が出力される際も同様に `redact` の戻り値が使われ、生のURLが含まれないことを検証する。
-    - [ ] `TestDoer_Do_NoRedactor_GivingUpLogUsesRawURL`（新規）: `WithURLRedactor` を指定しない場合、`logGivingUp` が従来通り `req.URL.String()`（生のURL）をログに出力すること。既存の `TestDoer_Do_LogsRetryAttempt` は `logRetrying`（再試行ログ）の非redactorケースの回帰確認として既に機能しているが、`logGivingUp`（打ち切りログ)には同等の既存テストが存在しないため、`WithURLRedactor` 導入によってこの経路の未redactor時の挙動が変化していないことを保証する新規のベースラインテストとして追加する。
+    - [x] `TestDoer_Do_WithURLRedactor_RetryLogUsesRedactedURL`（新規）: `WithURLRedactor` を指定して構築した `Doer` が再試行ログ（`logRetrying`）を出力する際、`url` フィールドの値が `redact` 関数の戻り値になり、`req.URL.String()`（生のURL）が含まれないことを検証する（既存の `TestDoer_Do_LogsRetryAttempt` と同じ `slog.SetDefault`/`bytes.Buffer` パターンを用いる）。
+    - [x] `TestDoer_Do_WithURLRedactor_GivingUpLogUsesRedactedURL`（新規）: `Policy.MaxRetries` 到達により `logGivingUp` が出力される際も同様に `redact` の戻り値が使われ、生のURLが含まれないことを検証する。
+    - [x] `TestDoer_Do_NoRedactor_GivingUpLogUsesRawURL`（新規）: `WithURLRedactor` を指定しない場合、`logGivingUp` が従来通り `req.URL.String()`（生のURL）をログに出力すること。既存の `TestDoer_Do_LogsRetryAttempt` は `logRetrying`（再試行ログ）の非redactorケースの回帰確認として既に機能しているが、`logGivingUp`（打ち切りログ)には同等の既存テストが存在しないため、`WithURLRedactor` 導入によってこの経路の未redactor時の挙動が変化していないことを保証する新規のベースラインテストとして追加する。
     - 既存の `TestDoer_Do_LogsRetryAttempt`（`WithURLRedactor` を指定しないケース）は無変更のまま、`redact` 未設定時に従来通り `req.URL.String()` が再試行ログに出力されることの回帰確認として機能する。
   - **完了基準**: `make test` で `internal/retry` パッケージの全テストが成功する。
 

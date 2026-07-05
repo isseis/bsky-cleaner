@@ -467,6 +467,73 @@ func TestDoer_Do_CtxCanceledDuringSleep_ReturnsImmediately(t *testing.T) {
 	assert.Empty(t, clock.SleepCalls)
 }
 
+func TestDoer_Do_WithURLRedactor_RetryLogUsesRedactedURL(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	calls := 0
+	clock := &fakeClock{}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: io.NopCloser(strings.NewReader(""))}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("ok"))}, nil
+	}), Policy{MaxRetries: 3, BaseDelay: time.Second, MaxDelay: 30 * time.Second}, clock,
+		WithURLRedactor(func(_ *http.Request) string { return "https://example.com/[REDACTED]" }))
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	logged := buf.String()
+	assert.Contains(t, logged, "url=https://example.com/[REDACTED]")
+	assert.NotContains(t, logged, "http://example.com/xrpc/test")
+}
+
+func TestDoer_Do_WithURLRedactor_GivingUpLogUsesRedactedURL(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: time.Millisecond, MaxDelay: time.Second}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: io.NopCloser(strings.NewReader(""))}, nil
+	}), policy, clock,
+		WithURLRedactor(func(_ *http.Request) string { return "https://example.com/[REDACTED]" }))
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	logged := buf.String()
+	assert.Contains(t, logged, "giving up")
+	assert.Contains(t, logged, "url=https://example.com/[REDACTED]")
+	assert.NotContains(t, logged, "http://example.com/xrpc/test")
+}
+
+func TestDoer_Do_NoRedactor_GivingUpLogUsesRawURL(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: time.Millisecond, MaxDelay: time.Second}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: io.NopCloser(strings.NewReader(""))}, nil
+	}), policy, clock)
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	logged := buf.String()
+	assert.Contains(t, logged, "giving up")
+	assert.Contains(t, logged, "url=http://example.com/xrpc/test")
+}
+
 func TestDoer_Do_LogsRetryAttempt(t *testing.T) {
 	var buf bytes.Buffer
 	prev := slog.Default()
