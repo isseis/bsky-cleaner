@@ -195,7 +195,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/44）
-- [ ] PR がマージされた
+- [x] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
 
