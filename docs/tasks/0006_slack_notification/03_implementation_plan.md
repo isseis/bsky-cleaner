@@ -305,8 +305,8 @@
 
 **レビュー観点**: `buildPayload` が投稿本文を一切参照していないこと（AC-14） / サニタイズ→mrkdwnエスケープの適用順序が識別子・エラー種別のすべてに一貫していること（AC-15, AC-16） / `SendError.Error()`・リトライログのいずれからもWebhook URLが漏洩しないこと（AC-19） / チャンネル振り分けの優先順位が設計書 3.4節の表と一致していること（AC-05〜AC-08） / `requestTimeout`・`defaultRetryPolicy` の値が設計書 3.6節の既定値と一致していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/50、base: `issei/0006-slack-notification-04`）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
