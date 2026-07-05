@@ -32,7 +32,7 @@ func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
 	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
 	outcome := Outcome{Result: nil, Err: someErr}
 	got := buildPayload(outcome)
-	assert.Contains(t, got, errorKind(someErr))
+	assert.Contains(t, got, "atproto http error: com.atproto.server.createSession status=401")
 }
 
 func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.T) {
@@ -49,9 +49,9 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 	}
 	got := buildPayload(outcome)
 	assert.Contains(t, got, "rkey1")
-	assert.Contains(t, got, errorKind(err1))
+	assert.Contains(t, got, "atproto http error: com.atproto.repo.deleteRecord status=500")
 	assert.Contains(t, got, "rkey2")
-	assert.Contains(t, got, errorKind(err2))
+	assert.Contains(t, got, "atproto http error: com.atproto.repo.deleteRecord status=429")
 }
 
 func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T) {
@@ -65,11 +65,12 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 		},
 	}
 	got := buildPayload(outcome)
-	// atproto.Post structurally has no body field, so this is a regression
-	// guard confirming buildPayload only references RKey/errorKind and the
-	// counts, not some accidentally-added extra field.
-	assert.Contains(t, got, "rkey1")
-	assert.Contains(t, got, errorKind(err))
+	// atproto.Post structurally has no body field; full equality (not
+	// Contains) is required so an accidentally-added extra field would
+	// actually fail this regression guard.
+	want := "bsky-cleaner run completed with failures: deleted 0 post(s), 1 failure(s).\n" +
+		"  rkey1: atproto http error: com.atproto.repo.deleteRecord status=500\n"
+	assert.Equal(t, want, got)
 }
 
 func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
@@ -115,6 +116,26 @@ func TestBuildPayload_SanitizesNewlineInFailedRKey(t *testing.T) {
 	lineCountBefore := strings.Count("evil\nFAKE LOG LINE", "\n")
 	assert.Equal(t, 1, lineCountBefore) // sanity check on the fixture itself
 	assert.NotContains(t, got, "evil\nFAKE LOG LINE")
+}
+
+// TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint covers
+// the outcome.Err branch of buildPayload, which the other mention/ANSI/
+// newline sanitization tests above do not: SSRFError.Endpoint is derived
+// from DID/PDS resolution (see internal/atproto's SSRF threat model) and so,
+// like a failed post's RKey, is externally-influenced text that must not
+// reach Slack as live mrkdwn mention syntax.
+func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testing.T) {
+	err := &atproto.SSRFError{
+		Endpoint: "https://evil.example.com/<!channel>",
+		Stage:    atproto.SSRFStageInitialValidation,
+		Err:      errors.New("rejected"),
+	}
+	outcome := Outcome{Result: nil, Err: err}
+
+	got := buildPayload(outcome)
+
+	assert.NotContains(t, got, "<!channel>")
+	assert.Contains(t, got, "&lt;!channel&gt;")
 }
 
 func TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {

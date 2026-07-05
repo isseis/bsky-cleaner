@@ -64,7 +64,10 @@ func TestSend_Success_PostsToSelectedWebhook(t *testing.T) {
 
 	var payload webhookPayload
 	require.NoError(t, json.Unmarshal(gotBody, &payload))
-	assert.Contains(t, payload.Text, buildPayload(succeededOutcome()))
+	// Literal expected substring (not buildPayload(succeededOutcome())): a bug
+	// in buildPayload itself must not go undetected just because both sides
+	// of the comparison would share it.
+	assert.Contains(t, payload.Text, "bsky-cleaner run succeeded: deleted 0 post(s).")
 }
 
 func TestSend_ChannelRouting_AllSucceeded_UsesSuccessURL(t *testing.T) {

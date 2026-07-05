@@ -161,11 +161,12 @@
     - [x] `TestBuildPayload_TruncationIsUTF8Safe`（コードレビューで発見したバグの回帰防止として新規追加）: マルチバイト文字（日本語）の `RKey` を大量に含め切り詰めが発生する `Outcome` を与えた場合、切り詰め後のテキストが `utf8.ValidString` を満たすこと。当初の実装は `text[:maxPayloadLength-len(truncatedMarker)]` という生のバイトオフセットでスライスしており、マルチバイト文字の途中で切断され不正なUTF-8を生成しうるバグがあった。`truncationCutPoint`（新規のヘルパー関数、`unicode/utf8.RuneStart` でルーン境界まで後退する）を導入して修正した。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。
 
-- [ ] **テスト品質監査での追加修正**（2026-07-06、PR-2 マージ前に対応。優先度の高い順）
-  1. **（優先度: 高、セキュリティ）** `buildPayload` の `outcome.Err` 経路（`SSRFError` 等）に対するSlackインジェクション対策の検証が存在しない: `atproto.SSRFError.Endpoint` はDID/PDS解決由来で攻撃者が影響しうる値（`docs/design/security.md` の脅威モデル対象）であり、`errorKind` 経由で `buildPayload` の出力に埋め込まれるが、既存のインジェクション系テスト（`TestBuildPayload_EscapesMentionSyntaxInFailedRKey` 等）は `Result.Failed[].Post.RKey` 経路しかカバーしていない。新規テスト `TestBuildPayload_SanitizesSlackInjectionInSSRFErrorEndpoint`（仮称）を追加し、`Outcome{Err: &atproto.SSRFError{Endpoint: "<!channel>\nFAKE", ...}}` のようなペイロードで mrkdwn記法・ANSIエスケープ・改行がいずれも無害化されることを検証する。
-  2. **（優先度: 中）** `TestBuildPayload_RunError_IncludesErrorKind`・`TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` は期待値を検証対象自身の `errorKind(...)` 呼び出し結果から生成しており、`errorKind` 自体にバグがあっても両辺が同じ値になり検出できない。期待値を既知の入力から手書きしたリテラル文字列（例: `"atproto http error: com.atproto.server.createSession status=401"`）に置き換える。
-  3. **（優先度: 低）** `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` は `assert.Contains` を使っており、想定外フィールドが追加で混入しても検出できない（「他に何が含まれていても」通ってしまうため）。`assert.Equal` による完全一致比較に変更するか、内容が重複する `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` に統合して削除する。
-  - **完了基準**: 追加・修正した全テストを含め `make test` で `internal/notify` パッケージの全テストが成功する。
+- [x] **テスト品質監査での追加修正**（2026-07-06、PR-2 マージ前に対応。優先度の高い順）
+  1. **（優先度: 高、セキュリティ）** `buildPayload` の `outcome.Err` 経路（`SSRFError` 等）に対するSlackインジェクション対策の検証が存在しなかった: `atproto.SSRFError.Endpoint` はDID/PDS解決由来で攻撃者が影響しうる値（`docs/design/security.md` の脅威モデル対象）であり、`errorKind` 経由で `buildPayload` の出力に埋め込まれるが、既存のインジェクション系テスト（`TestBuildPayload_EscapesMentionSyntaxInFailedRKey` 等）は `Result.Failed[].Post.RKey` 経路しかカバーしていなかった。**実装時の分岐**: `errorKind` は `SSRFError.Endpoint` を `%q`（Go文字列リテラル形式）で埋め込んでおり、これが改行・ANSIエスケープ等の制御文字を既に文字表現へエスケープ済みにしてしまうため、`Sanitize()` によるANSI/改行除去は本経路では実質的な検証対象にならない（`%q` が先に無害化してしまうため）一方、`<`/`>` はそのまま素通りするため `escapeSlackMarkup()` によるmrkdwnメンション構文の無害化のみが本経路で意味のある検証対象である。この実態に合わせ、当初案の `TestBuildPayload_SanitizesSlackInjectionInSSRFErrorEndpoint`（仮称、ANSI/改行/メンション構文すべてを検証する想定）ではなく、`TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint`（メンション構文の無害化のみを検証）を追加した。
+  2. **（優先度: 中）** `TestBuildPayload_RunError_IncludesErrorKind`・`TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` は期待値を検証対象自身の `errorKind(...)` 呼び出し結果から生成しており、`errorKind` 自体にバグがあっても両辺が同じ値になり検出できなかった。期待値を既知の入力から手書きしたリテラル文字列（`"atproto http error: com.atproto.server.createSession status=401"` 等）に置き換えた。
+  3. **（優先度: 低）** `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` は `assert.Contains` を使っており、想定外フィールドが追加で混入しても検出できなかった（「他に何が含まれていても」通ってしまうため）。`assert.Equal` による完全一致比較に変更した。
+  4. **（優先度: 低、フェーズ5 `notify_test.go` 分の前倒し対応）** `TestSend_Success_PostsToSelectedWebhook`（フェーズ5）も同種の自己参照問題（期待値を `buildPayload(...)` 呼び出し結果から生成）があったため、本項目とあわせてリテラル部分文字列比較に修正した（詳細はフェーズ5側のチェックリストに記載）。
+  - **完了基準**: 追加・修正した全テストを含め `make test`・`make lint` で `internal/notify` パッケージの全テストが成功する（確認済み: 2026-07-06）。
 
 ### フェーズ5: `internal/notify` — `Send`（HTTP送信・リトライ統合、設計書 3.4節〜3.6節）
 
@@ -202,12 +203,12 @@
     - [x] `TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts`: 常に500を返す `httptest.Server` に対し、`fakeClock` を使って実待機なしで検証し、リクエスト回数が `defaultRetryPolicy.MaxRetries + 1`（= 3回）で頭打ちになり、最終的に `*SendError` が返ること（AC-10、リトライが有界であることの確認）。
     - [x] `TestSendError_Error_NeverContainsWebhookURL`: 送信先URLのパスにトークン文字列を含む `httptest.Server` の URL を用い、通信エラー（例: サーバーを即座にクローズする）を発生させ、`SendError.Error()` の戻り値にその URL/トークン文字列が含まれないこと（AC-19）。
     - [x] `TestSend_RetryLog_UsesRedactedURL_NotRawWebhookURL`: `slog.SetDefault` をバッファ書き込みハンドラに差し替え、500応答によるリトライを発生させたうえで、ログ出力に Webhook URL のパス（トークン相当）が含まれず、ホスト名相当の文字列のみが含まれること（AC-19、`WithURLRedactor` の実際の配線確認）。
-    - [x] `TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance`: `requestTimeout`・`defaultRetryPolicy`（`MaxRetries`/`BaseDelay`/`MaxDelay`）の実際の値のみから最悪ケース所要時間（`requestTimeout * (MaxRetries + 1)` に、`BaseDelay` を初項とし `MaxDelay` で頭打ちにしたバックオフ合計を加えたもの）を計算し、設計書 3.6節が示す約12秒と一致すること、かつ [0005_retry_timeout](../0005_retry_timeout/01_requirements.md) が定める推奨実行タイムアウト値のオーダー（数十秒〜）より十分小さいことを、実際の待機を伴わない定数の算術チェックとしてアサートする（AC-10。`TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` はリクエスト回数の頭打ちしか示さず、「実行タイムアウトより十分短い」という要求自体を検証する自動テストが存在しなかったため追加する）。
+    - [x] `TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance`: 設計書 3.6節が示す約12秒という最悪ケース所要時間の見積もりが、[0005_retry_timeout](../0005_retry_timeout/01_requirements.md) が定める推奨実行タイムアウト値のオーダー（数十秒〜）より十分小さいことを確認する（AC-10）。**実装からの分岐（2026-07-06、テスト品質監査で発見）**: 当初の実装は `requestTimeout`・`defaultRetryPolicy` の値のみから最悪ケース所要時間を独立した算術式で再計算し、設計書の約12秒という数値と比較するものだった。これは `backoffDelay`（本番のバックオフ計算式、`internal/retry/doer.go`）を一切呼び出さず同じ式をテスト側で再実装していたため、本番の計算式自体にバグがあっても両者が同じ値になり検出できないという欠陥があった。修正として、常に500を返す `httptest.Server` に対して実際に `Send`（→ 実際の `retry.Doer.Do`）を実行し尽くし、`fakeClock` が記録した実際の `SleepCalls` の合計値から最悪ケース所要時間を導出する形に変更した（`TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` と同じ `httptest.Server`/`fakeClock` の組み合わせを流用）。これにより本番のリトライループ・バックオフ計算式そのものを経由した検証になった。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。`TestSend_HTTPTimeout_ReturnsSendError` を除く全テストが `fakeClock` を使い実待機を行わないため、`go test -tags test -run TestSend ./internal/notify -v` の実行時間が1秒未満であることを目視確認する（NF-002）。
 
-- [ ] **テスト品質監査での追加修正**（2026-07-06、PR-2 マージ前に対応。優先度: 低）
-  - `TestSend_Success_PostsToSelectedWebhook` は期待値の一部を検証対象と同じ経路の `buildPayload(...)` 呼び出し結果から生成しており、`buildPayload` 自体のバグはこのテストでは検出できない（`payload_test.go` 側で別途カバーされるため実害は小さいが、多重防御のため対応する）。`assert.Contains` の一部をハードコードしたリテラル部分文字列（例: `"deleted 0 post(s)"` 相当の固定文言）による検証に置き換える。
-  - **完了基準**: 変更後も `make test` で `internal/notify` パッケージの全テストが成功する。
+- [x] **テスト品質監査での追加修正**（2026-07-06、PR-2 マージ前に対応。優先度: 低）
+  - `TestSend_Success_PostsToSelectedWebhook` は期待値の一部を検証対象と同じ経路の `buildPayload(...)` 呼び出し結果から生成しており、`buildPayload` 自体のバグはこのテストでは検出できなかった（`payload_test.go` 側で別途カバーされるため実害は小さいが、多重防御のため対応した）。`assert.Contains` をハードコードしたリテラル部分文字列（`"bsky-cleaner run succeeded: deleted 0 post(s)."`）による検証に置き換えた。
+  - **完了基準**: 変更後も `make test` で `internal/notify` パッケージの全テストが成功する（確認済み: 2026-07-06）。
 
 ### フェーズ6: `cmd/main.go` への統合（設計書 2.2節・3.5節）
 
