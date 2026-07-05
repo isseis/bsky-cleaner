@@ -161,6 +161,12 @@
     - [x] `TestBuildPayload_TruncationIsUTF8Safe`（コードレビューで発見したバグの回帰防止として新規追加）: マルチバイト文字（日本語）の `RKey` を大量に含め切り詰めが発生する `Outcome` を与えた場合、切り詰め後のテキストが `utf8.ValidString` を満たすこと。当初の実装は `text[:maxPayloadLength-len(truncatedMarker)]` という生のバイトオフセットでスライスしており、マルチバイト文字の途中で切断され不正なUTF-8を生成しうるバグがあった。`truncationCutPoint`（新規のヘルパー関数、`unicode/utf8.RuneStart` でルーン境界まで後退する）を導入して修正した。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。
 
+- [ ] **テスト品質監査での追加修正**（2026-07-06、PR-2 マージ前に対応。優先度の高い順）
+  1. **（優先度: 高、セキュリティ）** `buildPayload` の `outcome.Err` 経路（`SSRFError` 等）に対するSlackインジェクション対策の検証が存在しない: `atproto.SSRFError.Endpoint` はDID/PDS解決由来で攻撃者が影響しうる値（`docs/design/security.md` の脅威モデル対象）であり、`errorKind` 経由で `buildPayload` の出力に埋め込まれるが、既存のインジェクション系テスト（`TestBuildPayload_EscapesMentionSyntaxInFailedRKey` 等）は `Result.Failed[].Post.RKey` 経路しかカバーしていない。新規テスト `TestBuildPayload_SanitizesSlackInjectionInSSRFErrorEndpoint`（仮称）を追加し、`Outcome{Err: &atproto.SSRFError{Endpoint: "<!channel>\nFAKE", ...}}` のようなペイロードで mrkdwn記法・ANSIエスケープ・改行がいずれも無害化されることを検証する。
+  2. **（優先度: 中）** `TestBuildPayload_RunError_IncludesErrorKind`・`TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` は期待値を検証対象自身の `errorKind(...)` 呼び出し結果から生成しており、`errorKind` 自体にバグがあっても両辺が同じ値になり検出できない。期待値を既知の入力から手書きしたリテラル文字列（例: `"atproto http error: com.atproto.server.createSession status=401"`）に置き換える。
+  3. **（優先度: 低）** `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` は `assert.Contains` を使っており、想定外フィールドが追加で混入しても検出できない（「他に何が含まれていても」通ってしまうため）。`assert.Equal` による完全一致比較に変更するか、内容が重複する `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` に統合して削除する。
+  - **完了基準**: 追加・修正した全テストを含め `make test` で `internal/notify` パッケージの全テストが成功する。
+
 ### フェーズ5: `internal/notify` — `Send`（HTTP送信・リトライ統合、設計書 3.4節〜3.6節）
 
 - [x] **対象ファイル**: `internal/notify/notify.go`（新規作成）
@@ -198,6 +204,10 @@
     - [x] `TestSend_RetryLog_UsesRedactedURL_NotRawWebhookURL`: `slog.SetDefault` をバッファ書き込みハンドラに差し替え、500応答によるリトライを発生させたうえで、ログ出力に Webhook URL のパス（トークン相当）が含まれず、ホスト名相当の文字列のみが含まれること（AC-19、`WithURLRedactor` の実際の配線確認）。
     - [x] `TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance`: `requestTimeout`・`defaultRetryPolicy`（`MaxRetries`/`BaseDelay`/`MaxDelay`）の実際の値のみから最悪ケース所要時間（`requestTimeout * (MaxRetries + 1)` に、`BaseDelay` を初項とし `MaxDelay` で頭打ちにしたバックオフ合計を加えたもの）を計算し、設計書 3.6節が示す約12秒と一致すること、かつ [0005_retry_timeout](../0005_retry_timeout/01_requirements.md) が定める推奨実行タイムアウト値のオーダー（数十秒〜）より十分小さいことを、実際の待機を伴わない定数の算術チェックとしてアサートする（AC-10。`TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` はリクエスト回数の頭打ちしか示さず、「実行タイムアウトより十分短い」という要求自体を検証する自動テストが存在しなかったため追加する）。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。`TestSend_HTTPTimeout_ReturnsSendError` を除く全テストが `fakeClock` を使い実待機を行わないため、`go test -tags test -run TestSend ./internal/notify -v` の実行時間が1秒未満であることを目視確認する（NF-002）。
+
+- [ ] **テスト品質監査での追加修正**（2026-07-06、PR-2 マージ前に対応。優先度: 低）
+  - `TestSend_Success_PostsToSelectedWebhook` は期待値の一部を検証対象と同じ経路の `buildPayload(...)` 呼び出し結果から生成しており、`buildPayload` 自体のバグはこのテストでは検出できない（`payload_test.go` 側で別途カバーされるため実害は小さいが、多重防御のため対応する）。`assert.Contains` の一部をハードコードしたリテラル部分文字列（例: `"deleted 0 post(s)"` 相当の固定文言）による検証に置き換える。
+  - **完了基準**: 変更後も `make test` で `internal/notify` パッケージの全テストが成功する。
 
 ### フェーズ6: `cmd/main.go` への統合（設計書 2.2節・3.5節）
 
