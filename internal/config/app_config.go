@@ -21,5 +21,9 @@ func LoadAppConfig(path string) (*AppConfig, error) {
 		return nil, err
 	}
 
+	if err := validateSlackAllowedHost(*cfg, *creds); err != nil {
+		return nil, err
+	}
+
 	return &AppConfig{Config: *cfg, Credentials: *creds}, nil
 }

@@ -74,40 +74,42 @@
 
 ### フェーズ2: `internal/config` — Webhook URL 許可ホスト検証（設計書 3.1節、F-005: AC-11〜AC-13, AC-21）
 
-- [ ] **対象ファイル**: `internal/config/errors.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/config/errors.go`（既存ファイルの変更）
   - **作業内容**: 設計書 3.1節のコード例通り、`ErrWebhookHostMismatch`・`ErrSlackAllowedHostMissing` の2つのセンチネルエラーを追加する。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/config/config.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/config/config.go`（既存ファイルの変更）
   - **作業内容**: `rawConfig`（26行目）に `SlackAllowedHost string \`toml:"slack_allowed_host"\`` を追加する。`Config`（18行目）に `SlackAllowedHost string` を追加する。`validateConfig`（`validate.go`）の戻り値構築部分に `SlackAllowedHost: raw.SlackAllowedHost` を追加する（1.3節の通り、他の必須フィールドと異なりポインタ型にせず、欠落時のゼロ値 `""` をそのまま「未設定」として扱う）。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/config/validate.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/config/validate.go`（既存ファイルの変更）
   - **作業内容**: 設計書 3.1節「検証内容」の3ルールに従い `validateSlackAllowedHost(cfg Config, creds Credentials) error` を追加する。
     1. `creds.SlackSuccessWebhookURL.Reveal()` と `creds.SlackFailureWebhookURL.Reveal()` が両方とも空文字列なら、`cfg.SlackAllowedHost` の値を問わず `nil` を返す（AC-21後段）。
     2. 上記に該当せず（いずれか一方でも設定されており）、かつ `cfg.SlackAllowedHost == ""` なら `&FieldError{Field: "slack_allowed_host", Err: ErrSlackAllowedHostMissing}` を返す（AC-21前段）。
     3. 上記のいずれにも該当しない場合、設定されている Webhook URL（`BSKY_SLACK_WEBHOOK_URL_SUCCESS`・`BSKY_SLACK_WEBHOOK_URL_FAILURE`）それぞれについて、`net/url.Parse` 済みの `Hostname()`（ポート番号を除く）を `strings.EqualFold` で `cfg.SlackAllowedHost` と比較し、一致しなければ該当する環境変数名を `Field` に持つ `&FieldError{Field: <該当envvar名>, Err: ErrWebhookHostMismatch}` を返す（AC-12, AC-13）。両方とも設定されている場合、成功/失敗のどちらの照合が先に不一致になってもよい（順序は要件で規定されていない）。未設定（空文字列）の側はスキップする。
   - **完了基準**: `go build ./...` が成功する。この関数は `internal/config` パッケージ内でのみ使用され、公開しない。
 
-- [ ] **対象ファイル**: `internal/config/app_config.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/config/app_config.go`（既存ファイルの変更）
   - **作業内容**: `LoadAppConfig`（13行目）が `Load`・`LoadCredentials` の両方を成功させた後、`AppConfig` を組み立てて返す前に `validateSlackAllowedHost(*cfg, *creds)` を呼び出し、エラーがあればそれをそのまま返す。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/config/app_config_test.go`（既存ファイルの変更・追加）
+- [x] **対象ファイル**: `internal/config/app_config_test.go`（既存ファイルの変更・追加）
   - **作業内容**:
-    - [ ] `TestLoadAppConfig_Success`（既存）のTOMLフィクスチャに `slack_allowed_host = "hooks.slack.com"` を追加する（1.3節の通り、このテストが正常系・異常系の両方の Webhook URL を `hooks.slack.com` に設定しているため、この追加なしでは AC-21 前段により失敗するようになる）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_BothURLsMatchAllowedHost_Succeeds`（新規）: 正常系・異常系の両方の Webhook URL のホスト部が `slack_allowed_host` と一致する場合、`LoadAppConfig` が成功すること（AC-11）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_OnlySuccessURLSet_MatchesAllowedHost_Succeeds`（新規）: 正常系 Webhook URL のみ設定され、そのホスト部が `slack_allowed_host` と一致する場合に成功すること（AC-11、片方のみ設定という既存の正当な構成が壊れないことの確認）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_SuccessURLHostMismatch_ReturnsError`（新規）: 正常系 Webhook URL のホスト部が `slack_allowed_host` と異なる場合、`LoadAppConfig` が `ErrWebhookHostMismatch` を返し、`errors.AsType[*FieldError]` で得られる `Field` が `"BSKY_SLACK_WEBHOOK_URL_SUCCESS"` であること（AC-12）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_FailureURLHostMismatch_ReturnsError`（新規）: 異常系 Webhook URL のホスト部が異なる場合も同様に `ErrWebhookHostMismatch`・`Field == "BSKY_SLACK_WEBHOOK_URL_FAILURE"` であること（AC-12）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_PortAndCaseIgnoredInComparison_Succeeds`（新規）: Webhook URL が `https://Hooks.Slack.com:443/services/x` のようにポート番号・大文字小文字の異なる表記であっても、`slack_allowed_host = "hooks.slack.com"` と一致するとみなされ成功すること（AC-13）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_MissingWhileWebhookURLSet_ReturnsError`（新規）: 正常系 Webhook URL のみ設定され `slack_allowed_host` が未設定（TOMLにキー自体がない）の場合、`ErrSlackAllowedHostMissing` を返し、`Field == "slack_allowed_host"` であること（AC-21前段）。
-    - [ ] `TestLoadAppConfig_SlackAllowedHost_NotRequiredWhenBothWebhookURLsUnset_Succeeds`（新規）: 正常系・異常系の両方の Webhook URL が未設定の場合、`slack_allowed_host` が未設定であっても `LoadAppConfig` が成功すること（AC-21後段、Slack 通知を使わない運用との整合）。
+    - [x] `TestLoadAppConfig_Success`（既存）のTOMLフィクスチャに `slack_allowed_host = "hooks.slack.com"` を追加する（1.3節の通り、このテストが正常系・異常系の両方の Webhook URL を `hooks.slack.com` に設定しているため、この追加なしでは AC-21 前段により失敗するようになる）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_BothURLsMatchAllowedHost_Succeeds`（新規）: 正常系・異常系の両方の Webhook URL のホスト部が `slack_allowed_host` と一致する場合、`LoadAppConfig` が成功すること（AC-11）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_OnlySuccessURLSet_MatchesAllowedHost_Succeeds`（新規）: 正常系 Webhook URL のみ設定され、そのホスト部が `slack_allowed_host` と一致する場合に成功すること（AC-11、片方のみ設定という既存の正当な構成が壊れないことの確認）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_SuccessURLHostMismatch_ReturnsError`（新規）: 正常系 Webhook URL のホスト部が `slack_allowed_host` と異なる場合、`LoadAppConfig` が `ErrWebhookHostMismatch` を返し、`errors.AsType[*FieldError]` で得られる `Field` が `"BSKY_SLACK_WEBHOOK_URL_SUCCESS"` であること（AC-12）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_FailureURLHostMismatch_ReturnsError`（新規）: 異常系 Webhook URL のホスト部が異なる場合も同様に `ErrWebhookHostMismatch`・`Field == "BSKY_SLACK_WEBHOOK_URL_FAILURE"` であること（AC-12）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_PortAndCaseIgnoredInComparison_Succeeds`（新規）: Webhook URL が `https://Hooks.Slack.com:443/services/x` のようにポート番号・大文字小文字の異なる表記であっても、`slack_allowed_host = "hooks.slack.com"` と一致するとみなされ成功すること（AC-13）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_MissingWhileWebhookURLSet_ReturnsError`（新規）: 正常系 Webhook URL のみ設定され `slack_allowed_host` が未設定（TOMLにキー自体がない）の場合、`ErrSlackAllowedHostMissing` を返し、`Field == "slack_allowed_host"` であること（AC-21前段）。
+    - [x] `TestLoadAppConfig_SlackAllowedHost_NotRequiredWhenBothWebhookURLsUnset_Succeeds`（新規）: 正常系・異常系の両方の Webhook URL が未設定の場合、`slack_allowed_host` が未設定であっても `LoadAppConfig` が成功すること（AC-21後段、Slack 通知を使わない運用との整合）。
   - **完了基準**: `make test` で `internal/config` パッケージの全テストが成功する。
 
-- [ ] **対象ファイル**: `internal/config/config_test.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `internal/config/config_test.go`（既存ファイルの変更）
   - **作業内容**: `TestLoad_SlackAllowedHostField_ParsesOptionalTOMLKey`（新規）を追加する。`slack_allowed_host = "hooks.slack.com"` を含む TOML から `Load` を呼んだ場合に `cfg.SlackAllowedHost == "hooks.slack.com"` となること、キー自体を含まない TOML では `cfg.SlackAllowedHost == ""` のままエラーにならないことの2パターンをテーブル駆動で検証する（新規に追加した TOML フィールドが実際にパースされることの基礎確認。`validateSlackAllowedHost` 側のテストとは独立して、パース自体が正しいことを確認する）。
   - **完了基準**: `make test` で本テストが成功する。
+
+- [x] **フェーズ2完了時の前倒し修正（計画からの分岐）**: `validateSlackAllowedHost` を `LoadAppConfig` に組み込んだ時点で、`cmd/main_test.go` の `validConfigPath`（フェーズ6項目、当初計画は本行をフェーズ6でのみ修正する想定だった）が書き込む TOML に `slack_allowed_host` がないため、`setEnvCredentials` が両 Webhook URL を `hooks.slack.com` に設定している既存テスト群が AC-21 前段によりテスト失敗するようになった。フェーズ6の本格的な `cmd/main.go` 統合（`notify.Send` 呼び出し等）を待たず、このフェーズ2の完了時点で `validConfigPath` と `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` 独自TOMLの双方に `slack_allowed_host = "hooks.slack.com"` を追加済み（`make test` を継続的に green に保つため）。フェーズ6では、この行の再追加は不要（既に完了済み）である点に注意し、Slack POST 応答モックの追加など残りの統合作業のみを行う。
 
 ### フェーズ3: `internal/notify` — 型定義・サニタイズ・エラーカテゴリ化（設計書 3.2節・4節）
 

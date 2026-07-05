@@ -19,6 +19,12 @@ type Config struct {
 	RetentionDays    int
 	Schedule         string
 	ExecutionTimeout time.Duration
+	// SlackAllowedHost is the required host for any configured Slack
+	// webhook URL (validated by validateSlackAllowedHost in validate.go).
+	// Unlike the other fields above, an empty string and an absent TOML
+	// key are both treated as "not configured" -- there is no need to
+	// distinguish them here.
+	SlackAllowedHost string
 }
 
 // rawConfig mirrors the TOML file structure with pointer fields, so a
@@ -27,6 +33,7 @@ type rawConfig struct {
 	RetentionDays           *int    `toml:"retention_days"`
 	Schedule                *string `toml:"schedule"`
 	ExecutionTimeoutSeconds *int    `toml:"execution_timeout_seconds"`
+	SlackAllowedHost        string  `toml:"slack_allowed_host"`
 }
 
 // Load reads and validates the TOML file at path and returns the

@@ -153,6 +153,44 @@ execution_timeout_seconds = %d
 	}
 }
 
+func TestLoad_SlackAllowedHostField_ParsesOptionalTOMLKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name: "key present",
+			content: `
+retention_days = 30
+schedule = "0 3 * * *"
+execution_timeout_seconds = 3600
+slack_allowed_host = "hooks.slack.com"
+`,
+			want: "hooks.slack.com",
+		},
+		{
+			name: "key absent",
+			content: `
+retention_days = 30
+schedule = "0 3 * * *"
+execution_timeout_seconds = 3600
+`,
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeTempTOML(t, tt.content)
+
+			cfg, err := Load(path)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.SlackAllowedHost)
+		})
+	}
+}
+
 func TestLoad_UnknownKey(t *testing.T) {
 	path := writeTempTOML(t, `
 retention_days = 30

@@ -8,16 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setAllCredentialEnv(t *testing.T, handle, appPassword, slackSuccessURL, slackFailureURL string) {
+func setAllCredentialEnv(t *testing.T, slackSuccessURL, slackFailureURL string) {
 	t.Helper()
-	t.Setenv("BSKY_HANDLE", handle)
-	t.Setenv("BSKY_APP_PASSWORD", appPassword)
+	t.Setenv("BSKY_HANDLE", "alice.bsky.social")
+	t.Setenv("BSKY_APP_PASSWORD", "app-password")
 	t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", slackSuccessURL)
 	t.Setenv("BSKY_SLACK_WEBHOOK_URL_FAILURE", slackFailureURL)
 }
 
 func TestLoadCredentials_Success(t *testing.T) {
-	setAllCredentialEnv(t, "alice.bsky.social", "app-password", "https://hooks.slack.com/services/success", "https://hooks.slack.com/services/failure")
+	setAllCredentialEnv(t, "https://hooks.slack.com/services/success", "https://hooks.slack.com/services/failure")
 
 	creds, err := LoadCredentials()
 	require.NoError(t, err)
