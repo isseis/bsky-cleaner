@@ -17,7 +17,7 @@
 | `retention_days` | 整数 | 必須 | なし | 正の整数（`1` 以上）。`0` 以下は起動失敗（全投稿即削除を防ぐ fail-closed 検証） |
 | `schedule` | 文字列 | 必須 | なし | cron 相当のスケジュール文字列。本パッケージはキーの存在確認のみを行い（空文字列 `""` は許容される）、cron 構文としての妥当性検証は行わない（[0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md) の `print-schedule` サブコマンドの責務） |
 | `execution_timeout_seconds` | 整数 | 必須 | なし | 秒単位。`1`〜`86400`（24時間）の範囲の整数。`0` 以下または `86400` を超える値は起動失敗 |
-| `slack_allowed_host` | 文字列 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` のいずれかが設定されている場合は必須 | 未設定 | Slack Webhook URL のホスト部として許可する値（例: `hooks.slack.com`）。設定されている Webhook URL のホスト部（ポート番号を除く、大文字小文字を区別しない）がこの値と一致しない場合、起動失敗（fail-closed）。Webhook URL が両方とも未設定の場合は本項目が未設定でも起動失敗しない（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005） |
+| `slack_allowed_host` | 文字列 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` のいずれかが設定されている場合は必須 | 未設定 | Slack Webhook URL のホスト部として許可する値（例: `hooks.slack.com`）。設定されている Webhook URL のホスト部（ポート番号を除く、大文字小文字を区別しない）がこの値と一致しない場合、起動失敗（fail-closed）。Webhook URL が両方とも未設定の場合は本項目が未設定でも起動失敗しない（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005）。**未実装（計画中）**: 本項目は [0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) タスクでの実装が計画されているのみで、現時点の `internal/config` の TOML パーサーはこのキーを認識しない。`internal/config` は未知フィールドを拒否する設定（`DisallowUnknownFields`）で読み込むため、現時点でこのキーを設定ファイルに追加すると起動時にパースエラーとなる |
 
 ### 記述例
 
@@ -42,6 +42,8 @@ slack_allowed_host = "hooks.slack.com"
 | `BSKY_SLACK_WEBHOOK_URL_FAILURE` | 文字列（秘匿・URL） | 任意 | 未設定（該当チャンネルへの通知を行わない） | 失敗時通知用の Slack Incoming Webhook URL。制約・未設定時の挙動は `BSKY_SLACK_WEBHOOK_URL_SUCCESS` と同じ |
 
 Slack Webhook URL のホスト部が TOML `slack_allowed_host` と一致することの検証は、TOML（`Config`）と環境変数（`Credentials`）の両方を必要とするため `LoadAppConfig()` が両方を読み込んだ後に行う（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005）。
+
+> **未実装（計画中）**: 上記のホスト一致検証は [0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) タスクでの実装が計画されている内容であり、現時点の `internal/config` にはまだ実装されていない。
 
 ### 記述例（`.env`）
 
