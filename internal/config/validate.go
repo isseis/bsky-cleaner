@@ -3,6 +3,7 @@ package config
 import (
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -46,7 +47,50 @@ func validateConfig(raw rawConfig) (Config, error) {
 		RetentionDays:    *raw.RetentionDays,
 		Schedule:         *raw.Schedule,
 		ExecutionTimeout: time.Duration(timeoutSeconds) * time.Second,
+		SlackAllowedHost: raw.SlackAllowedHost,
 	}, nil
+}
+
+// validateSlackAllowedHost enforces that any configured Slack webhook URL's
+// host matches cfg.SlackAllowedHost, failing closed rather than silently
+// skipping notification for a misconfigured or attacker-redirected URL.
+func validateSlackAllowedHost(cfg Config, creds Credentials) error {
+	successURL := creds.SlackSuccessWebhookURL.Reveal()
+	failureURL := creds.SlackFailureWebhookURL.Reveal()
+
+	if successURL == "" && failureURL == "" {
+		return nil
+	}
+
+	allowedHost := strings.TrimSpace(cfg.SlackAllowedHost)
+	if allowedHost == "" {
+		return &FieldError{Field: "slack_allowed_host", Err: ErrSlackAllowedHostMissing}
+	}
+
+	if err := checkWebhookHostAllowed("BSKY_SLACK_WEBHOOK_URL_SUCCESS", successURL, allowedHost); err != nil {
+		return err
+	}
+	if err := checkWebhookHostAllowed("BSKY_SLACK_WEBHOOK_URL_FAILURE", failureURL, allowedHost); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkWebhookHostAllowed compares rawURL's host (port removed, case
+// insensitive) against allowedHost. An empty rawURL (not configured) is
+// skipped, matching validateWebhookURL's treatment of an unconfigured
+// webhook. rawURL is assumed already validated as a well-formed https URL
+// by validateWebhookURL, since this runs after LoadCredentials succeeds.
+func checkWebhookHostAllowed(field, rawURL, allowedHost string) error {
+	if rawURL == "" {
+		return nil
+	}
+
+	u, err := url.Parse(rawURL)
+	if err != nil || !strings.EqualFold(u.Hostname(), allowedHost) {
+		return &FieldError{Field: field, Err: ErrWebhookHostMismatch}
+	}
+	return nil
 }
 
 // validateCredentials checks the required fields for presence and the

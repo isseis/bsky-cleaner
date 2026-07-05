@@ -33,7 +33,7 @@ const testDID = "did:web:" + publicIPLiteral
 func validConfigPath(t *testing.T) string {
 	t.Helper()
 	path := t.TempDir() + "/config.toml"
-	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 3600\n"
+	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 3600\nslack_allowed_host = \"hooks.slack.com\"\n"
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 	return path
 }
@@ -154,7 +154,7 @@ func TestRun_ClientInitFailure_ReturnsExitCode1(t *testing.T) {
 func TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1(t *testing.T) {
 	setEnvCredentials(t)
 	path := t.TempDir() + "/config.toml"
-	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 1\n"
+	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 1\nslack_allowed_host = \"hooks.slack.com\"\n"
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 
 	mock := &atprototestutil.MockHTTPDoer{Handler: func(req *http.Request) (*http.Response, error) {

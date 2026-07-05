@@ -51,12 +51,29 @@ type Doer struct {
 	inner  HTTPDoer
 	policy Policy
 	clock  Clock
+	redact func(*http.Request) string
+}
+
+// Option customizes a Doer built by NewDoer beyond Policy/Clock.
+type Option func(*Doer)
+
+// WithURLRedactor overrides the URL text Doer's own retry/give-up logging
+// emits, for callers whose request URL itself carries a secret (e.g. a
+// Slack Incoming Webhook token embedded in the path). Callers that do not
+// need this (internal/atproto's existing usage) omit it, preserving the
+// current req.URL.String() logging unchanged.
+func WithURLRedactor(redact func(*http.Request) string) Option {
+	return func(d *Doer) { d.redact = redact }
 }
 
 // NewDoer builds a Doer wrapping inner per policy, using clock to wait
 // between attempts.
-func NewDoer(inner HTTPDoer, policy Policy, clock Clock) *Doer {
-	return &Doer{inner: inner, policy: policy, clock: clock}
+func NewDoer(inner HTTPDoer, policy Policy, clock Clock, opts ...Option) *Doer {
+	d := &Doer{inner: inner, policy: policy, clock: clock}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 // Do implements HTTPDoer, retrying per d.policy and d.clock. It never
@@ -84,7 +101,7 @@ func (d *Doer) Do(req *http.Request) (*http.Response, error) {
 			// its body (if any) must reach the caller unread and unclosed
 			// -- it must not be drained/closed like the intermediate
 			// responses below.
-			logGivingUp(req, attempt+1)
+			d.logGivingUp(req, attempt+1)
 			return outcomeResp, outcomeErr
 		}
 
@@ -99,7 +116,7 @@ func (d *Doer) Do(req *http.Request) (*http.Response, error) {
 		if sleepErr := d.clock.Sleep(ctx, wait); sleepErr != nil {
 			return nil, sleepErr
 		}
-		logRetrying(req, attempt+1, wait)
+		d.logRetrying(req, attempt+1, wait)
 	}
 }
 
@@ -215,14 +232,17 @@ func parseRetryAfter(value string) time.Duration {
 // actually completed and another attempt will follow, so an on-call
 // responder can tell an immediate failure apart from one that retried.
 // completedAttempt is the 1-indexed attempt number that just failed. The
-// URL never carries secrets: XRPC callers always send credentials via the
-// request body or Authorization header, never as a query parameter.
-func logRetrying(req *http.Request, completedAttempt int, wait time.Duration) {
+// URL never carries secrets for callers that omit WithURLRedactor: XRPC
+// callers always send credentials via the request body or Authorization
+// header, never as a query parameter. Callers whose URL itself is a
+// secret (e.g. internal/notify's Slack webhook) supply redact via
+// WithURLRedactor instead.
+func (d *Doer) logRetrying(req *http.Request, completedAttempt int, wait time.Duration) {
 	slog.Default().Warn("retrying HTTP request",
 		"attempt", completedAttempt,
 		"wait", wait,
 		"method", req.Method,
-		"url", req.URL.String(),
+		"url", d.urlText(req),
 	)
 }
 
@@ -231,10 +251,19 @@ func logRetrying(req *http.Request, completedAttempt int, wait time.Duration) {
 // "retried until it succeeded" and "retried until it gave up" are each
 // unambiguously visible in logs. completedAttempt is the 1-indexed attempt
 // number of that final failure.
-func logGivingUp(req *http.Request, completedAttempt int) {
+func (d *Doer) logGivingUp(req *http.Request, completedAttempt int) {
 	slog.Default().Warn("giving up retrying HTTP request",
 		"attempt", completedAttempt,
 		"method", req.Method,
-		"url", req.URL.String(),
+		"url", d.urlText(req),
 	)
+}
+
+// urlText returns the URL text to use in retry/give-up logging: d.redact's
+// output if set, otherwise the raw req.URL.String() (existing behavior).
+func (d *Doer) urlText(req *http.Request) string {
+	if d.redact != nil {
+		return d.redact(req)
+	}
+	return req.URL.String()
 }

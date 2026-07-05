@@ -9,11 +9,13 @@ import (
 // failure. Callers use errors.Is to check for these regardless of the
 // specific field involved.
 var (
-	ErrFileNotFound = errors.New("config file not found")
-	ErrParseFailed  = errors.New("config file parse failed")
-	ErrMissingField = errors.New("required field is missing")
-	ErrInvalidValue = errors.New("field value is invalid")
-	ErrMissingEnv   = errors.New("required environment variable is missing")
+	ErrFileNotFound            = errors.New("config file not found")
+	ErrParseFailed             = errors.New("config file parse failed")
+	ErrMissingField            = errors.New("required field is missing")
+	ErrInvalidValue            = errors.New("field value is invalid")
+	ErrMissingEnv              = errors.New("required environment variable is missing")
+	ErrWebhookHostMismatch     = errors.New("slack webhook URL host does not match the allowed host")
+	ErrSlackAllowedHostMissing = errors.New("slack_allowed_host is required when a Slack webhook URL is set")
 )
 
 // FieldError identifies which configuration field caused a validation
