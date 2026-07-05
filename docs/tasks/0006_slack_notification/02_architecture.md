@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-05 |
-| Review date | - |
-| Reviewer | - |
-| Comments | 2026-07-05（再オープン）: F-005 のホスト検証方式を、正常系/異常系 URL の相互一致のみから、TOML `slack_allowed_host` による明示的な allowlist 方式に変更（3.1節・9節・付録を改訂）。要件定義書 [01_requirements.md](01_requirements.md) の同日付コメント参照。再承認待ち。 |
+| Review date | 2026-07-05 |
+| Reviewer | isseis |
+| Comments | 2026-07-05（再オープン）: F-005 のホスト検証方式を、正常系/異常系 URL の相互一致のみから、TOML `slack_allowed_host` による明示的な allowlist 方式に変更（3.1節・9節・付録を改訂）。要件定義書 [01_requirements.md](01_requirements.md) の同日付コメント参照。 |
 
 関連ドキュメント: [要件定義書](01_requirements.md)
 
