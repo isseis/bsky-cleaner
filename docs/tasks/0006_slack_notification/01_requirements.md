@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Status | `approved` |
+| Status | `draft` |
 | Created | 2026-07-02 |
-| Review date | 2026-07-05 |
-| Reviewer | isseis |
-| Comments | 2026-07-05: 姉妹プロジェクト `tlsrpt-digest`（`internal/notify`）を参考にレビューし、(1) Slack POST の HTTP タイムアウト（F-004）、(2) 実行モードと通知タイミング（`--apply` 時のみ通知、F-002）、(3) 部分失敗の異常系ルーティング（AC-07）、(4) サニタイズを「本文を含めない・外部由来文字列に無条件適用」へ整理（F-006）、(5) 通知送信失敗の stderr surface（AC-03）、(6) マスキング対象への Webhook URL 追加（AC-19）、(7) ペイロード長の切り詰め（AC-18）、(8) ホスト照合の正規化（AC-13）を追記。要件から外した詳細判断はメモに記録。 |
+| Review date | - |
+| Reviewer | - |
+| Comments | 2026-07-05: 姉妹プロジェクト `tlsrpt-digest`（`internal/notify`）を参考にレビューし、(1) Slack POST の HTTP タイムアウト（F-004）、(2) 実行モードと通知タイミング（`--apply` 時のみ通知、F-002）、(3) 部分失敗の異常系ルーティング（AC-07）、(4) サニタイズを「本文を含めない・外部由来文字列に無条件適用」へ整理（F-006）、(5) 通知送信失敗の stderr surface（AC-03）、(6) マスキング対象への Webhook URL 追加（AC-19）、(7) ペイロード長の切り詰め（AC-18）、(8) ホスト照合の正規化（AC-13）を追記。要件から外した詳細判断はメモに記録。2026-07-05（再オープン）: F-005 のホスト検証方式を、正常系/異常系 URL の相互一致のみから、TOML `slack_allowed_host` による明示的な許可ホスト方式に変更（AC-11/AC-12 を改訂、AC-21 を追加）。5節の「allowlist は採用しない」の記述を撤回。再承認待ち。 |
 
 ## 1. 背景と目的
 
@@ -16,7 +16,7 @@
 
 [プロジェクト概要](../../overview.md) の「実行結果の通知」「Slack 通知における情報漏洩対策」、および [セキュリティ設計](../../design/security.md) の「投稿本文経由の間接的なインジェクション」にある通り、実行結果（正常系・異常系）を Slack Webhook 経由で通知する。投稿本文をそのまま通知に含めると、メンション拡散・ANSI エスケープ注入・ログ偽装のリスクがあるため、姉妹プロジェクト `go-safe-cmd-runner` と同様の対策を踏襲する。
 
-正常系・異常系の通知先 Webhook URL はホスト部が一致している前提とし、不一致の場合は fail-closed で起動を失敗させる。
+設定ファイル（TOML）に許可ホスト（`slack_allowed_host`）を明示的に指定し、正常系・異常系の通知先 Webhook URL のホスト部がこれと一致することを起動時に検証する。一致しない場合は fail-closed で起動を失敗させる。
 
 ### 1.2 目的（ゴール）
 
@@ -77,12 +77,15 @@ Slack Webhook への POST がハング・低速応答した場合でも、CLI �
 - **AC-09**: Slack Webhook への HTTP POST には HTTP タイムアウトを設ける（無制限にブロックしない）
 - **AC-10**: 通知処理全体（送信・リトライを行う場合はそれを含む）の最悪ケース所要時間は有界であり、[0005_retry_timeout](../0005_retry_timeout/01_requirements.md) が設定する実行タイムアウトより十分短くなるよう設計する（通知処理が実行タイムアウトを食い尽くさない）
 
-### F-005: Webhook URL のホスト一致検証
+### F-005: Webhook URL のホスト許可リスト検証
+
+TOML 設定ファイルに任意項目 `slack_allowed_host`（例: `slack_allowed_host = "hooks.slack.com"`）を定義できるようにする。正常系・異常系いずれかの Slack Webhook URL（環境変数、[0001_config](../0001_config/01_requirements.md) 参照）が設定されている場合、それらの Webhook URL のホスト部が `slack_allowed_host` の値と一致することを起動時に検証する。
 
 **Acceptance Criteria**:
-- **AC-11**: 正常系・異常系の Webhook URL のホスト部が一致する場合、設定は正常に読み込まれる
-- **AC-12**: 正常系・異常系の Webhook URL のホスト部が一致しない場合、fail-closed で起動が失敗する（通知を送らずスキップするのではなく、明確なエラーで起動自体を止める）
+- **AC-11**: `slack_allowed_host` が設定されており、正常系・異常系の Webhook URL のうち設定されているものすべてについてホスト部が `slack_allowed_host` と一致する場合、設定は正常に読み込まれる
+- **AC-12**: 正常系・異常系のいずれかの Webhook URL のホスト部が `slack_allowed_host` と一致しない場合、fail-closed で起動が失敗する（通知を送らずスキップするのではなく、明確なエラーで起動自体を止める）
 - **AC-13**: ホスト部の照合はポート番号を除いた形で行い、大文字/小文字を区別しない完全一致とする（例: `https://host:443/...` のホスト部は `host` として照合する）
+- **AC-21**: 正常系・異常系いずれかの Webhook URL が設定されているにもかかわらず `slack_allowed_host` が未設定の場合、fail-closed で起動が失敗する（Webhook URL を設定しながら許可ホストを省略することで検証を回避できないようにする）。両方の Webhook URL が未設定の場合は、`slack_allowed_host` の設定有無を問わずエラーにしない（Slack 通知自体を使わない運用と整合させるため）
 
 ### F-006: 通知内容のサニタイズ
 
@@ -113,9 +116,9 @@ Slack Webhook への POST がハング・低速応答した場合でも、CLI �
 - **Bluesky API のリトライ実行**自体は別タスク（[0005_retry_timeout](../0005_retry_timeout/01_requirements.md)）の責務であり、本タスクは実行結果を受け取って通知する下流の処理に専念する。なお **Slack Webhook POST の HTTP タイムアウト**は 0005 のスコープ外であるため本タスク F-004 が扱う（別のタイムアウト関心事である）。
 - CLI からの結果集約は CLI エントリポイントタスクの責務であり、本タスクは [0004_cli_entrypoint](../0004_cli_entrypoint/01_requirements.md) の NF-005 で定義される構造化された実行結果データを受け取る形で実装する。
 - **通知メッセージの詳細フォーマット（色・絵文字・Run ID 等）**は [プロジェクト概要](../../overview.md) で後続検討とされているため本タスクでは扱わない。姉妹プロジェクト `tlsrpt-digest` の attachment ベースのリッチ表現を将来の参考実装とする。
-- **ホスト検証は正常系/異常系 2 URL の相互一致のみ**で行い、許可ホスト名の allowlist（`tlsrpt-digest` の `allowed_host` 相当）は本タスクでは採用しない（[プロジェクト概要](../../overview.md) の方針に従う）。相互一致で防げない誤送信（両 URL を同一の意図しないホストに向けた場合）に対する追加防御が必要になった場合は、[0008_security_hardening](../0008_security_hardening/) で再検討する。
+- **ホスト検証は TOML `slack_allowed_host` による明示的な allowlist 方式を採用する**（`tlsrpt-digest` の `allowed_host` 相当）。正常系/異常系 2 URL の相互一致のみを検証する方式は、両 URL が同一の意図しない（攻撃者が制御する）ホストに向けられているケースを検知できないという残存リスクがあったため、本タスクの時点で allowlist 方式に切り替える。
 
 ## 6. 成功基準（要約）
 
-- AC-01〜AC-20 が test/static で緑。
+- AC-01〜AC-21 が test/static で緑。
 - `--apply` 実行時に、実行結果が正常系/異常系（部分失敗含む）に応じた Slack チャンネルに、秘密情報漏洩・インジェクションのリスクなく通知される状態。dry-run（デフォルト）実行では通知が送信されない状態。

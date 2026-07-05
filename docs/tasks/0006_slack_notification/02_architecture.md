@@ -8,7 +8,7 @@
 | Created | 2026-07-05 |
 | Review date | - |
 | Reviewer | - |
-| Comments | - |
+| Comments | 2026-07-05（再オープン）: F-005 のホスト検証方式を、正常系/異常系 URL の相互一致のみから、TOML `slack_allowed_host` による明示的な allowlist 方式に変更（3.1節・9節・付録を改訂）。要件定義書 [01_requirements.md](01_requirements.md) の同日付コメント参照。再承認待ち。 |
 
 関連ドキュメント: [要件定義書](01_requirements.md)
 
@@ -18,7 +18,7 @@
 
 - **YAGNI**: 通知メッセージのリッチ表現（色・絵文字・attachment・Run ID 等）は要件定義書のスコープ外であり、それらを見据えた抽象化を先取りしない。Slack Incoming Webhook の最も基本的な `text` フィールド（mrkdwn プレーンテキスト）のみを使う（3.3節）。
 - **既存コンポーネントの再利用**: HTTP タイムアウト・リトライは `internal/retry.Doer`（[0005_retry_timeout](../0005_retry_timeout/01_requirements.md)）をそのまま利用し、新たなリトライ実装を作らない。実行結果の構造化データは `internal/report.Result`（[0004_cli_entrypoint](../0004_cli_entrypoint/01_requirements.md)）をそのまま入力として使い、Slack 用に構造体を再定義しない。秘匿情報のマスキングは `internal/config.SecretString`（[0001_config](../0001_config/01_requirements.md)）をそのまま利用する。
-- **fail-closed（設定検証）**: 正常系・異常系 Webhook URL のホスト不一致は、起動時の設定検証（`internal/config`）で検出し、通知を諦めるのではなく起動自体を失敗させる（F-005）。
+- **fail-closed（設定検証）**: 正常系・異常系 Webhook URL のホスト部が TOML `slack_allowed_host`（許可ホスト）と一致しない場合、および Webhook URL が設定されているのに `slack_allowed_host` が未設定の場合は、起動時の設定検証（`internal/config`）で検出し、通知を諦めるのではなく起動自体を失敗させる（F-005）。
 - **fail-open（通知送信そのもの）**: 通知の送信失敗は削除処理の成否に影響しない（AC-02）。fail-closed は「設定が壊れている状態で実行を続けない」ことに適用され、「通知が失敗したら削除結果も失敗扱いにする」ことには適用されない。この 2 つの fail-closed/fail-open は適用対象が異なることに注意する。
 - **単一責任**: 新規パッケージ `internal/notify` は「`report.Result` を Slack ペイロードに変換し送信する」ことと「外部由来文字列のサニタイズ関数を提供する」ことに専念する。Webhook URL の妥当性検証（構文・ホスト一致）は、担当パッケージを変えずに `internal/config` の責務の範囲を拡張する形で対応し、`internal/notify` には持ち込まない。
 
@@ -31,7 +31,8 @@ flowchart LR
     classDef enhanced fill:#e8f5e8,stroke:#2e8b57,stroke-width:2px,color:#006400;
     classDef newpkg fill:#ffe8f5,stroke:#d946ef,stroke-width:2px,color:#701a75;
 
-    ENV[("環境変数<br>BSKY_SLACK_WEBHOOK_URL_SUCCESS<br>BSKY_SLACK_WEBHOOK_URL_FAILURE")] --> CFG["internal/config<br>LoadCredentials()<br>(ホスト一致検証を追加)"]
+    ENV[("環境変数<br>BSKY_SLACK_WEBHOOK_URL_SUCCESS<br>BSKY_SLACK_WEBHOOK_URL_FAILURE")] --> CFG["internal/config<br>LoadAppConfig()<br>(allowlist ホスト検証を追加)"]
+    TOML[("TOML 設定ファイル<br>slack_allowed_host")] --> CFG
     CFG --> MAIN["cmd/main.go<br>run()"]
     RESULT[("internal/report<br>Result")] --> MAIN
     MAIN --> OUTCOME["internal/notify<br>Outcome"]
@@ -42,7 +43,7 @@ flowchart LR
     MAIN --> STDOUT["internal/notify<br>Sanitize()"]
     STDOUT --> CONSOLE["標準出力"]
 
-    class ENV,RESULT data
+    class ENV,RESULT,TOML data
     class MAIN process
     class CFG enhanced
     class OUTCOME,BUILD,SEND,STDOUT newpkg
@@ -56,7 +57,7 @@ flowchart LR
 |---|---|
 | 青 (`data`) | 環境変数・`report.Result` などの静的データ |
 | 橙 (`process`) | 既存コンポーネント（変更なし） |
-| 緑 (`enhanced`) | 本タスクで変更する既存コンポーネント（`internal/config` のホスト一致検証追加） |
+| 緑 (`enhanced`) | 本タスクで変更する既存コンポーネント（`internal/config` の allowlist ホスト検証追加） |
 | 紫 (`newpkg`) | 本タスクで新設するパッケージ（`internal/notify`） |
 
 ## 2. システム構成
@@ -97,7 +98,7 @@ graph TB
     end
 
     subgraph pkg_existing_config ["internal/config/ (existing, extended)"]
-        C1["credentials.go / validate.go<br>ホスト一致検証を追加"]
+        C1["credentials.go / validate.go<br>allowlist ホスト検証を追加"]
     end
 
     M1 --> RN1
@@ -135,9 +136,9 @@ graph TB
 | `internal/notify/payload.go` | 新規 | `buildPayload()`/`escapeSlackMarkup()` |
 | `internal/notify/sanitize.go` | 新規 | `Sanitize()` |
 | `internal/notify/errorkind.go` | 新規 | `errorKind()` |
-| `internal/config/validate.go` | 変更 | Webhook URL ホスト一致検証を追加（3.1節） |
-| `internal/config/errors.go` | 変更 | `ErrWebhookHostMismatch` を追加 |
-| `internal/config/credentials_test.go` | 変更 | ホスト不一致のテストケースを追加（既存2ケースは変更不要、3.1節） |
+| `internal/config/validate.go` | 変更 | Webhook URL の allowlist ホスト検証（`slack_allowed_host`）を追加（3.1節） |
+| `internal/config/errors.go` | 変更 | `ErrWebhookHostMismatch`・`ErrSlackAllowedHostMissing` を追加 |
+| `internal/config/credentials_test.go` | 変更 | ホスト不一致・`slack_allowed_host` 未設定のテストケースを追加、既存2ケースのフィクスチャに `slack_allowed_host` を追加（3.1節） |
 | `internal/retry/doer.go` | 変更 | URL 秘匿用の redactor オプションを追加（3.6.1節） |
 | `cmd/main.go` | 変更 | `notify.Send()` 呼び出し・`notify.Sanitize()` によるラップを追加 |
 | `cmd/main_test.go` | 変更 | `TestRun_ApplyAllSucceed_*`/`TestRun_ApplyPartialFailure_*` のモックに Slack Webhook 向けの応答を追加（7節） |
@@ -192,23 +193,29 @@ sequenceDiagram
 
 ## 3. コンポーネント設計
 
-### 3.1 Webhook URL のホスト一致検証（`internal/config` の拡張）
+### 3.1 Webhook URL のホスト allowlist 検証（`internal/config` の拡張）
 
-F-005（AC-11〜AC-13）は既存の `internal/config` の設定検証責務の一部として扱う。`internal/config.validateCredentials`（`internal/config/validate.go`）が構文検証（`validateWebhookURL`）に続けてホスト一致検証を行う。この判断の理由:
+F-005（AC-11・AC-12・AC-13・AC-21）は既存の `internal/config` の設定検証責務の一部として扱う。`Config`（TOML 由来）に新規フィールド `SlackAllowedHost string`（TOML キー: `slack_allowed_host`、任意項目）を追加する。ホスト検証自体は `Config`（TOML）と `Credentials`（環境変数、Webhook URL）の両方を必要とするため、双方が確定した後（`LoadAppConfig` が両方をロードした時点）で行う新しい検証関数 `validateSlackAllowedHost(cfg Config, creds Credentials) error` として実装する。この判断の理由:
 
-- AC-11/AC-12 は「設定が正常に読み込まれる」「起動が失敗する」という、`LoadAppConfig` の既存の fail-closed 契約（`FieldError` を返す）とまったく同じ形の要求である。`internal/notify` に持ち込むと、起動時検証の責務が 2 箇所に分散する。
+- AC-11/AC-12/AC-21 は「設定が正常に読み込まれる」「起動が失敗する」という、`LoadAppConfig` の既存の fail-closed 契約（`FieldError` を返す）とまったく同じ形の要求である。`internal/notify` に持ち込むと、起動時検証の責務が 2 箇所に分散する。
 - `cmd/main.go` の `run()` は既に `config.LoadAppConfig` のエラーを「標準エラー出力 + 終了コード1」として扱う既存のフックを持つ（`cmd/main.go` の該当箇所）ため、新しいエラー経路を `main.go` に追加する必要がない。
+- `slack_allowed_host` は Slack Webhook URL とは異なり、それ単体では投稿権限を持たない値（`hooks.slack.com` のようなホスト名の文字列）であるため秘匿情報ではなく、[0001_config](../0001_config/01_requirements.md) の秘匿情報分離方針（秘匿情報のみ環境変数）に従い TOML（`Config`）側のフィールドとする。
 
-**検証内容（AC-13）**: 両方の URL が空でない場合のみ比較する（既存のテスト `TestLoadCredentials_SlackWebhookURLOnlyOneSet` は片方のみ設定されたケースを正当な構成として扱っており、この既存挙動を壊さない）。比較は `net/url.Parse` 済みの `Host` からポート番号を除いた部分（`net/url.URL.Hostname()` 相当）を `strings.EqualFold` で比較する大文字小文字区別なしの完全一致とする。
+**検証内容（AC-11〜AC-13, AC-21）**:
+1. 正常系・異常系の Webhook URL が両方とも未設定（空）の場合、`slack_allowed_host` の設定有無を問わず検証をスキップする（Slack 通知を使わない運用との整合、AC-21 後段）。
+2. いずれか一方でも Webhook URL が設定されている場合、`slack_allowed_host` が空であれば `ErrSlackAllowedHostMissing` を返す（AC-21 前段）。
+3. `slack_allowed_host` が設定されている場合、設定されている Webhook URL それぞれについて、`net/url.Parse` 済みの `Host` からポート番号を除いた部分（`net/url.URL.Hostname()` 相当）を `strings.EqualFold` で `slack_allowed_host` と比較する。一致しなければ `ErrWebhookHostMismatch` を返す（AC-12・AC-13）。
 
 ```go
 // internal/config/errors.go に追加するサンプルの sentinel error（実装イメージ）
-var ErrWebhookHostMismatch = errors.New("Slack webhook URL hosts do not match")
+var ErrWebhookHostMismatch = errors.New("Slack webhook URL host is not in the allowed host")
+var ErrSlackAllowedHostMissing = errors.New("slack_allowed_host is required when a Slack webhook URL is set")
 ```
 
 **影響を受ける既存テスト**:
-- `internal/config/credentials_test.go::TestLoadCredentials_Success` — 現行のフィクスチャは両 URL とも `hooks.slack.com` を使っており、ホスト一致検証を追加しても失敗しない（要確認のみ、変更不要）。
-- `internal/config/credentials_test.go::TestLoadCredentials_SlackWebhookURLOnlyOneSet` — 片方のみ設定のケース。上記の「両方非空の場合のみ比較」により現状の合格を維持する（要確認のみ、変更不要）。
+- `internal/config/credentials_test.go::TestLoadCredentials_Success` — 現行のフィクスチャは両 URL とも `hooks.slack.com` を使っている。`slack_allowed_host = "hooks.slack.com"` をフィクスチャの `Config` 側に追加する必要がある（変更要）。
+- `internal/config/credentials_test.go::TestLoadCredentials_SlackWebhookURLOnlyOneSet` — 片方のみ設定のケース。設定されている側のみ `slack_allowed_host` と比較する（上記 3.）ため、既存の意図（片方のみの設定を正当な構成として扱う）は維持されるが、フィクスチャに `slack_allowed_host` の追加が必要（変更要）。
+- 新規テストとして、(a) `slack_allowed_host` と異なるホストの URL を与えるケース（AC-12）、(b) Webhook URL を設定しつつ `slack_allowed_host` を省略するケース（AC-21）を追加する必要がある。
 - 新規テストとして「ホストが異なる2つの URL」を与えるケースを追加する必要がある（AC-12）。
 
 ### 3.2 `internal/notify` の型定義
@@ -412,7 +419,7 @@ flowchart TD
 - **秘密情報漏洩（Webhook URL、`internal/retry` のリトライログ経由）**: `internal/retry.Doer` の既存のリトライ・打ち切りログは `req.URL.String()` をそのまま出力する設計であり、これをそのまま再利用すると Webhook URL がログに漏洩する（`internal/atproto` での既存利用ではリクエスト URL が秘匿情報でないため問題にならなかった前提が、本タスクでは成り立たない）。3.6.1節の `internal/retry.WithURLRedactor` により、`internal/notify` はこのログにホスト名のみを渡すことでこれを防ぐ。
 - **秘密情報漏洩（app パスワード・セッション JWT・Authorization ヘッダー）**: `internal/notify` は `report.Result`/`DeleteFailure` のうち明示的に選択したフィールド（RKey・エラー種別）のみをペイロードに含め、`atproto.Client` やセッション情報そのものには一切アクセスしない（`internal/atproto` への依存は 2.1節の通り `Post`/`HTTPError`/`SSRFError` 型に限られ、`Client`/セッション状態には触れない）。
 - **エラーオブジェクトの丸ごとシリアライズ回避（AC-20）**: 4節の `errorKind` が示す通り、型付きエラーからの明示的なフィールド選択のみを行い、`%v`/`fmt.Sprintf("%+v", err)` 等によるエラー構造体全体の展開は行わない。
-- **設定改ざん（Webhook URL を攻撃者が制御するホストに向けるケース）**: F-005（3.1節）のホスト一致検証は、正常系・異常系の2つの URL が互いに一致することのみを検証する相互検証であり、両方が同時に同一の意図しない（攻撃者が制御する）ホストに向けられているケースは検知できない。この場合、そのホストへ削除失敗の識別子（RKey）・エラー種別が送信されてしまう（投稿本文は含まれないため、被害はこれらの構造化フィールドに限られる）。[プロジェクト概要](../../overview.md) の方針により、この残存リスクへの対策（allowlist 等）は本タスクでは採用せず、[0008_security_hardening](../0008_security_hardening/) で再検討する既知の残存リスクとして受け入れる（9節・付録参照）。
+- **設定改ざん（Webhook URL を攻撃者が制御するホストに向けるケース）**: F-005（3.1節）のホスト検証は TOML `slack_allowed_host` に対する allowlist 方式であり、正常系・異常系それぞれの Webhook URL のホスト部を独立に検証する。両方を同時に同一の意図しない（攻撃者が制御する）ホストに向けても、`slack_allowed_host` と一致しない限り起動時に検出される（正常系/異常系 URL の相互一致のみを検証する方式では検知できなかったケース）。ただし `slack_allowed_host` 自体が改ざんされた場合（TOML ファイルへの書き込み権限を攻撃者が得た場合）は、この allowlist も無力化される。TOML ファイル自体の改ざん対策（ファイルパーミッション等）は本タスクのスコープ外であり、[0008_security_hardening](../0008_security_hardening/) の一般的な設定改ざん対策の対象とする。
 - **通知失敗の可観測性（ファイルログを持たない設計との相互作用）**: AC-03 は「サイレント失敗を避けるため最低限 stderr に出力する」ことを求めるが、この出力が実際に永続化されるかどうかは、cron/Docker 実行環境が標準エラー出力をどう扱うか（[0007_docker_distribution](../0007_docker_distribution/) の責務）に依存する。本タスクは stderr への出力までを担い、その先の収集・永続化は 0007 のスコープであるため、0007 側で標準エラー出力が実際に収集される構成になっていることを別途確認する必要がある（本ドキュメントでは未検証の前提として明示する）。
 
 ## 6. 処理フロー詳細
@@ -424,14 +431,14 @@ flowchart TD
 - **ユニットテスト**: `internal/notify` は実際のネットワーク通信なしに、`payload.go` のペイロード構築・サニタイズ・切り詰めロジックを単体テストする（NF-002）。HTTP 挙動（タイムアウト・リトライ・送信失敗時の `SendError` 内容）は `net/http/httptest` によるモックサーバで検証する。リトライ・バックオフを経路上で発生させるテストは、`retry.Clock` の自前のフェイク実装（`retry.Clock` は公開インターフェースであるため `internal/notify` のテストコードから直接実装できる）を `Send` に注入し、実待機なしで検証する（3.6節）。
 - **`internal/retry` の拡張テスト**: `WithURLRedactor`（3.6.1節）を指定した場合にリトライ・打ち切りログが redactor の返す文字列を使うこと、指定しない場合は既存の `req.URL.String()` のままであること（`internal/atproto` の既存挙動に回帰がないこと）をテストする。
 - **セキュリティテスト**: `Sanitize()`/`escapeSlackMarkup()` に対して、悪意あるペイロード（`<!channel>`/`<!here>`/ANSI エスケープシーケンス/改行混入）を用いたテストケースを用意し、無害化されることを確認する（NF-003）。`errorKind()` および `SendError.Error()` が Webhook URL・app パスワード・セッション JWT・`Authorization` ヘッダーの値をいかなる形でも出力しないことをテストで確認する（NF-003, AC-19）。特に、リトライ・打ち切りログ経由で Webhook URL が出力されないことも、この観点でテストする（`WithURLRedactor` テストと合わせて確認）。
-- **`internal/config` の拡張テスト**: 3.1節のホスト一致検証について、一致・不一致・片方のみ設定の3パターンをテストする（AC-11〜AC-13）。
+- **`internal/config` の拡張テスト**: 3.1節の allowlist ホスト検証について、一致・不一致・片方のみ設定・`slack_allowed_host` 未設定の4パターンをテストする（AC-11〜AC-13, AC-21）。
 - **`cmd/main.go` の統合テスト**: `--apply` 時のみ通知が発生すること（AC-04）、正常系/異常系/部分失敗のチャンネル振り分け（AC-05〜AC-08）、通知失敗時に終了コードが変化しないこと（AC-02）と標準エラー出力にマスク済みの文言が出ること（AC-03）を、モック HTTP サーバを用いて検証する。「`--apply` かつ選択された送信先 URL が未設定」（3.5節）についても、対応する AC はないが回帰防止のためテストする。既存の `cmd/main_test.go` の `TestRun_ApplyAllSucceed_*` / `TestRun_ApplyPartialFailure_*` は、`run()` が Slack 宛の POST を追加で発行するようになるため、これらのテストのモック HTTP ハンドラに Slack Webhook 向けリクエストへの応答を追加する必要がある（実装時に更新が必要な既存テストとして記録する）。
 - **`"unknown error"` フォールバックの扱い**: `errorKind()` のフォールバック値がテスト対象のエラー型の分類漏れを示す可能性があるため、`internal/atproto`/`internal/config` が公開する型付きエラーを一通り列挙し、意図的に分類対象から外したもの以外は `"unknown error"` にならないことを確認する（4節）。
 
 ## 8. 実装の優先順位
 
 1. `internal/retry` に `WithURLRedactor`（3.6.1節）を追加する。`internal/atproto` の既存呼び出しに影響しない後方互換の拡張であるため、他の変更に先行して着手できる。
-2. `internal/config` にホスト一致検証を追加する（3.1節）。既存の設定検証パスに乗るため、他コンポーネントへの依存がなく着手できる。
+2. `internal/config` に allowlist ホスト検証を追加する（3.1節）。既存の設定検証パスに乗るため、他コンポーネントへの依存がなく着手できる。
 3. `internal/notify` の型定義とサニタイズ関数（`Sanitize`/`escapeSlackMarkup`/`errorKind`）をユニットテストとともに実装する。
 4. `internal/notify` のペイロード構築・チャンネル振り分け・切り詰めを実装する。
 5. `internal/notify.Send`（HTTP 送信・`internal/retry.Doer` 統合・`WithURLRedactor`・`SendError`）を実装する。
@@ -441,7 +448,7 @@ flowchart TD
 ## 9. 将来の拡張性
 
 - メッセージフォーマット（色・絵文字・Run ID・Block Kit 化）は将来必要になった場合、`payload.go` の `buildPayload()` 内部実装のみを変更すればよく、`Send`/`Config`/`Outcome` の型は変更不要となるよう設計している。
-- Webhook URL の allowlist 方式によるホスト検証強化が必要になった場合は、[0008_security_hardening](../0008_security_hardening/) で `internal/config` の検証ロジックを拡張する形で対応する想定（3.1節の検証はその際も変更不要な範囲に留める）。
+- 現行の allowlist は単一ホスト（`slack_allowed_host` は文字列 1 件）のみを許可する。複数ホストの許可（例: ワークスペースごとに異なる Webhook ホストを使う運用）が必要になった場合は、[0008_security_hardening](../0008_security_hardening/) で `slack_allowed_host` を配列に拡張する形で対応する想定。
 
 ---
 
@@ -452,4 +459,4 @@ flowchart TD
 - **`tlsrpt-digest` は `slog.Handler` + バッファ/`Flush()` モデル**（cron 常駐のポーラー向け）だが、bsky-cleaner は一回実行の CLI であり、0004 が生成した構造化結果を受け取って一度だけ送信するモデルで十分なため、`slog.Handler`/`Flush`/集約バッファは採用しない。
 - **リトライ回数・バックオフ**: `tlsrpt-digest` は 5秒タイムアウト・3リトライ・base 2秒の指数バックオフを採用しているが、本タスクは通知失敗が非致命的（AC-02）であるため、3.6節の通りより軽量な値（3秒タイムアウト・2リトライ・base 1秒）を採用した。
 - **切り詰め上限**: `tlsrpt-digest` は全体4000文字・フィールド毎1000文字という2段階の上限を持つが、本タスクは投稿本文を含まずペイロード全体が小さいため、全体4000文字の単一の上限のみを採用した（3.3節）。
-- **ホスト検証は allowlist 方式を採用しない**: `tlsrpt-digest` の `allowed_host` 相当の allowlist は、[overview.md](../../overview.md) の方針に従いこのタスクでは採用しない。正常系・異常系 URL の相互一致のみで防げない誤送信（両方を意図しない同一ホストに向けるケース）への追加対応が必要になった場合は [0008_security_hardening](../0008_security_hardening/) で再検討する（3.1節・9節参照）。
+- **ホスト検証は allowlist 方式を採用する**: `tlsrpt-digest` の `allowed_host` 相当の allowlist を TOML `slack_allowed_host` として採用する。正常系・異常系 URL の相互一致のみを検証する方式では防げなかった誤送信（両方を意図しない同一ホストに向けるケース）を、この方式では検出できる（3.1節・9節参照）。
