@@ -3,6 +3,7 @@ package notify
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/isseis/bsky-cleaner/internal/report"
 )
@@ -20,7 +21,7 @@ type Outcome struct {
 // maxPayloadLength is a conservative upper bound on the constructed Slack
 // message text, guarding against unbounded payload growth on a run with a
 // very large number of delete failures. It is not derived from a verified
-// Slack platform limit; see the architecture doc 3.3節 for rationale.
+// Slack platform limit; see the architecture doc section 3.3 for rationale.
 const maxPayloadLength = 4000
 
 // truncatedMarker is appended when buildPayload's output exceeds
@@ -41,7 +42,7 @@ func escapeSlackMarkup(s string) string {
 }
 
 // sanitizeForPayload applies the two-stage sanitization the architecture
-// doc 3.3節 describes for any externally-sourced text (post rkeys, error
+// doc section 3.3 describes for any externally-sourced text (post rkeys, error
 // category text) included in a Slack payload: Sanitize (strip control
 // characters/newlines) first, then escapeSlackMarkup (neutralize mrkdwn
 // mention syntax).
@@ -81,5 +82,24 @@ func buildPayload(outcome Outcome) string {
 	if len(text) <= maxPayloadLength {
 		return text
 	}
-	return text[:maxPayloadLength-len(truncatedMarker)] + truncatedMarker
+	return text[:truncationCutPoint(text)] + truncatedMarker
+}
+
+// truncationCutPoint returns the byte offset to cut text at so that
+// text[:cut]+truncatedMarker stays within maxPayloadLength without
+// splitting a multi-byte UTF-8 rune in half (RKey/error text may contain
+// non-ASCII characters). It backs up from the naive byte offset to the
+// start of the rune straddling that offset, if any.
+func truncationCutPoint(text string) int {
+	cut := maxPayloadLength - len(truncatedMarker)
+	if cut < 0 {
+		cut = 0
+	}
+	if cut > len(text) {
+		cut = len(text)
+	}
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return cut
 }

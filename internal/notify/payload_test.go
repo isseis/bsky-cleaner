@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/isseis/bsky-cleaner/internal/atproto"
 	"github.com/isseis/bsky-cleaner/internal/report"
@@ -131,4 +132,29 @@ func TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testin
 	got := buildPayload(outcome)
 	assert.LessOrEqual(t, len(got), maxPayloadLength)
 	assert.True(t, strings.HasSuffix(got, truncatedMarker))
+}
+
+// TestBuildPayload_TruncationIsUTF8Safe guards against cutting a
+// multi-byte rune in half: RKey values here are all multi-byte Japanese
+// characters, sized so the naive byte-offset cut point (maxPayloadLength
+// - len(truncatedMarker)) lands mid-rune unless truncationCutPoint backs
+// up to a rune boundary.
+func TestBuildPayload_TruncationIsUTF8Safe(t *testing.T) {
+	failures := make([]report.DeleteFailure, 0, 200)
+	err := errors.New("boom")
+	for range 200 {
+		failures = append(failures, report.DeleteFailure{Post: atproto.Post{RKey: "日本語のリキー識別子です"}, Err: err})
+	}
+	outcome := Outcome{
+		Result: &report.Result{
+			Mode:   report.ModeApply,
+			Failed: failures,
+		},
+	}
+
+	got := buildPayload(outcome)
+
+	assert.LessOrEqual(t, len(got), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(got, truncatedMarker))
+	assert.True(t, utf8.ValidString(got), "truncated payload must not split a multi-byte rune")
 }

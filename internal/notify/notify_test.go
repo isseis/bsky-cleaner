@@ -129,8 +129,10 @@ func TestSend_HTTPTimeout_ReturnsSendError(t *testing.T) {
 	requestTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { requestTimeout = original })
 
+	var count atomic.Int32
 	block := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		count.Add(1)
 		<-block
 	}))
 	// Cleanup runs LIFO: unblock the handler before Close, otherwise
@@ -144,6 +146,44 @@ func TestSend_HTTPTimeout_ReturnsSendError(t *testing.T) {
 	sendErr, ok := errorsAsSendError(err)
 	require.True(t, ok)
 	assert.Equal(t, 0, sendErr.StatusCode)
+	// Every attempt hangs (the handler never returns), so each individually
+	// exhausts requestTimeout: this asserts the retry loop actually made
+	// MaxRetries+1 separate attempts rather than giving up after the first
+	// once a shared deadline expired (see TestSend_EachRetryAttemptGetsFreshTimeout).
+	assert.Equal(t, int32(defaultRetryPolicy.MaxRetries+1), count.Load())
+}
+
+// TestSend_EachRetryAttemptGetsFreshTimeout guards against a shared,
+// single context.WithTimeout being applied once across the whole retry
+// loop: internal/retry.Doer reuses the same request/context for every
+// attempt (see internal/retry/doer.go's cloneForAttempt), so if Send
+// applied requestTimeout to a ctx built before entering the retry loop,
+// that one deadline would already be exhausted by the time the second
+// attempt is made. Here the first two attempts each individually exceed
+// requestTimeout (simulating slow-but-not-hung responses); with each
+// attempt getting its own fresh timeout, a third fast attempt must still
+// succeed within the retry policy's MaxRetries=2 budget.
+func TestSend_EachRetryAttemptGetsFreshTimeout(t *testing.T) {
+	original := requestTimeout
+	requestTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { requestTimeout = original })
+
+	var count atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if count.Add(1) <= 2 {
+			time.Sleep(2 * requestTimeout)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := Config{SuccessWebhookURL: newSecretString(t, server.URL)}
+	clock := &fakeClock{}
+	err := Send(context.Background(), cfg, http.DefaultClient, clock, succeededOutcome())
+
+	require.NoError(t, err)
+	assert.Equal(t, int32(3), count.Load())
 }
 
 func TestSend_NonRetryableStatus_ReturnsSendErrorWithStatusCode(t *testing.T) {

@@ -68,9 +68,31 @@ var defaultRetryPolicy = retry.Policy{
 
 // webhookPayload is the Slack Incoming Webhook request body: the most
 // basic supported shape, a single mrkdwn "text" field. Richer Block Kit
-// elements are out of scope (see architecture doc 3.3節).
+// elements are out of scope (see architecture doc section 3.3).
 type webhookPayload struct {
 	Text string `json:"text"`
+}
+
+// perAttemptTimeoutDoer gives every attempt its own fresh requestTimeout
+// deadline, derived from the attempt request's context. internal/retry's
+// Doer clones the same original request (and its context) for every retry
+// attempt (see internal/retry/doer.go's cloneForAttempt), so without this
+// wrapper a single context.WithTimeout applied once before entering the
+// retry loop would have its deadline shared across all attempts: once it
+// expired (which a single slow-but-not-hung request can trigger on its
+// own), every later attempt and backoff sleep would fail immediately with
+// a ctx error instead of getting its own chance to succeed, defeating the
+// "requestTimeout per attempt" worst-case model in the architecture doc
+// (section 3.6).
+type perAttemptTimeoutDoer struct {
+	inner   HTTPDoer
+	timeout time.Duration
+}
+
+func (d perAttemptTimeoutDoer) Do(req *http.Request) (*http.Response, error) {
+	ctx, cancel := context.WithTimeout(req.Context(), d.timeout)
+	defer cancel()
+	return d.inner.Do(req.Clone(ctx))
 }
 
 // Send builds a Slack payload from outcome, selects the destination
@@ -100,12 +122,10 @@ func Send(ctx context.Context, cfg Config, doer HTTPDoer, clock retry.Clock, out
 		return &SendError{Err: err}
 	}
 
-	redactedDoer := retry.NewDoer(doer, defaultRetryPolicy, clock, retry.WithURLRedactor(redactWebhookURL))
+	timeoutDoer := perAttemptTimeoutDoer{inner: doer, timeout: requestTimeout}
+	redactedDoer := retry.NewDoer(timeoutDoer, defaultRetryPolicy, clock, retry.WithURLRedactor(redactWebhookURL))
 
-	reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, webhookURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
 	if err != nil {
 		return &SendError{Err: err}
 	}
@@ -128,7 +148,7 @@ func Send(ctx context.Context, cfg Config, doer HTTPDoer, clock retry.Clock, out
 
 // redactWebhookURL overrides retry.Doer's retry/give-up log URL text with
 // the webhook's host only, so a Slack Incoming Webhook token embedded in
-// the URL path never reaches logs (architecture doc 3.6.1節).
+// the URL path never reaches logs (architecture doc section 3.6.1).
 func redactWebhookURL(req *http.Request) string {
 	return fmt.Sprintf("%s://%s/[REDACTED]", req.URL.Scheme, req.URL.Host)
 }
