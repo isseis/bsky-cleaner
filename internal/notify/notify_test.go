@@ -48,11 +48,10 @@ func partialFailureOutcome() Outcome {
 }
 
 func TestSend_Success_PostsToSelectedWebhook(t *testing.T) {
-	var received atomic.Bool
-	var gotBody []byte
+	bodyCh := make(chan []byte, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		received.Store(true)
-		gotBody, _ = readAll(r)
+		body, _ := readAll(r)
+		bodyCh <- body
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(server.Close)
@@ -60,7 +59,13 @@ func TestSend_Success_PostsToSelectedWebhook(t *testing.T) {
 	cfg := Config{SuccessWebhookURL: newSecretString(t, server.URL)}
 	err := Send(context.Background(), cfg, http.DefaultClient, &fakeClock{}, succeededOutcome())
 	require.NoError(t, err)
-	assert.True(t, received.Load())
+
+	var gotBody []byte
+	select {
+	case gotBody = <-bodyCh:
+	default:
+		t.Fatal("handler was not invoked")
+	}
 
 	var payload webhookPayload
 	require.NoError(t, json.Unmarshal(gotBody, &payload))
