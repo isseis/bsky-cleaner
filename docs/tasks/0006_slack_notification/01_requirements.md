@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-02 |
 | Review date | 2026-07-05 |
-| Reviewer | - |
+| Reviewer | isseis |
 | Comments | 2026-07-05: 姉妹プロジェクト `tlsrpt-digest`（`internal/notify`）を参考にレビューし、(1) Slack POST の HTTP タイムアウト（F-004）、(2) 実行モードと通知タイミング（`--apply` 時のみ通知、F-002）、(3) 部分失敗の異常系ルーティング（AC-07）、(4) サニタイズを「本文を含めない・外部由来文字列に無条件適用」へ整理（F-006）、(5) 通知送信失敗の stderr surface（AC-03）、(6) マスキング対象への Webhook URL 追加（AC-19）、(7) ペイロード長の切り詰め（AC-18）、(8) ホスト照合の正規化（AC-13）を追記。要件から外した詳細判断はメモに記録。 |
 
 ## 1. 背景と目的
