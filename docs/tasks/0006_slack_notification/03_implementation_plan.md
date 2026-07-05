@@ -158,6 +158,7 @@
     - [x] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`: `RKey` にANSIエスケープシーケンスを含む値を与えた場合、構築されたテキストにエスケープシーケンスがそのまま残らないこと（AC-16）。
     - [x] `TestBuildPayload_SanitizesNewlineInFailedRKey`: `RKey` に改行を含む値を与えた場合、構築されたテキストに生の改行が残らないこと（AC-16、ログ偽装対策の一部としてペイロード側でも確認）。
     - [x] `TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker`: `Result.Failed` に大量の `DeleteFailure` を含め全体が4000文字を超える `Outcome` を与えた場合、構築されたテキストの長さが上限以下に切り詰められ、末尾に `"...(truncated)"` が付与されること（AC-18）。
+    - [x] `TestBuildPayload_TruncationIsUTF8Safe`（コードレビューで発見したバグの回帰防止として新規追加）: マルチバイト文字（日本語）の `RKey` を大量に含め切り詰めが発生する `Outcome` を与えた場合、切り詰め後のテキストが `utf8.ValidString` を満たすこと。当初の実装は `text[:maxPayloadLength-len(truncatedMarker)]` という生のバイトオフセットでスライスしており、マルチバイト文字の途中で切断され不正なUTF-8を生成しうるバグがあった。`truncationCutPoint`（新規のヘルパー関数、`unicode/utf8.RuneStart` でルーン境界まで後退する）を導入して修正した。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。
 
 ### フェーズ5: `internal/notify` — `Send`（HTTP送信・リトライ統合、設計書 3.4節〜3.6節）
@@ -171,9 +172,10 @@
       2. 選択した URL の `Reveal()` が空文字列なら、送信をスキップし `nil` を返す（設計書 3.5節の表3行目）。
       3. `buildPayload(outcome)`（フェーズ4）の結果を Slack Incoming Webhook の JSON ボディ `{"text": "..."}` に組み立てる。
       4. `retry.NewDoer(doer, defaultRetryPolicy, clock, retry.WithURLRedactor(...))` を構築する。渡す redactor は選択した Webhook URL のホスト名のみを返す関数とする（例: `"https://" + host + "/services/[REDACTED]"`、設計書 3.6.1節）。
-      5. `context.WithTimeout(ctx, requestTimeout)` で単一呼び出し用の ctx を作り、`http.NewRequestWithContext` で選択したURLへの POST リクエストを組み立て、構築した `retry.Doer` 経由で送信する。
+      5. `http.NewRequestWithContext` で選択したURLへの POST リクエストを組み立て（この時点の ctx には requestTimeout を適用しない ── 理由は次項の分岐メモを参照）、構築した `retry.Doer` 経由で送信する。
       6. 通信エラー・非2xxレスポンスのいずれの場合も、生の `net/http`/`net/url` エラー文字列やレスポンスボディを一切含めず `&SendError{StatusCode: <0または実際のステータス>, Err: <元エラー>}` を返す（設計書 4節・5.2節）。`SendError.Error()` は `StatusCode` と固定の分類文字列のみから組み立て、`Unwrap()` は内部の `err` を返すが、呼び出し元は `Unwrap()` の結果を直接出力してはならない（設計書 3.2節のコメント契約）。
       7. 成功（2xx）の場合は `nil` を返す。
+  - **実装からの分岐（コードレビューで発見）**: 当初の実装は手順5を「`context.WithTimeout(ctx, requestTimeout)` で単一呼び出し用の ctx を作り、`http.NewRequestWithContext` でリクエストを組み立てる」としていたが、これは `internal/retry.Doer`（`cloneForAttempt`）が再試行のたびに元のリクエストの ctx をそのまま使い回す実装であるため、1回の低速な応答だけでこの共有デッドラインが尽きてしまうと、以降の全ての再試行・バックオフ待機が即座に失敗し、設計書 3.6節が想定する「requestTimeout × 最大試行回数」という最悪ケースモデル（再試行ごとに新しいタイムアウト予算を得る）が成立しないバグがあった。修正として、`doer`（`HTTPDoer`）を `perAttemptTimeoutDoer`（`Do` 呼び出しのたびに `req.Context()` から新しい `context.WithTimeout` を導出するラッパー）でラップしてから `retry.NewDoer` に渡す形に変更した。`Send` 自身は呼び出し元から渡された `ctx` をそのまま `http.NewRequestWithContext` に渡し、requestTimeout の適用は `perAttemptTimeoutDoer` 側に一任する。回帰防止として `TestSend_EachRetryAttemptGetsFreshTimeout`（新規）と `TestSend_HTTPTimeout_ReturnsSendError` への試行回数アサーション追加で検証した。
   - **完了基準**: `go build ./...` が成功する。
 
 - [x] **対象ファイル**: `internal/notify/test_helpers.go`（新規作成、`//go:build test`）
