@@ -299,8 +299,8 @@ func TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance(t *testing.T) 
 	worstCase := requestTimeout*time.Duration(defaultRetryPolicy.MaxRetries+1) + backoff
 
 	assert.Equal(t, 12*time.Second, worstCase)
-	// Recommended execution_timeout_seconds guidance ("tens of seconds or
-	// more", 0005_retry_timeout) is an order of magnitude above this.
+	// Recommended execution_timeout_seconds guidance (tens of seconds or
+	// more) is an order of magnitude above this.
 	assert.Less(t, worstCase, 30*time.Second)
 }
 
