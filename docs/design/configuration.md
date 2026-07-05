@@ -26,6 +26,8 @@ schedule = "0 3 * * *"
 execution_timeout_seconds = 3600
 ```
 
+> `execution_timeout_seconds` は、投稿一覧取得・投稿削除などの個々の API 呼び出しがリトライ込みで要する最悪ケース時間を考慮して設定すること。本ツールのリトライポリシー（既定値: 最大リトライ回数5回、初回バックオフ1秒、最大バックオフ30秒）では、1回の API 呼び出しが継続的に一時的エラー（429/5xx/タイムアウト）に遭遇した場合の最悪ケース待機時間は約31秒である（[0005_retry_timeout アーキテクチャ設計書](../tasks/0005_retry_timeout/02_architecture.md#34-f-002実行タイムアウトの充足状況とリトライポリシーの数値ac-05ac-07)）。削除対象の投稿数が多い場合、この待機時間が呼び出し回数分積み重なりうるため、`execution_timeout_seconds` はスケジュール間隔（`schedule`）より十分小さい範囲で、想定される最大投稿数を踏まえて余裕を持たせて設定することを推奨する。実行タイムアウトに到達した場合、実行中の削除呼び出しは強制中断されるが、これによってデータが破壊されることはない（`DeleteRecord` の冪等性、[0002_atproto_client](../tasks/0002_atproto_client/01_requirements.md) AC-12 参照）。
+
 ## 環境変数
 
 `internal/config.LoadCredentials()` が読み込む。いずれも秘匿情報として扱い、TOML には書かない。Docker 配布時は `.env` 経由で渡す（[Docker 配布の詳細設計](docker_deployment.md) 参照）。
