@@ -171,7 +171,7 @@
 
 **レビュー観点**: `docs/design/configuration.md` への追記内容が設計書 3.6節の文面と一致していること（数値のコピーミスがないこと） / `package_reference.md` の追記が既存の `internal/atproto`・`internal/cleanup` の記述粒度・文体と一致していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
