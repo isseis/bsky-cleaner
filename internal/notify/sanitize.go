@@ -10,10 +10,10 @@ import "strings"
 // which neutralizes ANSI escape sequences) and DEL (0x7F) from s. Newlines
 // (\n, \r) are C0 control characters and are removed by this same pass,
 // preventing both log-line injection and Slack message structure
-// corruption. Used by this package's own payload construction (AC-16) and
-// intended to also be used by cmd/main.go before writing externally-sourced
-// identifiers/error text to stdout (AC-17), once that integration lands, so
-// the implementation is centralized in one place.
+// corruption. Used by this package's own payload construction, and intended
+// to also be used by cmd/main.go before writing externally-sourced
+// identifiers/error text to stdout once that integration lands, so the
+// implementation is centralized in one place rather than duplicated.
 func Sanitize(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
