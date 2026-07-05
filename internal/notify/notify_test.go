@@ -277,17 +277,7 @@ func TestSend_RetryLog_UsesRedactedURL_NotRawWebhookURL(t *testing.T) {
 }
 
 func TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance(t *testing.T) {
-	worstCase := requestTimeout * time.Duration(defaultRetryPolicy.MaxRetries+1)
-	backoff := time.Duration(0)
-	wait := defaultRetryPolicy.BaseDelay
-	for range defaultRetryPolicy.MaxRetries {
-		if wait > defaultRetryPolicy.MaxDelay {
-			wait = defaultRetryPolicy.MaxDelay
-		}
-		backoff += wait
-		wait *= 2
-	}
-	worstCase += backoff
+	worstCase := requestTimeout*time.Duration(defaultRetryPolicy.MaxRetries+1) + defaultRetryPolicy.WorstCaseBackoff()
 
 	assert.Equal(t, 12*time.Second, worstCase)
 	// Recommended execution_timeout_seconds guidance ("tens of seconds or
