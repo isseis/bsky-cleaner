@@ -113,28 +113,28 @@
 
 ### フェーズ3: `internal/notify` — 型定義・サニタイズ・エラーカテゴリ化（設計書 3.2節・4節）
 
-- [ ] **対象ファイル**: `internal/notify/sanitize.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/sanitize.go`（新規作成）
   - **作業内容**: 設計書 3.2節のシグネチャ通り `Sanitize(s string) string` を実装する。C0制御文字（ESC (0x1B) を含む）と改行 (`\n`/`\r`) を除去する。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/notify/sanitize_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/sanitize_test.go`（新規作成）
   - **作業内容**:
-    - [ ] `TestSanitize_RemovesANSIEscapeSequence`: ESC (0x1B) から始まるANSIエスケープシーケンスを含む文字列が無害化されること（AC-16）。
-    - [ ] `TestSanitize_RemovesNewlinesAndCarriageReturns`: `\n`・`\r` を含む文字列からこれらが除去されること（AC-17）。
-    - [ ] `TestSanitize_LeavesOrdinaryTextUnchanged`: 制御文字を含まない通常の文字列（マルチバイト文字を含む）が変化しないこと（回帰確認）。
+    - [x] `TestSanitize_RemovesANSIEscapeSequence`: ESC (0x1B) から始まるANSIエスケープシーケンスを含む文字列が無害化されること（AC-16）。
+    - [x] `TestSanitize_RemovesNewlinesAndCarriageReturns`: `\n`・`\r` を含む文字列からこれらが除去されること（AC-17）。
+    - [x] `TestSanitize_LeavesOrdinaryTextUnchanged`: 制御文字を含まない通常の文字列（マルチバイト文字を含む）が変化しないこと（回帰確認）。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。
 
-- [ ] **対象ファイル**: `internal/notify/errorkind.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/errorkind.go`（新規作成）
   - **作業内容**: 設計書 4節の通り `errorKind(err error) string` を実装する。`errors.AsType[*config.FieldError]`・`errors.AsType[*atproto.HTTPError]`・`errors.AsType[*atproto.SSRFError]` の順に判定し、該当する型のうち秘匿情報を含まないフィールド（`Field`／`Method`+`StatusCode`+`ErrorName`／`Endpoint`+`Stage`）から分類文字列を組み立てる。いずれにも一致しない場合は固定文字列 `"unknown error"` を返す。`err.Error()` や `%v`/`%+v` によるエラー全体の展開は行わない。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/notify/errorkind_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/errorkind_test.go`（新規作成）
   - **作業内容**:
-    - [ ] `TestErrorKind_ConfigFieldError_ReturnsFieldBasedCategory`: `*config.FieldError` を渡した場合、`Field` に基づく分類文字列が返ること。
-    - [ ] `TestErrorKind_AtprotoHTTPError_ReturnsMethodAndStatusBasedCategory`: `*atproto.HTTPError` を渡した場合、`Method`/`StatusCode`/`ErrorName` に基づく分類文字列が返ること。
-    - [ ] `TestErrorKind_AtprotoSSRFError_ReturnsEndpointStageBasedCategory`: `*atproto.SSRFError` を渡した場合、`Endpoint`/`Stage` に基づく分類文字列が返ること。
-    - [ ] `TestErrorKind_UnknownErrorType_ReturnsUnknownErrorFallback`: 上記いずれの型にも一致しない `errors.New("some error")` を渡した場合、固定文字列 `"unknown error"` が返ること（AC-20、4節「運用上の意味」）。
-    - [ ] `TestErrorKind_NeverIncludesRawErrorStringOrSecrets`: `fmt.Errorf("...: %w", ...)` で `"Authorization: Bearer secret-token"` のような秘匿情報らしき文字列を埋め込んだ未知のエラー型を渡した場合でも、戻り値が固定の `"unknown error"` のみであり、埋め込んだ文字列を一切含まないこと（AC-19, AC-20, NF-003）。
+    - [x] `TestErrorKind_ConfigFieldError_ReturnsFieldBasedCategory`: `*config.FieldError` を渡した場合、`Field` に基づく分類文字列が返ること。
+    - [x] `TestErrorKind_AtprotoHTTPError_ReturnsMethodAndStatusBasedCategory`: `*atproto.HTTPError` を渡した場合、`Method`/`StatusCode`/`ErrorName` に基づく分類文字列が返ること。
+    - [x] `TestErrorKind_AtprotoSSRFError_ReturnsEndpointStageBasedCategory`: `*atproto.SSRFError` を渡した場合、`Endpoint`/`Stage` に基づく分類文字列が返ること。
+    - [x] `TestErrorKind_UnknownErrorType_ReturnsUnknownErrorFallback`: 上記いずれの型にも一致しない `errors.New("some error")` を渡した場合、固定文字列 `"unknown error"` が返ること（AC-20、4節「運用上の意味」）。
+    - [x] `TestErrorKind_NeverIncludesRawErrorStringOrSecrets`: `fmt.Errorf("...: %w", ...)` で `"Authorization: Bearer secret-token"` のような秘匿情報らしき文字列を埋め込んだ未知のエラー型を渡した場合でも、戻り値が固定の `"unknown error"` のみであり、埋め込んだ文字列を一切含まないこと（AC-19, AC-20, NF-003）。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。
 
 ### フェーズ4: `internal/notify` — ペイロード構築・切り詰め（設計書 3.3節）
