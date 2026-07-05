@@ -139,29 +139,30 @@
 
 ### フェーズ4: `internal/notify` — ペイロード構築・切り詰め（設計書 3.3節）
 
-- [ ] **対象ファイル**: `internal/notify/payload.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/payload.go`（新規作成）
   - **作業内容**:
     - パッケージ非公開の `escapeSlackMarkup(s string) string` を実装する。`&`→`&amp;`、`<`→`&lt;`、`>`→`&gt;` の順に置換する（設計書 3.3節、Slack公式のmrkdwnエスケープ規則）。
     - パッケージ非公開の `buildPayload(outcome Outcome) string` を実装する。設計書 3.3節の表の通り、実行結果（成功/失敗）・削除件数・失敗した投稿の識別子（`DeleteFailure.Post.RKey`）・エラー種別（`errorKind(err)`）のみを組み立てる。投稿本文は一切参照しない（1.3節の通り `atproto.Post` に本文フィールドが存在しないため構造的に不可能）。識別子・エラー種別には `Sanitize()` を適用した後に `escapeSlackMarkup()` を適用する（設計書 3.3節「サニタイズの二段階」の順序）。`outcome.Result` が `nil`（ログイン/一覧取得失敗等、`runner.Run` が結果を返せなかった場合）でもパニックせず、削除件数を0件として扱い `outcome.Err` 由来のエラー種別のみを含むテキストを構築する（`report.FormatText` の "Never panics" という既存の設計方針と同様の配慮をする）。
     - 全体のテキストが上限（`const maxPayloadLength = 4000`）を超える場合、末尾を切り詰め `"...(truncated)"` を付与する（設計書 3.3節）。
+  - **実装時の分岐（計画からの逸脱）**: 設計書 3.2節の型定義のうち `Outcome`（`buildPayload` が直接引数に取る）だけは、フェーズ5の `notify.go` ではなくこのフェーズ4の `payload.go` 側に定義した。`HTTPDoer`/`Config`/`SendError` はフェーズ5の計画通り `notify.go` に定義している。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/notify/payload_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/payload_test.go`（新規作成）
   - **作業内容**:
-    - [ ] `TestEscapeSlackMarkup_EscapesAmpersandLtGt`: `&`・`<`・`>` を含む文字列がそれぞれ `&amp;`・`&lt;`・`&gt;` に置換されること（AC-15の前提となる白箱テスト）。
-    - [ ] `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`: `Outcome{Result: &report.Result{Mode: report.ModeApply, Deleted: [...]}}`（`Err` が `nil`、`Failed` が空）から、成功を示す文言と削除件数を含むテキストが構築されること（AC-01）。
-    - [ ] `TestBuildPayload_RunError_IncludesErrorKind`: `Outcome{Result: nil, Err: someErr}`（ログイン失敗等を模した実行時エラー）から、`errorKind(someErr)` の戻り値を含むテキストが構築されること（AC-01）。
-    - [ ] `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`: `Result.Failed` に複数の `DeleteFailure` を含む `Outcome` から、それぞれの `RKey` と `errorKind` の分類文字列を含むテキストが構築されること（AC-01）。
-    - [ ] `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`: 構築されたテキストが `RKey`・エラー種別・件数以外の想定外の内容を含まないこと（AC-14。1.3節の通り `atproto.Post` に本文フィールドがないため、このテストは主に「意図せぬフィールドを追加していないこと」の回帰確認として機能する）。
-    - [ ] `TestBuildPayload_EscapesMentionSyntaxInFailedRKey`: 失敗した投稿の `RKey` に `<!channel>` を含むテスト用の値を与えた場合、構築されたテキストにおいて `<` が `&lt;` にエスケープされ、Slackのメンション記法として解釈されない形になること（AC-15）。
-    - [ ] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`: `RKey` にANSIエスケープシーケンスを含む値を与えた場合、構築されたテキストにエスケープシーケンスがそのまま残らないこと（AC-16）。
-    - [ ] `TestBuildPayload_SanitizesNewlineInFailedRKey`: `RKey` に改行を含む値を与えた場合、構築されたテキストに生の改行が残らないこと（AC-16、ログ偽装対策の一部としてペイロード側でも確認）。
-    - [ ] `TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker`: `Result.Failed` に大量の `DeleteFailure` を含め全体が4000文字を超える `Outcome` を与えた場合、構築されたテキストの長さが上限以下に切り詰められ、末尾に `"...(truncated)"` が付与されること（AC-18）。
+    - [x] `TestEscapeSlackMarkup_EscapesAmpersandLtGt`: `&`・`<`・`>` を含む文字列がそれぞれ `&amp;`・`&lt;`・`&gt;` に置換されること（AC-15の前提となる白箱テスト）。
+    - [x] `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`: `Outcome{Result: &report.Result{Mode: report.ModeApply, Deleted: [...]}}`（`Err` が `nil`、`Failed` が空）から、成功を示す文言と削除件数を含むテキストが構築されること（AC-01）。
+    - [x] `TestBuildPayload_RunError_IncludesErrorKind`: `Outcome{Result: nil, Err: someErr}`（ログイン失敗等を模した実行時エラー）から、`errorKind(someErr)` の戻り値を含むテキストが構築されること（AC-01）。
+    - [x] `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`: `Result.Failed` に複数の `DeleteFailure` を含む `Outcome` から、それぞれの `RKey` と `errorKind` の分類文字列を含むテキストが構築されること（AC-01）。
+    - [x] `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`: 構築されたテキストが `RKey`・エラー種別・件数以外の想定外の内容を含まないこと（AC-14。1.3節の通り `atproto.Post` に本文フィールドがないため、このテストは主に「意図せぬフィールドを追加していないこと」の回帰確認として機能する）。
+    - [x] `TestBuildPayload_EscapesMentionSyntaxInFailedRKey`: 失敗した投稿の `RKey` に `<!channel>` を含むテスト用の値を与えた場合、構築されたテキストにおいて `<` が `&lt;` にエスケープされ、Slackのメンション記法として解釈されない形になること（AC-15）。
+    - [x] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`: `RKey` にANSIエスケープシーケンスを含む値を与えた場合、構築されたテキストにエスケープシーケンスがそのまま残らないこと（AC-16）。
+    - [x] `TestBuildPayload_SanitizesNewlineInFailedRKey`: `RKey` に改行を含む値を与えた場合、構築されたテキストに生の改行が残らないこと（AC-16、ログ偽装対策の一部としてペイロード側でも確認）。
+    - [x] `TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker`: `Result.Failed` に大量の `DeleteFailure` を含め全体が4000文字を超える `Outcome` を与えた場合、構築されたテキストの長さが上限以下に切り詰められ、末尾に `"...(truncated)"` が付与されること（AC-18）。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。
 
 ### フェーズ5: `internal/notify` — `Send`（HTTP送信・リトライ統合、設計書 3.4節〜3.6節）
 
-- [ ] **対象ファイル**: `internal/notify/notify.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/notify.go`（新規作成）
   - **作業内容**:
     - 設計書 3.2節の型定義通り、`HTTPDoer`・`Config`（`SuccessWebhookURL`/`FailureWebhookURL` とも `config.SecretString`）・`Outcome`（`Result *report.Result`・`Err error`）・`SendError`（`StatusCode int`・`Err error`、`Error()`/`Unwrap()`）を定義する。
     - 非公開パッケージ変数 `var requestTimeout = 3 * time.Second`（1.3節のテスト容易性に関する決定）と、`defaultRetryPolicy = retry.Policy{MaxRetries: 2, BaseDelay: time.Second, MaxDelay: 4 * time.Second}`（設計書 3.6節の既定値）を定義する。
@@ -175,25 +176,25 @@
       7. 成功（2xx）の場合は `nil` を返す。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `internal/notify/test_helpers.go`（新規作成、`//go:build test`）
+- [x] **対象ファイル**: `internal/notify/test_helpers.go`（新規作成、`//go:build test`）
   - **作業内容**: `package notify` を宣言し、`//go:build test` タグを付与する。`retry.Clock` を実装する非公開の `fakeClock` 構造体（実待機なしで `SleepCalls []time.Duration` に記録し、`nil` を返す）を定義する。`internal/retry/test_helpers.go` の `fakeClock` と同じ設計であり、`retry.Clock`（公開インターフェース）のみを実装する（1.3節。`internal/retry` 自身の `fakeClock` が利用テストファイル1つのみにもかかわらず `test_helpers.go` に置かれている前例に合わせる）。
   - **完了基準**: `internal/notify` パッケージ配下のテストからのみ参照され、`//go:build test` タグにより本番ビルドに含まれないことを `go build ./...`（タグなし）でも確認する。
 
-- [ ] **対象ファイル**: `internal/notify/notify_test.go`（新規作成）
+- [x] **対象ファイル**: `internal/notify/notify_test.go`（新規作成）
   - **作業内容**: `net/http/httptest.Server` を用いて実際のHTTPラウンドトリップを検証する。各テストで構築した `httptest.Server` は、構築直後に `t.Cleanup(server.Close)` を登録し、テスト終了時に必ず停止する（すべてのテストケースで一貫して適用し、リスニングソケット・goroutineのリークを防ぐ）。
-    - [ ] `TestSend_Success_PostsToSelectedWebhook`: 正常系 `Outcome`（成功、失敗なし）で `Send` を呼び、`httptest.Server` が正常系URL宛のPOSTを受信し、そのボディが `buildPayload` の出力を含む妥当なJSONであること（AC-01）。
-    - [ ] `TestSend_ChannelRouting_AllSucceeded_UsesSuccessURL`: 全件成功の `Outcome` で正常系URLにのみ送信されること（AC-05）。
-    - [ ] `TestSend_ChannelRouting_RunError_UsesFailureURL`: `Outcome.Err != nil`（`Result` が `nil`）の場合に異常系URLに送信されること（AC-06）。
-    - [ ] `TestSend_ChannelRouting_PartialFailure_UsesFailureURL`: `Result.Failed` が1件以上の場合に異常系URLに送信されること（AC-07）。
-    - [ ] `TestSend_SameWebhookURLForBothChannels_RoutesCorrectlyInBothOutcomes`: `Config.SuccessWebhookURL == Config.FailureWebhookURL` の場合、成功・失敗いずれの `Outcome` でも同一URLに正しく送信されること（AC-08）。
-    - [ ] `TestSend_SelectedWebhookURLEmpty_SkipsSendReturnsNil`: 選択された送信先の `SecretString` が空の場合、HTTPリクエストを一切発行せず `nil` を返すこと（設計書 3.5節の回帰防止テスト、対応するACはないが明示的に規定されている挙動）。
-    - [ ] `TestSend_HTTPTimeout_ReturnsSendError`: `requestTimeout` をテスト用に短い値（例: 50ミリ秒。実行環境の負荷によるスケジューリング遅延で誤って早期タイムアウト/未タイムアウトにならない程度の余裕を持たせる）に上書きし、`httptest.Server` のハンドラを意図的にブロックさせ、`Send` が `*SendError`（`StatusCode == 0`）を返すこと（AC-09）。テスト終了後に `requestTimeout` を元の値に `t.Cleanup` で復元する。
-    - [ ] `TestSend_NonRetryableStatus_ReturnsSendErrorWithStatusCode`: `httptest.Server` が400を返す場合、リトライされず1回のリクエストで `*SendError{StatusCode: 400}` が返ること。
-    - [ ] `TestSend_RetriesTransientFailureThenSucceeds_UsesFakeClock`: 1回目500・2回目200を返す `httptest.Server` に対し、`fakeClock` を使って実待機なしで2回目の成功応答が返ること（F-004）。
-    - [ ] `TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts`: 常に500を返す `httptest.Server` に対し、`fakeClock` を使って実待機なしで検証し、リクエスト回数が `defaultRetryPolicy.MaxRetries + 1`（= 3回）で頭打ちになり、最終的に `*SendError` が返ること（AC-10、リトライが有界であることの確認）。
-    - [ ] `TestSendError_Error_NeverContainsWebhookURL`: 送信先URLのパスにトークン文字列を含む `httptest.Server` の URL を用い、通信エラー（例: サーバーを即座にクローズする）を発生させ、`SendError.Error()` の戻り値にその URL/トークン文字列が含まれないこと（AC-19）。
-    - [ ] `TestSend_RetryLog_UsesRedactedURL_NotRawWebhookURL`: `slog.SetDefault` をバッファ書き込みハンドラに差し替え、500応答によるリトライを発生させたうえで、ログ出力に Webhook URL のパス（トークン相当）が含まれず、ホスト名相当の文字列のみが含まれること（AC-19、`WithURLRedactor` の実際の配線確認）。
-    - [ ] `TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance`: `requestTimeout`・`defaultRetryPolicy`（`MaxRetries`/`BaseDelay`/`MaxDelay`）の実際の値のみから最悪ケース所要時間（`requestTimeout * (MaxRetries + 1)` に、`BaseDelay` を初項とし `MaxDelay` で頭打ちにしたバックオフ合計を加えたもの）を計算し、設計書 3.6節が示す約12秒と一致すること、かつ [0005_retry_timeout](../0005_retry_timeout/01_requirements.md) が定める推奨実行タイムアウト値のオーダー（数十秒〜）より十分小さいことを、実際の待機を伴わない定数の算術チェックとしてアサートする（AC-10。`TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` はリクエスト回数の頭打ちしか示さず、「実行タイムアウトより十分短い」という要求自体を検証する自動テストが存在しなかったため追加する）。
+    - [x] `TestSend_Success_PostsToSelectedWebhook`: 正常系 `Outcome`（成功、失敗なし）で `Send` を呼び、`httptest.Server` が正常系URL宛のPOSTを受信し、そのボディが `buildPayload` の出力を含む妥当なJSONであること（AC-01）。
+    - [x] `TestSend_ChannelRouting_AllSucceeded_UsesSuccessURL`: 全件成功の `Outcome` で正常系URLにのみ送信されること（AC-05）。
+    - [x] `TestSend_ChannelRouting_RunError_UsesFailureURL`: `Outcome.Err != nil`（`Result` が `nil`）の場合に異常系URLに送信されること（AC-06）。
+    - [x] `TestSend_ChannelRouting_PartialFailure_UsesFailureURL`: `Result.Failed` が1件以上の場合に異常系URLに送信されること（AC-07）。
+    - [x] `TestSend_SameWebhookURLForBothChannels_RoutesCorrectlyInBothOutcomes`: `Config.SuccessWebhookURL == Config.FailureWebhookURL` の場合、成功・失敗いずれの `Outcome` でも同一URLに正しく送信されること（AC-08）。
+    - [x] `TestSend_SelectedWebhookURLEmpty_SkipsSendReturnsNil`: 選択された送信先の `SecretString` が空の場合、HTTPリクエストを一切発行せず `nil` を返すこと（設計書 3.5節の回帰防止テスト、対応するACはないが明示的に規定されている挙動）。
+    - [x] `TestSend_HTTPTimeout_ReturnsSendError`: `requestTimeout` をテスト用に短い値（例: 50ミリ秒。実行環境の負荷によるスケジューリング遅延で誤って早期タイムアウト/未タイムアウトにならない程度の余裕を持たせる）に上書きし、`httptest.Server` のハンドラを意図的にブロックさせ、`Send` が `*SendError`（`StatusCode == 0`）を返すこと（AC-09）。テスト終了後に `requestTimeout` を元の値に `t.Cleanup` で復元する。
+    - [x] `TestSend_NonRetryableStatus_ReturnsSendErrorWithStatusCode`: `httptest.Server` が400を返す場合、リトライされず1回のリクエストで `*SendError{StatusCode: 400}` が返ること。
+    - [x] `TestSend_RetriesTransientFailureThenSucceeds_UsesFakeClock`: 1回目500・2回目200を返す `httptest.Server` に対し、`fakeClock` を使って実待機なしで2回目の成功応答が返ること（F-004）。
+    - [x] `TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts`: 常に500を返す `httptest.Server` に対し、`fakeClock` を使って実待機なしで検証し、リクエスト回数が `defaultRetryPolicy.MaxRetries + 1`（= 3回）で頭打ちになり、最終的に `*SendError` が返ること（AC-10、リトライが有界であることの確認）。
+    - [x] `TestSendError_Error_NeverContainsWebhookURL`: 送信先URLのパスにトークン文字列を含む `httptest.Server` の URL を用い、通信エラー（例: サーバーを即座にクローズする）を発生させ、`SendError.Error()` の戻り値にその URL/トークン文字列が含まれないこと（AC-19）。
+    - [x] `TestSend_RetryLog_UsesRedactedURL_NotRawWebhookURL`: `slog.SetDefault` をバッファ書き込みハンドラに差し替え、500応答によるリトライを発生させたうえで、ログ出力に Webhook URL のパス（トークン相当）が含まれず、ホスト名相当の文字列のみが含まれること（AC-19、`WithURLRedactor` の実際の配線確認）。
+    - [x] `TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance`: `requestTimeout`・`defaultRetryPolicy`（`MaxRetries`/`BaseDelay`/`MaxDelay`）の実際の値のみから最悪ケース所要時間（`requestTimeout * (MaxRetries + 1)` に、`BaseDelay` を初項とし `MaxDelay` で頭打ちにしたバックオフ合計を加えたもの）を計算し、設計書 3.6節が示す約12秒と一致すること、かつ [0005_retry_timeout](../0005_retry_timeout/01_requirements.md) が定める推奨実行タイムアウト値のオーダー（数十秒〜）より十分小さいことを、実際の待機を伴わない定数の算術チェックとしてアサートする（AC-10。`TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` はリクエスト回数の頭打ちしか示さず、「実行タイムアウトより十分短い」という要求自体を検証する自動テストが存在しなかったため追加する）。
   - **完了基準**: `make test` で本ファイルの全テストが成功する。`TestSend_HTTPTimeout_ReturnsSendError` を除く全テストが `fakeClock` を使い実待機を行わないため、`go test -tags test -run TestSend ./internal/notify -v` の実行時間が1秒未満であることを目視確認する（NF-002）。
 
 ### フェーズ6: `cmd/main.go` への統合（設計書 2.2節・3.5節）

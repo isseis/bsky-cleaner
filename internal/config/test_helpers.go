@@ -8,6 +8,15 @@ import (
 	"testing"
 )
 
+// NewSecretStringForTest builds a SecretString wrapping value, for tests in
+// other packages (e.g. internal/notify) that need a config.SecretString
+// value without going through the full LoadAppConfig/TOML+env path. Gated
+// behind the test build tag like the rest of this file, so it is never
+// reachable from production code.
+func NewSecretStringForTest(value string) SecretString {
+	return SecretString{value: value}
+}
+
 // writeTempTOML writes content to a temporary TOML file and returns its
 // path.
 func writeTempTOML(t *testing.T, content string) string {
