@@ -62,14 +62,15 @@ func validateSlackAllowedHost(cfg Config, creds Credentials) error {
 		return nil
 	}
 
-	if cfg.SlackAllowedHost == "" {
+	allowedHost := strings.TrimSpace(cfg.SlackAllowedHost)
+	if allowedHost == "" {
 		return &FieldError{Field: "slack_allowed_host", Err: ErrSlackAllowedHostMissing}
 	}
 
-	if err := checkWebhookHostAllowed("BSKY_SLACK_WEBHOOK_URL_SUCCESS", successURL, cfg.SlackAllowedHost); err != nil {
+	if err := checkWebhookHostAllowed("BSKY_SLACK_WEBHOOK_URL_SUCCESS", successURL, allowedHost); err != nil {
 		return err
 	}
-	if err := checkWebhookHostAllowed("BSKY_SLACK_WEBHOOK_URL_FAILURE", failureURL, cfg.SlackAllowedHost); err != nil {
+	if err := checkWebhookHostAllowed("BSKY_SLACK_WEBHOOK_URL_FAILURE", failureURL, allowedHost); err != nil {
 		return err
 	}
 	return nil

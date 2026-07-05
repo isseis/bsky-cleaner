@@ -14,7 +14,7 @@ var (
 	ErrMissingField            = errors.New("required field is missing")
 	ErrInvalidValue            = errors.New("field value is invalid")
 	ErrMissingEnv              = errors.New("required environment variable is missing")
-	ErrWebhookHostMismatch     = errors.New("slack webhook URL host is not in the allowed host")
+	ErrWebhookHostMismatch     = errors.New("slack webhook URL host does not match the allowed host")
 	ErrSlackAllowedHostMissing = errors.New("slack_allowed_host is required when a Slack webhook URL is set")
 )
 
