@@ -203,20 +203,6 @@ func backoffDelay(policy Policy, attempt int, retryAfter time.Duration) time.Dur
 	return min(wait, policy.MaxDelay)
 }
 
-// WorstCaseBackoff returns the total time an exhausted retry loop under this
-// policy would spend sleeping between attempts, assuming no Retry-After
-// hint is ever supplied (backoffDelay's own BaseDelay/MaxDelay exponential
-// formula). Exported so callers that need a worst-case latency bound for
-// guidance/sizing checks (e.g. internal/notify's execution_timeout_seconds
-// test) exercise the real backoff formula instead of duplicating it.
-func (p Policy) WorstCaseBackoff() time.Duration {
-	var total time.Duration
-	for attempt := range p.MaxRetries {
-		total += backoffDelay(p, attempt, 0)
-	}
-	return total
-}
-
 // parseRetryAfter interprets a 429 response's Retry-After header value as
 // either a delay in seconds or an HTTP-date, per RFC 9110 10.2.3. It
 // returns 0 (meaning "no usable hint, fall back to exponential backoff")
