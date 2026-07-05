@@ -138,15 +138,15 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/42）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ3: ドキュメント更新（AC-07、CLAUDE.md のパッケージ参照更新方針）
 
-- [ ] **対象ファイル**: `docs/design/configuration.md`
+- [x] **対象ファイル**: `docs/design/configuration.md`
   - **作業内容**: `execution_timeout_seconds` の記述例（TOMLコードブロック）の直後、`## 環境変数` 見出しの直前に、設計書 3.6節に記載された引用ブロックの文面をそのまま追記する（本文中の「本アーキテクチャ設計書 3.4節」という参照は、コピー先が `docs/design/` 直下であることを踏まえ `[0005_retry_timeout アーキテクチャ設計書](../tasks/0005_retry_timeout/02_architecture.md#34-f-002実行タイムアウトの充足状況とリトライポリシーの数値ac-05ac-07)` のような相対リンクに変換して追記する）。
   - **完了基準**: `rg -n "約31秒" docs/design/configuration.md` が1件以上ヒットする（設計書 3.6節の引用文面が転記されていることの確認）。
-- [ ] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
+- [x] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
   - **作業内容**:
     1. 「Directory Structure」の `internal/` 一覧に、`atproto/` の説明に続けて次の1行を追加する。
        ```
@@ -160,7 +160,7 @@
        - `internal/retry`: a generic `HTTPDoer` decorator (`Doer`) that retries transient failures (transport errors, HTTP 429, HTTP 5xx) with bounded exponential backoff, honoring a server's `Retry-After` header when positive and always capping the wait at `Policy.MaxDelay`. Never retries an error satisfying the unexported `permanentError` interface or a non-429 4xx status. Depends only on the standard library, so `internal/atproto` is the only consumer that imports it (see docs/tasks/0005_retry_timeout/01_requirements.md).
        ```
   - **完了基準**: 以下の `rg` コマンドがそれぞれ期待通りの結果になる。
-    - `rg -n "internal/retry" docs/dev/developer_guide/package_reference.md` — 3件以上ヒットする（Directory Structure の1行 + AT Protocol Client の項の書き換え後の1行 + Package Responsibilities「Retry」見出し以降の記述1行以上）。
+    - `rg -n "internal/retry" docs/dev/developer_guide/package_reference.md` — 2件以上ヒットする（AT Protocol Client の項の書き換え後の1行 + Package Responsibilities「Retry」見出し以降の記述1行以上。Directory Structure の1行は既存の他パッケージの表記慣習（`atproto/`・`cleanup/` 同様に `internal/` を冠さない）に合わせ `retry/` と書くため、この行自体は `internal/retry` という文字列を含まない）。
     - `rg -n "retries, dry-run/apply switching, and post-age/type filtering are out of scope" docs/dev/developer_guide/package_reference.md` — 0件（「リトライは対象外」という書き換え前の文言が残っていないことの確認）。
 
 ### PR-2 作成ポイント: documentation updates
@@ -171,8 +171,8 @@
 
 **レビュー観点**: `docs/design/configuration.md` への追記内容が設計書 3.6節の文面と一致していること（数値のコピーミスがないこと） / `package_reference.md` の追記が既存の `internal/atproto`・`internal/cleanup` の記述粒度・文体と一致していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/43）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
