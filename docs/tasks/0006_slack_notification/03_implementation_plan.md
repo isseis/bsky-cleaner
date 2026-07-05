@@ -291,8 +291,8 @@
 
 **レビュー観点**: `WithURLRedactor` 未指定時に `internal/atproto` の既存ログ出力が無変更であること / `validateSlackAllowedHost` の3ルール（両方未設定でスキップ・片方設定時の必須化・ホスト比較）が設計書 3.1節と一致していること / `internal/config/credentials_test.go` を変更しない判断（1.3節）が正しいこと
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/49）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
