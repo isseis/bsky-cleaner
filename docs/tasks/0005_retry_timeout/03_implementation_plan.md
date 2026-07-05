@@ -194,7 +194,7 @@
 **レビュー観点**: `make fmt`/`make test`/`make lint`/`make deadcode` の実行結果がすべて記録されていること
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/44）
 - [ ] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
