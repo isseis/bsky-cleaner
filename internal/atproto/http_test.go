@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,10 +68,10 @@ func TestCheckRedirect_AlwaysRejects(t *testing.T) {
 // server address independently of the DialContext's verifiedAddrs set, so
 // TestRestrictedDoer_Do can exercise the DialContext's own defense-in-depth
 // check even though restrictedDoer's own construction normally keeps the
-// two in sync.
-func newTestRestrictedDoer(t *testing.T, dialContextAddrs []net.IP, pinnedIP net.IP, host string, rootCAs *x509.CertPool) *restrictedDoer {
+// two in sync. The timeout parameter is passed to newRestrictedDoer.
+func newTestRestrictedDoer(t *testing.T, dialContextAddrs []net.IP, pinnedIP net.IP, host string, rootCAs *x509.CertPool, timeout time.Duration) *restrictedDoer {
 	t.Helper()
-	doer := newRestrictedDoer(dialContextAddrs, host).(*restrictedDoer)
+	doer := newRestrictedDoer(dialContextAddrs, host, timeout).(*restrictedDoer)
 	transport, ok := doer.client.Transport.(*http.Transport)
 	require.True(t, ok)
 	transport.TLSClientConfig.RootCAs = rootCAs
@@ -96,7 +97,7 @@ func TestRestrictedDoer_Do(t *testing.T) {
 	rootCAs := transport.TLSClientConfig.RootCAs
 
 	t.Run("connects to the pinned verified address, rewriting host and TLS SNI", func(t *testing.T) {
-		doer := newTestRestrictedDoer(t, []net.IP{serverIP}, serverIP, serverHost, rootCAs)
+		doer := newTestRestrictedDoer(t, []net.IP{serverIP}, serverIP, serverHost, rootCAs, xrpcRequestTimeout)
 		req, err := http.NewRequest(http.MethodGet, server.URL+"/xrpc/test", nil)
 		require.NoError(t, err)
 
@@ -115,7 +116,7 @@ func TestRestrictedDoer_Do(t *testing.T) {
 		// invariant -- is what blocks the connection, and that the
 		// resulting *SSRFError survives http.Client.Do's *url.Error
 		// wrapping and is still detectable by errors.AsType.
-		doer := newTestRestrictedDoer(t, []net.IP{net.ParseIP(publicIPLiteral)}, serverIP, serverHost, rootCAs)
+		doer := newTestRestrictedDoer(t, []net.IP{net.ParseIP(publicIPLiteral)}, serverIP, serverHost, rootCAs, xrpcRequestTimeout)
 		req, err := http.NewRequest(http.MethodGet, server.URL+"/xrpc/test", nil)
 		require.NoError(t, err)
 
@@ -126,5 +127,164 @@ func TestRestrictedDoer_Do(t *testing.T) {
 		ssrfErr, ok := errors.AsType[*SSRFError](doErr)
 		require.True(t, ok)
 		assert.Equal(t, SSRFStageDialRevalidation, ssrfErr.Stage)
+	})
+}
+
+func TestDoXRPC_ResponseSizeLimit(t *testing.T) {
+	t.Run("response within limit decodes successfully", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// Response body within limit (100 bytes)
+			_, _ = w.Write([]byte(`{"result":"ok"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		baseURL, err := url.Parse(server.URL)
+		require.NoError(t, err)
+
+		var out map[string]any
+		err = doXRPC(context.Background(), server.Client(), baseURL, http.MethodGet, "test.method", nil, nil, &out, "")
+
+		require.NoError(t, err)
+		assert.Equal(t, "ok", out["result"])
+	})
+
+	t.Run("response exceeding limit returns ErrResponseTooLarge", func(t *testing.T) {
+		// Create a response body that exceeds maxXRPCResponseBytes
+		excessData := make([]byte, maxXRPCResponseBytes+1024)
+		for i := range excessData {
+			excessData[i] = 'x'
+		}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(excessData)
+		}))
+		t.Cleanup(server.Close)
+
+		baseURL, err := url.Parse(server.URL)
+		require.NoError(t, err)
+
+		var out map[string]any
+		err = doXRPC(context.Background(), server.Client(), baseURL, http.MethodGet, "test.method", nil, nil, &out, "")
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrResponseTooLarge)
+		httpErr, ok := errors.AsType[*HTTPError](err)
+		require.True(t, ok)
+		assert.Equal(t, responseTooLargeErrorName, httpErr.ErrorName)
+	})
+
+	t.Run("response exactly at limit decodes successfully", func(t *testing.T) {
+		// Create a valid JSON response exactly at the limit
+		// {"data":"..."} where total size equals maxXRPCResponseBytes
+		// The template is {"data":"<data>"} which is 10 bytes + data length
+		templatePrefix := `{"data":"`
+		templateSuffix := `"}`
+		dataSize := maxXRPCResponseBytes - len(templatePrefix) - len(templateSuffix)
+		exactData := make([]byte, dataSize)
+		for i := range exactData {
+			exactData[i] = 'x'
+		}
+		response := []byte(templatePrefix + string(exactData) + templateSuffix)
+		require.Equal(t, maxXRPCResponseBytes, len(response), "response size should be exactly at limit")
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(response)
+		}))
+		t.Cleanup(server.Close)
+
+		baseURL, err := url.Parse(server.URL)
+		require.NoError(t, err)
+
+		var out map[string]any
+		err = doXRPC(context.Background(), server.Client(), baseURL, http.MethodGet, "test.method", nil, nil, &out, "")
+
+		require.NoError(t, err)
+		assert.NotNil(t, out["data"])
+	})
+
+	t.Run("response one byte over limit returns ErrResponseTooLarge", func(t *testing.T) {
+		// Create a valid JSON response one byte over the limit
+		templatePrefix := `{"data":"`
+		templateSuffix := `"}`
+		dataSize := maxXRPCResponseBytes - len(templatePrefix) - len(templateSuffix) + 1
+		exactData := make([]byte, dataSize)
+		for i := range exactData {
+			exactData[i] = 'x'
+		}
+		response := []byte(templatePrefix + string(exactData) + templateSuffix)
+		require.Equal(t, maxXRPCResponseBytes+1, len(response), "response size should be exactly one byte over limit")
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(response)
+		}))
+		t.Cleanup(server.Close)
+
+		baseURL, err := url.Parse(server.URL)
+		require.NoError(t, err)
+
+		var out map[string]any
+		err = doXRPC(context.Background(), server.Client(), baseURL, http.MethodGet, "test.method", nil, nil, &out, "")
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrResponseTooLarge)
+	})
+}
+
+func TestDoXRPC_RequestTimeout(t *testing.T) {
+	t.Run("slow response triggers timeout", func(t *testing.T) {
+		// Create a server that delays response beyond the timeout
+		shortTimeout := 100 * time.Millisecond
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			// Sleep longer than the timeout
+			time.Sleep(500 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":"ok"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		serverURL, err := url.Parse(server.URL)
+		require.NoError(t, err)
+		serverHost, _, err := net.SplitHostPort(serverURL.Host)
+		require.NoError(t, err)
+		serverIP := net.ParseIP(serverHost)
+		require.NotNil(t, serverIP)
+
+		// Create a restrictedDoer with short timeout
+		doer := newRestrictedDoer([]net.IP{serverIP}, serverHost, shortTimeout)
+
+		var out map[string]any
+		err = doXRPC(context.Background(), doer, serverURL, http.MethodGet, "test.method", nil, nil, &out, "")
+
+		require.Error(t, err)
+		// Timeout errors are wrapped as ErrTransportFailure
+		assert.ErrorIs(t, err, ErrTransportFailure)
+	})
+
+	t.Run("fast response completes before timeout", func(t *testing.T) {
+		shortTimeout := 100 * time.Millisecond
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":"fast"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		serverURL, err := url.Parse(server.URL)
+		require.NoError(t, err)
+		serverHost, _, err := net.SplitHostPort(serverURL.Host)
+		require.NoError(t, err)
+		serverIP := net.ParseIP(serverHost)
+		require.NotNil(t, serverIP)
+
+		// Create a restrictedDoer with short timeout
+		doer := newRestrictedDoer([]net.IP{serverIP}, serverHost, shortTimeout)
+
+		var out map[string]any
+		err = doXRPC(context.Background(), doer, serverURL, http.MethodGet, "test.method", nil, nil, &out, "")
+
+		require.NoError(t, err)
+		assert.Equal(t, "fast", out["result"])
 	})
 }

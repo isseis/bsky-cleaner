@@ -51,7 +51,7 @@ type Client struct {
 // (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint) -- only the
 // "which HTTPDoer actually sends the request" step changes.
 var newPDSDoer = func(_ HTTPDoer, verifiedAddrs []net.IP, host string) HTTPDoer {
-	return retry.NewDoer(newRestrictedDoer(verifiedAddrs, host), defaultRetryPolicy, retry.RealClock{})
+	return retry.NewDoer(newRestrictedDoer(verifiedAddrs, host, xrpcRequestTimeout), defaultRetryPolicy, retry.RealClock{})
 }
 
 // NewClient resolves handle to its DID, resolves the DID document to a PDS

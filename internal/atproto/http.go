@@ -20,6 +20,23 @@ import (
 // TCP connection to a verified address.
 const dialTimeout = 10 * time.Second
 
+// maxXRPCResponseBytes is the maximum size of an XRPC response body.
+// A single listRecords page returns at most 100 records, and a legitimate
+// account's response should fit within a few MB. 8 MiB provides ample
+// margin while protecting against memory exhaustion from a malicious PDS.
+const maxXRPCResponseBytes = 8 << 20 // 8 MiB
+
+// xrpcRequestTimeout is the total timeout for a single XRPC request,
+// including connection, send, and response body read. It bounds how long
+// a slow PDS can hang a single request, independent of the execution
+// timeout that bounds the entire run.
+const xrpcRequestTimeout = 30 * time.Second
+
+// responseTooLargeErrorName is the ErrorName marker set on *HTTPError
+// when a 2xx response body exceeds maxXRPCResponseBytes. This distinguishes
+// a size-limit failure from a normal 2xx success in errorKind classification.
+const responseTooLargeErrorName = "ResponseTooLarge"
+
 // HTTPDoer is the minimal interface this package needs from an HTTP
 // client, so unit tests can supply a mock instead of performing real
 // network I/O.
@@ -70,11 +87,22 @@ func doXRPC(ctx context.Context, doer HTTPDoer, base *url.URL, httpMethod, xrpcM
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: xrpcErrorName(resp.Body), Err: ErrHTTPStatus}
+		return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: xrpcErrorName(io.LimitReader(resp.Body, maxXRPCResponseBytes)), Err: ErrHTTPStatus}
 	}
 
 	if out != nil {
-		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		// Read the body with a size limit to protect against memory
+		// exhaustion from a malicious or broken PDS. Read limit+1 bytes
+		// so we can detect whether the response actually exceeded the
+		// limit (same pattern as retry.drainAndClose).
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxXRPCResponseBytes+1))
+		if err != nil {
+			return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, Err: fmt.Errorf("read response: %w", err)}
+		}
+		if len(data) > maxXRPCResponseBytes {
+			return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: responseTooLargeErrorName, Err: ErrResponseTooLarge}
+		}
+		if err := json.Unmarshal(data, out); err != nil {
 			return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, Err: fmt.Errorf("decode response: %w", err)}
 		}
 	}
@@ -117,15 +145,16 @@ type restrictedDoer struct {
 
 // newRestrictedDoer builds a restricted HTTPDoer bound to verifiedAddrs and
 // host, as validated by validatePDSEndpoint. verifiedAddrs must be
-// non-empty.
-func newRestrictedDoer(verifiedAddrs []net.IP, host string) HTTPDoer {
+// non-empty. The timeout parameter sets http.Client.Timeout, bounding the
+// total time for a single request (connection, send, and response body read).
+func newRestrictedDoer(verifiedAddrs []net.IP, host string, timeout time.Duration) HTTPDoer {
 	dialer := &net.Dialer{Timeout: dialTimeout}
 	transport := &http.Transport{
 		DialContext:     newRestrictedDialContext(verifiedAddrs, dialer),
 		TLSClientConfig: &tls.Config{ServerName: host},
 	}
 	return &restrictedDoer{
-		client:   &http.Client{Transport: transport, CheckRedirect: rejectRedirect},
+		client:   &http.Client{Transport: transport, CheckRedirect: rejectRedirect, Timeout: timeout},
 		host:     host,
 		pinnedIP: verifiedAddrs[0],
 	}
