@@ -97,8 +97,8 @@
 
 **レビュー観点**: `doXRPC` の成功／エラー両方のボディ読み取りに `maxXRPCResponseBytes` 上限が正しく適用され、境界値（上限ちょうど＝成功、上限＋1＝超過）が設計書3.1節と一致していること / `newRestrictedDoer` への `timeout` 引数追加がパッケージ変数の save/restore を使わず、`newPDSDoer`・`newTestRestrictedDoer` の呼び出し元をすべて更新済みであること（将来の `t.Parallel()` 導入時のデータ競合回避という設計意図どおりであること） / `listAllRecords` の累積バイト・総ページ・総レコード上限が既存の `ErrPaginationStalled` と同じラップ形式で `ErrPaginationLimitExceeded` を返すこと / 上限内の既存ケース（`TestClient_ListPosts_Pagination` 等）が無退行であること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した (https://github.com/isseis/bsky-cleaner/pull/59)
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
