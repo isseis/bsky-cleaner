@@ -30,57 +30,36 @@ For non-git commands that may invoke a pager (e.g., `less`, `more`), also set `P
 
 ## Long Message Handling for git/gh Commands
 
-Long commit or pull request messages may be truncated when passed as inline arguments, causing commands to fail silently.
+Long commit or pull request messages may be truncated when passed as inline arguments, causing commands to fail silently. Additionally, heredocs and pipes (`-F -`) still go through Cline's terminal input, which has its own length limitations.
+
+**The reliable approach is to write the message to a temporary file using `write_to_file`, then reference that file with `-F`.**
 
 ### git commit with long messages
 
-Use `-F -` (read from stdin) or a heredoc instead of `-m` for long messages:
-
 ```bash
-# Preferred: pipe the message via stdin
-cat <<'EOF' | git commit -F -
-feat: add new feature
-
-This is a long description that would normally
-get truncated if passed as an inline -m argument.
-Multiple paragraphs and detailed explanations
-work well with this approach.
-EOF
-
-# Alternative: use a temporary file
-git commit -F /dev/stdin <<'EOF'
-feat: add new feature
-
-Long description here.
-EOF
+# 1. Write the commit message to a temp file using write_to_file
+#  (path: /tmp/git-commit-msg-YYYYMMDD-HHMMSS.txt)
+# 2. Then execute:
+git commit -F /tmp/git-commit-msg-YYYYMMDD-HHMMSS.txt
+# 3. Clean up:
+rm -f /tmp/git-commit-msg-YYYYMMDD-HHMMSS.txt
 ```
 
 ### gh pr create with long messages
 
-Similarly, use `-F -` for pull request bodies:
-
 ```bash
-# Preferred: pipe the body via stdin
-cat <<'EOF' | gh pr create --title "feat: add new feature" -F -
-## Summary
-Detailed description of the changes.
-
-## Changes
-- Change 1
-- Change 2
-- Change 3
-
-Closes #123
-EOF
-
-# Alternative: write to temp file and use -F
-TMPFILE=$(mktemp) && cat > "$TMPFILE" <<'EOF'
-...long body...
-EOF
-gh pr create --title "..." -F "$TMPFILE"
-rm -f "$TMPFILE"
+# 1. Write the PR body to a temp file using write_to_file
+#  (path: /tmp/pr-body-YYYYMMDD-HHMMSS.md)
+# 2. Then execute:
+gh pr create --title "feat: add new feature" -F /tmp/pr-body-YYYYMMDD-HHMMSS.md
+# 3. Clean up:
+rm -f /tmp/pr-body-YYYYMMDD-HHMMSS.md
 ```
 
 ### General rule
 
-For any command that accepts a message/body argument and may truncate long inline input, prefer piping through stdin with `-F -` or a heredoc rather than passing long strings as inline arguments.
+For any command that accepts a message/body argument and may truncate long inline input:
+
+1. Use `write_to_file` to write the message content to a temporary file (e.g., `/tmp/git-commit-msg-*` or `/tmp/pr-body-*`)
+2. Use the `-F` flag to read from that file
+3. Clean up the temporary file with `rm -f` after the command succeeds
