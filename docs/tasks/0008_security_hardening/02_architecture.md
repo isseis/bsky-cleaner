@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-06 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-06 |
+| Reviewer | isseis |
 | Comments | - |
 
 ## 1. 設計の全体像
