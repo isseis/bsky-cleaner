@@ -31,7 +31,7 @@
   - Invariants for generated values: (none — this project is a consumer of upstream APIs, so ID/name generation rules belong to those upstream APIs)
   - Invariants for `--dry-run`: no external write/delete/unfollow side effects; every external API call must be skipped or use a read-only equivalent (e.g. `app.bsky.feed.getPosts` instead of `com.atproto.repo.deleteRecord`)
   - Invariants for sessions:
-    - `WithClient` (formerly `WithSession`) must close/logout the underlying session before returning (i.e. `defer session.Close()`) even on panic or error
+    - `Client.Login` stores the session JWT in-memory on the `Client` struct; it does not persist or log the password. On failure the client is left unauthenticated (session stays nil). There is no `Close`/`Logout` method — the session is ephemeral and lives only for the client's lifetime.
   - Porting steps (nothing to port; bsky-cleaner is the original implementation)
 
 <!-- vim: set fileencoding=utf-8:

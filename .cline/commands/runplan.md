@@ -24,7 +24,25 @@ Work in order.
   - Count `### フェーズ` headers in the plan. If there are 2 or more and no `### PR-` sections exist, design PR boundaries yourself before proceeding:
     - Read the full implementation plan to understand all phases.
     - Group phases into PRs such that each PR is independently reviewable and testable (each PR should pass the green gate on its own).
-    - Insert `### PR-N 作成ポイント` sections into the plan document at the boundaries you've chosen, with `推奨タイトル` and `レビュー観点` items for each PR.
+    - Insert `### PR-N 作成ポイント` sections into the plan document at the boundaries you've chosen, with the following required format:
+      ```
+      ### PR-N 作成ポイント
+      - **対象ステップ**: <phase titles covered by this PR>
+
+      **推奨タイトル**: <PR title>
+
+      **レビュー観点**:
+      - <review item 1>
+      - <review item 2>
+
+      PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+      - [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+      - [ ] PR を作成した
+      - [ ] PR がマージされた
+      - [ ] 次のブランチへ切り替えた
+      ```
+      - `**対象ステップ**` is required — step 4 reads it to determine which phases are covered.
+      - The four checkboxes are required — step 4 detects PR checkpoints by scanning for these unchecked items, and step 5a progresses through them in order.
     - After inserting PR markers, re-read the implementation plan document so the updated content is in context.
   - If PR markers already exist, skip this step and continue.
 
@@ -38,7 +56,7 @@ Work in order.
 5. Implement the selected phase group.
 - Follow the design in `02_architecture.md`.
 - Before writing new files in a package, read at least one existing file of the same kind (e.g. a `_test.go` in the target package) to confirm assertion library, import style, and helper conventions in use. Mismatches with the established style will be caught in review — reading first avoids the rework.
-- **State invariants before coding.** For any generated value (IDs/names), flag/mode, or side-effecting operation, write its contract in one line as a code comment above the implementation and implement to that — not to the first approach that compiles. Examples that would have prevented real bugs: a request identifier → *unique per call, within the API's accepted length* (a bare request ID, no caller-name prefix); `--dry-run` → *no external side effects* (skip every delete/unfollow API call and network send, not just logging); a session-scoped API client block → *always closes/logs out the session before returning, even on panic or error* (`WithSession` defers `session.Close()`, not just on the success path).
+- **State invariants before coding.** For any generated value (IDs/names), flag/mode, or side-effecting operation, write its contract in one line as a code comment above the implementation and implement to that — not to the first approach that compiles. Examples that would have prevented real bugs: a request identifier → *unique per call, within the API's accepted length* (a bare request ID, no caller-name prefix); `--dry-run` → *no external side effects* (skip every delete/unfollow API call and network send, not just logging); a session JWT → *stored in-memory on the Client struct, never persisted or logged; on Login failure the client is left unauthenticated (session stays nil)*.
 - Place test helpers per `docs/dev/developer_guide/test_organization.md`: cross-package helpers under `testutil/`; package-internal helpers in `test_helpers.go` (or `test_helpers_<category>.go`) with `//go:build test`.
 - After each file change (Go or otherwise), run `make test && make lint`; for Go file changes also run `make fmt` first. Fix errors before continuing. Exception: errors caused by the phase group's incomplete state (e.g. build or test failures from missing implementations that stubs depend on) need not be fixed until the group is complete; fix only errors unrelated to the in-progress group.
 - When removing multiple scattered code sites (e.g. several test functions), delete them one at a time using the exact text read from the file. Do not script bulk deletion (e.g. a brace-counting loop); nested literals make such heuristics over-consume adjacent code. After each removal, check IDE diagnostics for unintended breakage.
