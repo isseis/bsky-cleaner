@@ -70,23 +70,26 @@ Work in order.
 6. Run `make deadcode`. Remove functions made unreachable by this phase group; keep intentional scaffolding for future phases or tasks. If changes were made, run `make fmt && make test && make lint` and commit.
 
 6.5. Run programmatic pre-checks on the changed Go files before spawning the review agent. These checks are deterministic and cheaper than AI review — catch them here rather than in the review loop.
-
    ```bash
-   # Files changed in this phase group — exclude deleted files so rg never
-   # receives a path that no longer exists (which would exit 2, masking matches)
-   CHANGED=$(git diff origin/main...HEAD --diff-filter=d --name-only | grep '\.go$' || true)
-
-   if [ -n "$CHANGED" ]; then
+   # Collect Go files changed in this phase group — null-delimited to handle
+   # filenames with spaces, newlines, or special characters. Exclude deleted
+   # files so searches never receive a path that no longer exists.
+   files=()
+   if readarray -d '' files < <(git diff -z origin/main...HEAD --diff-filter=d --name-only '*.go' 2>/dev/null); then
      # Check 1: no planning-doc identifiers in source
-     if echo "$CHANGED" | xargs rg -l '\bAC-[0-9]+[a-z]?\b|\bF-[0-9]+[a-z]?\b' 2>/dev/null; then
+     if rg -lq -- '\bAC-[0-9]+[a-z]?\b|\bF-[0-9]+[a-z]?\b' "${files[@]}"; then
        echo "FAIL: planning-doc references found — fix before continuing"
      else
        echo "OK: no planning-doc references"
      fi
 
      # Check 2: no non-ASCII characters in Go source
-     if echo "$CHANGED" | xargs rg -Pn '[^\x00-\x7F]' 2>/dev/null; then
+     # LC_ALL=C forces byte-mode matching; grep -P provides PCRE support
+     # without depending on ripgrep's (often missing) PCRE2 build
+     if LC_ALL=C grep -PLq --include='*.go' -- '\x{80}-\x{10FFFF}' "${files[@]}" 2>/dev/null; then
        echo "REVIEW: non-ASCII found — verify each is intentional"
+     elif LC_ALL=C grep -c '' "${files[@]}" 2>/dev/null | grep -q ':0$'; then
+       echo "OK: all ASCII (or empty files)"
      else
        echo "OK: all ASCII"
      fi
