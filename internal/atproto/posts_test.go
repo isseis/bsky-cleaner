@@ -295,13 +295,11 @@ func mustParseQuery(t *testing.T, rawURL string) url.Values {
 }
 
 func TestClient_ListPosts_TotalBytesLimit(t *testing.T) {
-	// Create pages with record values that accumulate to exceed maxListTotalBytes
-	// Each page must stay within maxXRPCResponseBytes (8 MiB) to pass the XRPC limit
-	// but accumulate across pages to exceed maxListTotalBytes (256 MiB)
-	// Use 5 MiB per record value (well within 8 MiB XRPC limit)
-	// and 60 pages to exceed 256 MiB total (60 * 5 MiB = 300 MiB)
-	recordValueSize := 5 * 1024 * 1024 // 5 MiB per record value
-	numPages := 60                     // 60 * 5 MiB = 300 MiB > 256 MiB limit
+	// Use small thresholds to test limit behavior without consuming large memory
+	// Each page has 100 bytes, 3 pages = 300 bytes > 200 byte limit
+	recordValueSize := 100
+	numPages := 3
+	maxBytes := 200
 
 	pages := make([]string, numPages)
 	for i := range pages {
@@ -322,11 +320,11 @@ func TestClient_ListPosts_TotalBytesLimit(t *testing.T) {
 	handler := newListPostsHandler(t, pages, []string{buildListRecordsBody(nil, "")}, http.StatusBadRequest, `{"error":"RecordNotFound"}`)
 	client, _ := newPostsTestClient(handler)
 
-	posts, err := client.ListPosts(context.Background())
+	// Use listAllRecordsWithLimits to test with small thresholds
+	_, err := client.listAllRecordsWithLimits(context.Background(), collectionFeedPost, maxBytes, 100, 1000000)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
-	assert.Nil(t, posts)
 }
 
 func TestClient_ListPosts_TotalPagesLimit(t *testing.T) {
@@ -351,21 +349,19 @@ func TestClient_ListPosts_TotalPagesLimit(t *testing.T) {
 }
 
 func TestClient_ListPosts_TotalRecordsLimit(t *testing.T) {
-	// Create pages with many tiny records to exceed maxListRecords
-	// Each page has 100 records (the page limit)
-	recordsPerPage := 100
-	numPages := (maxListRecords / recordsPerPage) + 2
+	// Use small thresholds to test limit behavior without generating many records
+	// Each page has 3 records, 2 pages = 6 records > 5 record limit
+	recordsPerPage := 3
+	numPages := 2
+	maxRecords := 5
 
 	pages := make([]string, numPages)
-	recordCount := 0
 	for i := range pages {
 		records := make([]string, 0, recordsPerPage)
-		for j := 0; j < recordsPerPage && recordCount < maxListRecords+100; j++ {
-			rkey := fmt.Sprintf("p%d", recordCount)
-			// Tiny record value
+		for j := 0; j < recordsPerPage; j++ {
+			rkey := fmt.Sprintf("p%d-%d", i, j)
 			valueJSON := `{"$type":"app.bsky.feed.post","createdAt":"2024-01-01T00:00:00Z","text":"x"}`
 			records = append(records, postRecordJSON(rkey, valueJSON))
-			recordCount++
 		}
 		cursor := ""
 		if i < len(pages)-1 {
@@ -377,9 +373,9 @@ func TestClient_ListPosts_TotalRecordsLimit(t *testing.T) {
 	handler := newListPostsHandler(t, pages, []string{buildListRecordsBody(nil, "")}, http.StatusBadRequest, `{"error":"RecordNotFound"}`)
 	client, _ := newPostsTestClient(handler)
 
-	posts, err := client.ListPosts(context.Background())
+	// Use listAllRecordsWithLimits to test with small thresholds
+	_, err := client.listAllRecordsWithLimits(context.Background(), collectionFeedPost, 1000000, 100, maxRecords)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
-	assert.Nil(t, posts)
 }

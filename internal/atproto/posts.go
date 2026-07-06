@@ -186,6 +186,13 @@ func (c *Client) ListPosts(ctx context.Context) ([]Post, error) {
 // forever. It also enforces limits on total bytes, total pages, and total
 // records to protect against a malicious PDS exhausting memory.
 func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listRecord, error) {
+	return c.listAllRecordsWithLimits(ctx, collection, maxListTotalBytes, maxListPages, maxListRecords)
+}
+
+// listAllRecordsWithLimits is like listAllRecords but accepts custom limits.
+// This is useful for tests that want to verify limit behavior with small
+// thresholds instead of the production defaults.
+func (c *Client) listAllRecordsWithLimits(ctx context.Context, collection string, maxBytes, maxPages, maxRecords int) ([]listRecord, error) {
 	var all []listRecord
 	cursor := ""
 	var totalPages, totalRecords int
@@ -203,25 +210,32 @@ func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listR
 		if err := doXRPC(ctx, c.httpDoer, c.pdsBaseURL, http.MethodGet, "com.atproto.repo.listRecords", query, nil, &resp, ""); err != nil {
 			return nil, err
 		}
+
+		// Compute this page's contribution before appending
+		pageRecords := len(resp.Records)
+		var pageBytes int
+		for _, rec := range resp.Records {
+			pageBytes += len(rec.Value)
+		}
+
+		// Check limits BEFORE appending to prevent memory exhaustion from a malicious PDS
+		if totalBytes+pageBytes > maxBytes {
+			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
+		}
+		if totalPages+1 > maxPages {
+			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
+		}
+		if totalRecords+pageRecords > maxRecords {
+			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
+		}
+
+		// Safe to append now that limits are verified
 		all = append(all, resp.Records...)
 
-		// Accumulate totals for limit checking
+		// Accumulate totals
 		totalPages++
-		totalRecords += len(resp.Records)
-		for _, rec := range resp.Records {
-			totalBytes += len(rec.Value)
-		}
-
-		// Check limits after each page
-		if totalBytes > maxListTotalBytes {
-			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
-		}
-		if totalPages > maxListPages {
-			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
-		}
-		if totalRecords > maxListRecords {
-			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
-		}
+		totalRecords += pageRecords
+		totalBytes += pageBytes
 
 		if resp.Cursor == "" {
 			return all, nil
