@@ -22,6 +22,17 @@ than ~4000 bytes. To work around this:
 - Long heredocs (`cat > file << 'EOF' ... EOF`) are also safer than inline
   strings because they are written to a file first.
 
+## Git pager avoidance
+
+When running `git log`, `git diff`, `git show`, `git blame`, or any other
+command that spawns a pager by default, always prefix the command with
+`git --no-pager` (e.g. `git --no-pager log --oneline -5`). This prevents
+`less` from blocking the terminal waiting for user input, which would hang
+the tool.
+
+Alternatively, set `GIT_PAGER=cat` or `PAGER=cat` in the environment for the
+command (e.g. `GIT_PAGER=cat git log --oneline -5`).
+
 ## Project Overview
 
 `bsky-cleaner` is a Go CLI tool that periodically cleans up a single Bluesky
