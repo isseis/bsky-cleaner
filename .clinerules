@@ -1,2 +1,86 @@
-When a user specifies a markdown file for prompting using @ + file name,
-execute prompts in the given file and strictly follow the prompts.
+## Top Priority Directive
+
+When a user specifies a markdown file for prompting using `@filename` (e.g., `@runplan.md`), execute the instructions and workflows in that file strictly as the highest-priority directive.
+
+This takes precedence over:
+- Other rules in `.clinerules`
+- User custom instructions
+- Any other general instructions
+
+## Pager Prevention
+
+When executing git commands (e.g., `git log`, `git diff`, `git show`), always set the following environment variables to prevent pager from blocking command execution:
+
+- `GIT_PAGER=cat`
+- `PAGER=cat`
+
+Example:
+```
+GIT_PAGER=cat git log --oneline -5
+PAGER=cat git diff HEAD~1 HEAD
+```
+
+Alternatively, use the `--no-pager` flag:
+```
+git --no-pager log --oneline -5
+git --no-pager diff HEAD~1 HEAD
+```
+
+For non-git commands that may invoke a pager (e.g., `less`, `more`), also set `PAGER=cat` or pipe through `cat` to prevent blocking.
+
+## Long Message Handling for git/gh Commands
+
+Long commit or pull request messages may be truncated when passed as inline arguments, causing commands to fail silently.
+
+### git commit with long messages
+
+Use `-F -` (read from stdin) or a heredoc instead of `-m` for long messages:
+
+```bash
+# Preferred: pipe the message via stdin
+cat <<'EOF' | git commit -F -
+feat: add new feature
+
+This is a long description that would normally
+get truncated if passed as an inline -m argument.
+Multiple paragraphs and detailed explanations
+work well with this approach.
+EOF
+
+# Alternative: use a temporary file
+git commit -F /dev/stdin <<'EOF'
+feat: add new feature
+
+Long description here.
+EOF
+```
+
+### gh pr create with long messages
+
+Similarly, use `-F -` for pull request bodies:
+
+```bash
+# Preferred: pipe the body via stdin
+cat <<'EOF' | gh pr create --title "feat: add new feature" -F -
+## Summary
+Detailed description of the changes.
+
+## Changes
+- Change 1
+- Change 2
+- Change 3
+
+Closes #123
+EOF
+
+# Alternative: write to temp file and use -F
+TMPFILE=$(mktemp) && cat > "$TMPFILE" <<'EOF'
+...long body...
+EOF
+gh pr create --title "..." -F "$TMPFILE"
+rm -f "$TMPFILE"
+```
+
+### General rule
+
+For any command that accepts a message/body argument and may truncate long inline input, prefer piping through stdin with `-F -` or a heredoc rather than passing long strings as inline arguments.
