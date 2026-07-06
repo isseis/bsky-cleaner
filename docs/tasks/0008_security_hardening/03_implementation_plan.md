@@ -36,7 +36,7 @@
 - `internal/atproto/http.go`
   - 既存: `doXRPC` は成功応答を `json.NewDecoder(resp.Body).Decode(out)` で無制限に読む（77 行目）。非2xx 応答は `xrpcErrorName(resp.Body)` を上限なしで読む（73 行目）。`newRestrictedDoer`（121 行目）が構築する `http.Client` は `dialTimeout`（接続確立のみ）を持ち、`http.Client.Timeout`（全体）を持たない。定数 `dialTimeout` は 21 行目に既存。
   - 不足: 応答サイズ上限・リクエスト全体タイムアウト。
-  - 変更: 定数 `maxXRPCResponseBytes`・パッケージ変数 `xrpcRequestTimeout` を追加し、`doXRPC` の成功／エラー両ボディ読み取りに上限を課し、`newRestrictedDoer` の `http.Client` に `Timeout` を設定する（[02_architecture.md 3.1・3.3 節](./02_architecture.md#3-コンポーネント設計)）。
+  - 変更: 定数 `maxXRPCResponseBytes`・`xrpcRequestTimeout` を追加し、`doXRPC` の成功／エラー両ボディ読み取りに上限を課す。`newRestrictedDoer` に `timeout time.Duration` 引数を追加して `http.Client.Timeout` に設定し、本番の呼び出し元 `newPDSDoer` は定数 `xrpcRequestTimeout` を渡す（[02_architecture.md 3.1・3.3 節](./02_architecture.md#3-コンポーネント設計)）。パッケージ変数の save/restore は使わない（並列テストで壊れないようにするため）。
 - `internal/atproto/posts.go`
   - 既存: `listAllRecords`（169 行目）は `resp.Cursor == cursor` の停滞のみ検知し `ErrPaginationStalled` を返す（190-192 行目）。各ページの `resp.Records`（`listRecord.Value` は `json.RawMessage`）を `all` に蓄積する。ページ内レコード数上限は既存定数 `listRecordsPageLimit`（`"100"`、32 行目）。
   - 不足: 累積バイト数・総ページ数・総レコード数の上限。
@@ -46,7 +46,7 @@
   - 変更: センチネル `ErrResponseTooLarge`・`ErrPaginationLimitExceeded` を追加（追加のみ、[02_architecture.md 3.4 節](./02_architecture.md#34-追加する型定数インターフェイス定義)）。
 - `internal/atproto/test_helpers.go`（`//go:build test`, `package atproto`）
   - 既存: `newTestClient`・`StubPassthroughPDSDoer`。
-  - 変更: `xrpcRequestTimeout` をテストから一時的に短縮する非公開ヘルパーを追加（[Phase 1](#phase-1-dos-系防御の実装と単体テストac-04)）。
+  - 変更: なし。`xrpcRequestTimeout` の差し替えはパッケージ変数の save/restore ではなく `newRestrictedDoer` への引数渡しで行うため、本ファイルへの追加は不要（[Phase 1](#phase-1-dos-系防御の実装と単体テストac-04)）。
 
 **変更不要だが Phase 1 が再利用する既存資産**
 
@@ -76,16 +76,15 @@
 - [ ] `errors.go`: センチネル `ErrResponseTooLarge = errors.New("XRPC response exceeds size limit")` を追加する。
 - [ ] `errors.go`: センチネル `ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit exceeded")` を追加する。
 - [ ] `http.go`: 定数 `maxXRPCResponseBytes`（8 MiB = `8 << 20`）を追加する。1ページ最大100レコードの正当な応答が数 MB に収まる前提の余裕値（[02_architecture.md 3.1 節](./02_architecture.md#31-応答サイズ上限doxrpc)）。
-- [ ] `http.go`: リクエスト全体タイムアウトを表す**パッケージ変数** `xrpcRequestTimeout`（`var xrpcRequestTimeout = 30 * time.Second`）を追加する。`dialTimeout`（10秒）を上回る値。定数ではなく変数にするのは、テストからのみ短い値へ上書きできるようにするためである。これにより、遅延応答サーバーに対するタイムアウト発火を、実時間を待たずに単体テストで確認できる（`newPDSDoer` と同じ差し替え口パターン、[02_architecture.md 3.3 節](./02_architecture.md#33-リクエスト全体タイムアウトrestricteddoer)）。**注記**: 02_architecture.md は 3.3 節・9 章で `xrpcRequestTimeout` を「定数」と記すが、同 3.3 節が求める `newPDSDoer` 相当のテスト差し替え口を実現するため実装では `var` とする。この差分は実装時に 02_architecture.md 側の文言（定数→変数）へ反映する。
-- [ ] `http.go`: `newRestrictedDoer` が構築する `http.Client` に `Timeout: xrpcRequestTimeout` を設定する。`http.Client` は構築時にこの `var` の値をコピーするため、テストは差し替え口を doer 構築より前に適用する必要がある（[Phase 1 の単体テスト](#41-単体テストdos-系防御phase-1)で明記）。
+- [ ] `http.go`: リクエスト全体タイムアウトを表す定数 `xrpcRequestTimeout`（`const xrpcRequestTimeout = 30 * time.Second`）を追加する。`dialTimeout`（10秒）を上回る値。
+- [ ] `http.go`: `newRestrictedDoer` のシグネチャに `timeout time.Duration` 引数を追加し（`newRestrictedDoer(verifiedAddrs []net.IP, host string, timeout time.Duration)`）、構築する `http.Client` に `Timeout: timeout` を設定する。パッケージ変数を使わず引数で渡すのは、`t.Cleanup` によるグローバル状態の save/restore（`newPDSDoer` の既存パターン）だとこのパッケージのテストが将来 `t.Parallel()` を使った際にデータ競合になり得るためである。本番の唯一の呼び出し元 `newPDSDoer`（`client.go`）は定数 `xrpcRequestTimeout` を渡すよう更新する。テストは `newRestrictedDoer` を短い `timeout` で直接呼び出すことで、遅延応答サーバーに対するタイムアウト発火を実時間を待たずに確認できる（[02_architecture.md 3.3 節](./02_architecture.md#33-リクエスト全体タイムアウトrestricteddoer)）。
 - [ ] `http.go`: `doXRPC` の成功（2xx）応答処理を変更する。既存の `if out != nil` ガード（`DeleteRecord` は `out=nil` を渡すため、`http.go:76`）を維持したまま、`out != nil` の場合のみ `io.ReadAll(io.LimitReader(resp.Body, maxXRPCResponseBytes+1))` で読み取り、読み取り長が `maxXRPCResponseBytes` を超えた場合はデコードせず `&HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: <marker>, Err: ErrResponseTooLarge}` を返す。上限内なら読み取ったバイト列を `json.Unmarshal` で `out` にデコードする。`out == nil`（削除など本文を読まない経路）の挙動は従来どおり変えない。
 - [ ] `http.go`: 応答サイズ超過マーカー用の定数（例: `const responseTooLargeErrorName = "ResponseTooLarge"`）を追加し、上記 `HTTPError.ErrorName` に設定する。これは PDS 応答由来ではなく本パッケージが決め打つ固定値であり、成功応答（`status=200`）由来の超過を `errorKind` 上で正常な 2xx と区別可能にする（[02_architecture.md 4.1・4.2 節](./02_architecture.md#41-エラー型)）。
 - [ ] `http.go`: 非2xx 応答の `xrpcErrorName` 呼び出しを `xrpcErrorName(io.LimitReader(resp.Body, maxXRPCResponseBytes))` に変更し、エラーボディ経由の枯渇も塞ぐ。
 - [ ] `posts.go`: 定数 `maxListTotalBytes`（累積バイト上限、常駐メモリが数百 MiB 程度に収まる値、例: `256 << 20`）・`maxListPages`（総ページ数上限、例: `10000`）・`maxListRecords`（総レコード数上限、例: `1_000_000`）を追加する。正当な大規模アカウントが到達しない値とする（[02_architecture.md 3.2 節](./02_architecture.md#32-累積バイトページレコード数上限listallrecords)）。
 - [ ] `posts.go`: `listAllRecords` のループで、ページ取得ごとに (1) 総ページ数、(2) 蓄積した各 `listRecord.Value` の長さの累積和、(3) 総レコード数を集計し、いずれかが対応する上限を超えた時点で `fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)` を返す（既存の `ErrPaginationStalled` と同じラップ形式・同じフェイルクローズ）。
-- [ ] `test_helpers.go`: `xrpcRequestTimeout` を `t` の期間だけ指定値に上書きし、`t.Cleanup` で元へ戻す非公開ヘルパー（例: `setXRPCRequestTimeoutForTest(t *testing.T, d time.Duration)`、`StubPassthroughPDSDoer` と同じ save/restore パターン）を追加する。`http_test.go` は `package atproto`（内部テスト）なので非公開でよい。
 - [ ] `http_test.go`: 応答サイズ上限の単体テストを追加する（[4.1 節](#41-単体テストdos-系防御phase-1)）。
-- [ ] `http_test.go`: リクエスト全体タイムアウトの単体テストを追加する（[4.1 節](#41-単体テストdos-系防御phase-1)）。
+- [ ] `http_test.go`: リクエスト全体タイムアウトの単体テストを追加する。`newRestrictedDoer` を短い `timeout` 引数で直接呼び出す（グローバル変数の上書きは行わない）（[4.1 節](#41-単体テストdos-系防御phase-1)）。
 - [ ] `posts_test.go`: 累積バイト・総ページ・総レコード各上限の単体テストを追加する（[4.1 節](#41-単体テストdos-系防御phase-1)）。
 
 **完了基準**: `make test`・`make lint` が緑。新規センチネルと上限を検査する単体テストが、超過時に対応するセンチネルを返し、上限内では従来どおり全件取得・デコードされることを確認する。
@@ -157,7 +156,7 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 | 総レコード数上限 | 極小レコードを大量に返す応答で `ErrPaginationLimitExceeded` が返ること | `internal/atproto/posts_test.go` |
 | 上限内の全件取得 | 3上限のいずれにも達しない複数ページ応答が従来どおり全件取得されること（既存 `TestClient_ListPosts_Pagination` が担保しているため、新規追加は上限超過ケースのみ） | 既存 `internal/atproto/posts_test.go` |
 
-タイムアウトのテストでは、次の順序を厳守する: (1) `setXRPCRequestTimeoutForTest(t, <短い値>)` を呼んで `xrpcRequestTimeout` を短縮してから、(2) `newTestRestrictedDoer` で `restrictedDoer` を構築する。`http.Client.Timeout` は `newRestrictedDoer` 内で構築時にパッケージ変数の値をコピーするため（`http.go`）、差し替えを構築より後に行うと `http.Client` は 30 秒の既定値を保持し、テストが実発火せず 30 秒待つ／ハングする。`httptest` サーバーは短縮後の `xrpcRequestTimeout` より長く応答を遅らせ（既定 30 秒には依存しない）、`t.Cleanup(server.Close)` でサーバーを閉じてゴルーチン滞留を防ぐ。テスト対象の `restrictedDoer` は既存 `newTestRestrictedDoer`（サーバー証明書を信頼し、ピン留めアドレスを差し替え可能）で構築する。
+`newRestrictedDoer` へのシグネチャ変更（`timeout time.Duration` 引数追加）に伴い、既存 `newTestRestrictedDoer`（`http_test.go:71`、内部で `newRestrictedDoer(dialContextAddrs, host)` を呼ぶ）も `timeout time.Duration` 引数を追加してそのまま転送するよう更新する（既存の呼び出し元 `TestRestrictedDoer_Do` 等は本番相当の `xrpcRequestTimeout` を渡せばよい）。タイムアウト単体テストでは `newTestRestrictedDoer` に短いタイムアウト値を渡して `restrictedDoer` を構築する。パッケージ変数の上書きは行わないため、構築順序に関する制約はない。`httptest` サーバーはそのタイムアウト値より長く応答を遅らせ（本番既定の 30 秒には依存しない）、`t.Cleanup(server.Close)` でサーバーを閉じてゴルーチン滞留を防ぐ。
 
 ### 4.2 結合テスト（横断的検証、Phase 2・3）
 
@@ -168,7 +167,7 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 ### 4.3 テストヘルパー方針
 
 - 新規のクロスパッケージヘルパー・モックは不要（既存の `atprototestutil` で足りる）。
-- Phase 1 の `xrpcRequestTimeout` 上書きヘルパーは `internal/atproto` の非公開 API（パッケージ変数）を操作するため、[test_organization.md](../../dev/developer_guide/test_organization.md) の Classification B に従い既存の `internal/atproto/test_helpers.go`（`//go:build test`, `package atproto`）へ追加する。新規ヘルパーファイルは作らない。
+- Phase 1 はタイムアウトの差し替えを `newRestrictedDoer`／`newTestRestrictedDoer` への引数渡しで行うため、`test_helpers.go` への追加は不要（パッケージ変数の save/restore ヘルパーを設けない）。
 - Phase 2・3 の新規テストファイルは `_test.go` であり、`//go:build test` タグは付けない（テストバイナリで常にコンパイルされる。既存 `runner_integration_test.go`・`main_test.go` と同じ扱い）。
 
 ## 5. リスク管理
@@ -185,9 +184,8 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 - [ ] Phase 1: `errors.go` にセンチネル2種を追加
 - [ ] Phase 1: `http.go` に `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数を追加
 - [ ] Phase 1: `doXRPC` の成功／エラー両ボディに応答サイズ上限を適用
-- [ ] Phase 1: `newRestrictedDoer` の `http.Client` に `Timeout` を設定
+- [ ] Phase 1: `newRestrictedDoer` に `timeout` 引数を追加し `http.Client` の `Timeout` に設定。`newPDSDoer`・`newTestRestrictedDoer` の呼び出し元を更新
 - [ ] Phase 1: `posts.go` に3上限定数を追加し `listAllRecords` で検査
-- [ ] Phase 1: `test_helpers.go` に `xrpcRequestTimeout` 上書きヘルパーを追加
 - [ ] Phase 1: `http_test.go`・`posts_test.go` に単体テストを追加
 - [ ] Phase 2: `idempotency_integration_test.go` を新規作成（AC-05・AC-06）
 - [ ] Phase 3: `secret_leak_integration_test.go` を新規作成（AC-01・AC-02）
