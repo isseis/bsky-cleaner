@@ -100,7 +100,7 @@
 **対象ファイル**: `Dockerfile`（新規）, `entrypoint.sh`（新規）
 
 - [ ] `Dockerfile` を作成する。マルチステージビルド構成（ビルドステージ: `golang:alpine` を digest 固定、実行ステージ: `alpine` を digest 固定）。実行ステージにビルド済みバイナリ・`supercronic`・`entrypoint.sh` を同梱し、非特権ユーザー（UID 10001）で実行する（AC-05, AC-06, AC-07）。
-- [ ] `entrypoint.sh` を作成する。`bsky-cleaner print-schedule --config "$BSKY_CONFIG_PATH"` を呼び出し、終了コードが非 0 なら `exit 1` で異常終了（AC-10, fail-closed）。終了コード 0 なら標準出力の cron 式を `/tmp/crontab` に書き込み、`exec supercronic /tmp/crontab` で内蔵 cron を起動する（AC-08, AC-09）。
+- [ ] `entrypoint.sh` を作成する。`bsky-cleaner print-schedule --config "$BSKY_CONFIG_PATH"` を呼び出し、終了コードが非 0 なら `exit 1` で異常終了（AC-10, fail-closed）。終了コード 0 なら、標準出力の cron 式に続けて `bsky-cleaner --apply --config "$BSKY_CONFIG_PATH"` を記述した crontab 行を `/tmp/crontab` に書き込み、`exec supercronic /tmp/crontab` で内蔵 cron を起動する（AC-08, AC-09）。crontab 行の形式は `"$SCHEDULE bsky-cleaner --apply --config \"$BSKY_CONFIG_PATH\""` とする（02_architecture.md 3.2.3 節の仕様に従う）。
 - [ ] `docker build` を実行し、イメージが正常にビルドできることを確認する（AC-07）。手動検証。
 
 **完了基準**: `docker build` が成功し、生成されたイメージが期待通りの構成（バイナリ・`supercronic`・`entrypoint.sh`・非特権ユーザー）を持つこと。
