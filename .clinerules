@@ -1,0 +1,2 @@
+When a user specifies a markdown file for prompting using @ + file name,
+execute prompts in the given file and strictly follow the prompts.
