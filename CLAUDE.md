@@ -1,6 +1,26 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Cline when working with code in this repository.
+
+## Shell input length limit
+
+The PTY (pseudo-terminal) input buffer may silently truncate commands longer
+than ~4000 bytes. To work around this:
+
+- **Before running a command with a long inline argument** (e.g.
+  `gh pr create --body "..."`), write the long value to a temporary file and
+  reference it with a file-read flag (`--body-file`, `-F`, `--file`).
+- For shell pipelines with many arguments, use a script file instead of a
+  single long `command` string.
+- Example (PR body):
+  ```
+  gh pr create ... --body-file /tmp/pr-body.md
+  ```
+  instead of `gh pr create --body "...長い本文..."`.
+- If a command still gets truncated, split it into two steps (e.g. create
+  the PR with a short title first, then `gh pr edit $NUM --body-file ...`).
+- Long heredocs (`cat > file << 'EOF' ... EOF`) are also safer than inline
+  strings because they are written to a file first.
 
 ## Project Overview
 
