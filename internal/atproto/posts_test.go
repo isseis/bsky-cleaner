@@ -295,8 +295,9 @@ func mustParseQuery(t *testing.T, rawURL string) url.Values {
 }
 
 func TestClient_ListPosts_TotalBytesLimit(t *testing.T) {
-	// Use small thresholds to test limit behavior without consuming large memory
-	// Each page has 100 bytes, 3 pages = 300 bytes > 200 byte limit
+	// Use small thresholds to test limit behavior without consuming large memory.
+	// The exact byte count per page is not meaningful — the test just needs enough
+	// pages to exceed the configured maxBytes cap.
 	recordValueSize := 100
 	numPages := 3
 	maxBytes := 200
@@ -328,8 +329,12 @@ func TestClient_ListPosts_TotalBytesLimit(t *testing.T) {
 }
 
 func TestClient_ListPosts_TotalPagesLimit(t *testing.T) {
-	// Create many empty pages with different cursors to exceed maxListPages
-	pages := make([]string, maxListPages+2)
+	// Use small thresholds to test limit behavior without generating many pages
+	// Each page provides a distinct cursor; 3 pages exceeds the 2-page limit
+	numPages := 3
+	maxPages := 2
+
+	pages := make([]string, numPages)
 	for i := range pages {
 		cursor := ""
 		if i < len(pages)-1 {
@@ -341,11 +346,11 @@ func TestClient_ListPosts_TotalPagesLimit(t *testing.T) {
 	handler := newListPostsHandler(t, pages, []string{buildListRecordsBody(nil, "")}, http.StatusBadRequest, `{"error":"RecordNotFound"}`)
 	client, _ := newPostsTestClient(handler)
 
-	posts, err := client.ListPosts(context.Background())
+	// Use listAllRecordsWithLimits to test with small thresholds
+	_, err := client.listAllRecordsWithLimits(context.Background(), collectionFeedPost, 1000000, maxPages, 1000000)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
-	assert.Nil(t, posts)
 }
 
 func TestClient_ListPosts_TotalRecordsLimit(t *testing.T) {

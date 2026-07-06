@@ -87,7 +87,16 @@ func doXRPC(ctx context.Context, doer HTTPDoer, base *url.URL, httpMethod, xrpcM
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: xrpcErrorName(io.LimitReader(resp.Body, maxXRPCResponseBytes)), Err: ErrHTTPStatus}
+		// Read the error body with limit+1 to detect oversized responses,
+		// consistent with the 2xx path below.
+		errorBody, err := io.ReadAll(io.LimitReader(resp.Body, maxXRPCResponseBytes+1))
+		if err != nil {
+			return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, Err: fmt.Errorf("read error response: %w", err)}
+		}
+		if len(errorBody) > maxXRPCResponseBytes {
+			return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: responseTooLargeErrorName, Err: ErrResponseTooLarge}
+		}
+		return &HTTPError{Method: xrpcMethod, StatusCode: resp.StatusCode, ErrorName: xrpcErrorName(bytes.NewReader(errorBody)), Err: ErrHTTPStatus}
 	}
 
 	if out != nil {

@@ -134,7 +134,7 @@ func TestDoXRPC_ResponseSizeLimit(t *testing.T) {
 	t.Run("response within limit decodes successfully", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			// Response body within limit (100 bytes)
+			// Small response body guaranteed to fit within the limit
 			_, _ = w.Write([]byte(`{"result":"ok"}`))
 		}))
 		t.Cleanup(server.Close)
