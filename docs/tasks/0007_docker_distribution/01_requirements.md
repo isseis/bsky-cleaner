@@ -31,7 +31,7 @@
 - **F-001**: `print-schedule` サブコマンドの実装
 - **F-002**: Dockerfile の作成（ベースイメージの digest 固定を含む）
 - **F-003**: エントリポイントスクリプトと内蔵 cron の連携
-- **F-004**: `docker-compose.yml` および `.env.example` の作成
+- **F-004**: `docker-compose.yml` および `dot.env.example` の作成
 
 ### Out of Scope
 
@@ -67,11 +67,11 @@ TOML の読み込みには `config.Load()` を再利用する。`config.Load()` 
 - **AC-09**: 生成された crontab に従い、`bsky-cleaner --apply --config ...` が内蔵 cron（`supercronic` 等）経由で定期実行される
 - **AC-10**: `print-schedule` がエラー終了した場合（不正な `schedule` 値等）、コンテナは起動を継続せず異常終了する（fail-closed）
 
-### F-004: `docker-compose.yml` および `.env.example`
+### F-004: `docker-compose.yml` および `dot.env.example`
 
 **Acceptance Criteria**:
 - **AC-11**: `docker-compose.yml` に秘匿情報が直接書かれておらず、`environment:` で `.env` の変数を明示的に参照する形になっている
-- **AC-12**: `.env.example` が以下の環境変数名を列挙し、値をダミー/空にした状態でコミットされており、初期セットアップの手引きとして機能する: `BSKY_HANDLE`、`BSKY_APP_PASSWORD`、`BSKY_SLACK_WEBHOOK_URL_SUCCESS`、`BSKY_SLACK_WEBHOOK_URL_FAILURE`
+- **AC-12**: `dot.env.example` が以下の環境変数名を列挙し、値をダミー/空にした状態でコミットされており、初期セットアップの手引きとして機能する: `BSKY_HANDLE`、`BSKY_APP_PASSWORD`、`BSKY_SLACK_WEBHOOK_URL_SUCCESS`、`BSKY_SLACK_WEBHOOK_URL_FAILURE`
 - **AC-13**: `docker-compose.yml` が TOML 設定ファイルの volume mount 設定を含む
 - **AC-14**: `docker compose up` により、TOML 設定ファイルをボリュームマウントした状態でコンテナが起動し、定期実行が開始される
 

@@ -68,7 +68,7 @@ flowchart LR
 | F-001 (AC-01〜04) | `cmd/main.go` の `parsePrintScheduleFlags` と `runPrintSchedule`（3.2.1） |
 | F-002 (AC-05〜07) | `Dockerfile`（マルチステージビルド、digest 固定）（3.2.2） |
 | F-003 (AC-08〜10) | エントリポイントスクリプト（`entrypoint.sh`）と `print-schedule` の連携（3.2.3） |
-| F-004 (AC-11〜14) | `docker-compose.yml`、`.env.example`（3.2.4） |
+| F-004 (AC-11〜14) | `docker-compose.yml`、`dot.env.example`（3.2.4） |
 | NF-001 | 専用の設計要素なし。既存の `make fmt`/`make test`/`make lint` で検証する |
 | NF-002 | 既存の `.gitignore` に `.env` が含まれているため、追加作業は不要 |
 | NF-003 | cron ツール選定の根拠は 3.2.3 に記載する（実装計画書に委譲するには判断材料が設計レベルの情報を要するため、本設計書に選定理由を含める。実装計画書では本節を参照する形とする） |
@@ -94,7 +94,7 @@ flowchart TD
         DOCKERFILE["Dockerfile"]
         ENTRYPOINT["entrypoint.sh"]
         COMPOSE["docker-compose.yml"]
-        ENVEX["env.example"]
+        ENVEX["dot.env.example"]
     end
 
     MAIN --> CONFIG
@@ -146,7 +146,7 @@ flowchart TD
 | `Dockerfile` | 新規 | マルチステージビルド：Go ビルド用ステージ（`golang:alpine` 相当）と実行用ステージ（`alpine` 相当）を分離し、ベースイメージを digest で固定する |
 | `entrypoint.sh` | 新規 | コンテナ起動時に `print-schedule` を呼び出し、crontab ファイルを動的生成した上で `exec supercronic` を起動する |
 | `docker-compose.yml` | 新規 | TOML 設定ファイルの volume mount、`.env` からの環境変数注入、コンテナ定義 |
-| `.env.example` | 新規 | 必要な環境変数名をダミー値で列挙し、初期セットアップの手引きとする |
+| `dot.env.example` | 新規 | 必要な環境変数名をダミー値で列挙し、初期セットアップの手引きとする |
 | `.gitignore` | 変更なし | `.env` は既に除外済み |
 
 ### 3.2 各コンポーネントの設計
@@ -244,7 +244,7 @@ func validateSchedule(s string) error
 
 NF-003 が要求する「選定理由の実装計画書への記載」は、実装計画書から本節を参照する形で満たす。
 
-#### 3.2.4 `docker-compose.yml` および `.env.example`（AC-11〜14）
+#### 3.2.4 `docker-compose.yml` および `dot.env.example`（AC-11〜14）
 
 **`docker-compose.yml`** は以下の構成を持つ。
 
@@ -257,7 +257,7 @@ NF-003 が要求する「選定理由の実装計画書への記載」は、実�
 - volumes で TOML 設定ファイルのディレクトリを `/config` にマウントする（AC-13）
 - 環境変数 `BSKY_CONFIG_PATH` を `/config/config.toml` に設定し、エントリポイントスクリプトと `supercronic` のジョブ定義から参照可能にする
 
-**`.env.example`** は以下の環境変数をダミー値で列挙する（AC-12）:
+**`dot.env.example`** は以下の環境変数をダミー値で列挙する（AC-12）:
 - `BSKY_HANDLE=your-handle.bsky.social`
 - `BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx`
 - `BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...`
@@ -347,7 +347,7 @@ flowchart TD
 | 脅威 | 対策 | 対応 AC |
 |---|---|---|
 | TOML の `schedule` への改行注入による crontab コマンドインジェクション | `validateSchedule` が改行文字の存在を検出し、非 0 終了 + 標準出力なしで拒否する。エントリポイントスクリプトは `print-schedule` の終了コードが非 0 の場合にコンテナを異常終了させる（fail-closed） | AC-02, AC-10 |
-| `.env` の漏洩（Git リポジトリへの誤 commit） | 既存の `.gitignore` が `.env` を除外済み。`.env.example` のみコミットし、実際の秘匿情報は含まれない | NF-002 |
+| `.env` の漏洩（Git リポジトリへの誤 commit） | 既存の `.gitignore` が `.env` を除外済み。`dot.env.example` のみコミットし、実際の秘匿情報は含まれない | NF-002 |
 | ベースイメージのタグ差し替え（サプライチェーン攻撃） | ベースイメージをタグではなく digest で固定する。意図しないイメージ更新が発生しない | AC-06 |
 | cron 式の不正な値（範囲外の分・時など）による予期しない実行タイミング | `validateSchedule` が cron 5 フィールドの値域を検証し、不正な場合は拒否する | AC-04 |
 | `docker-compose.yml` への秘匿情報のハードコード | `environment:` で `.env` の変数を参照する形にし、`docker-compose.yml` 本体には秘匿情報を含めない | AC-11 |
@@ -441,7 +441,7 @@ sequenceDiagram
 | コンテナテスト | コンテナ起動 → `print-schedule` の成功 → `supercronic` 起動 | AC-08, AC-09 |
 | コンテナテスト | 不正な `schedule` 値でのコンテナ起動 → 異常終了 | AC-10 |
 | コンテナテスト | `docker compose up` → コンテナ起動 → 定期実行開始 | AC-13, AC-14 |
-| 静的検証 | `.env.example` の存在と環境変数名列挙 | AC-12 |
+| 静的検証 | `dot.env.example` の存在と環境変数名列挙 | AC-12 |
 | 静的検証 | `docker-compose.yml` に秘匿情報が直接書かれていないこと | AC-11 |
 | 静的検証 | `.gitignore` に `.env` が含まれていること | NF-002 |
 
@@ -477,13 +477,13 @@ AC-05〜AC-07（Dockerfile）、AC-08〜AC-10（エントリポイントスク�
 ### フェーズ 3: docker-compose 設定と統合テスト
 
 9. `docker-compose.yml` の作成
-10. `.env.example` の作成
+10. `dot.env.example` の作成
 11. `docker compose up` による統合動作確認
 
 ## 9. 将来の拡張性
 
 - **マルチアーキテクチャ対応**: 本タスクでは amd64 のみを対象とする（要件定義書 Out of Scope）。将来 arm64 対応が必要になった場合、Dockerfile の `FROM --platform` または `docker buildx` によるマルチアーキテクチャビルドへ拡張する。本設計のマルチステージビルド構成は、この拡張と互換性がある。
-- **`.env` の暗号化（`git-crypt`）の導入**: 本タスクのスコープ外だが、運用者が `git-crypt` を導入する際に本設計と競合する要素はない。`.env.example` はそのままコミットされ、`.env` のみが暗号化対象となる。
+- **`.env` の暗号化（`git-crypt`）の導入**: 本タスクのスコープ外だが、運用者が `git-crypt` を導入する際に本設計と競合する要素はない。`dot.env.example` はそのままコミットされ、`.env` のみが暗号化対象となる。
 - **別の cron 実装への差し替え**: `supercronic` の選定はエントリポイントスクリプト内の 1 行（`exec` の引数）にカプセル化されているため、差し替えは局所的である。TOML の `schedule` フィールドと `print-schedule` の契約（標準的な cron 5 フィールド構文を出力する）は、他の cron 実装でもそのまま再利用できる。
 
 ## 付録 A: 決定履歴
