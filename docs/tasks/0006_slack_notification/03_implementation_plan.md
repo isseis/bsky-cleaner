@@ -346,20 +346,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/52）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
-
-### PR-5 作成ポイント: quality gates
-
-**対象ステップ**: フェーズ8
-
-**推奨タイトル**: `chore(0006-slack-notification): confirm quality gates`
-
-**レビュー観点**: `make fmt`/`make test`/`make lint`/`make deadcode` の実行結果がすべて記録されていること
-
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
-- [ ] PR がマージされた
+- [x] PR がマージされた
 
 ## 4. テスト戦略
 
