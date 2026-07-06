@@ -123,8 +123,8 @@
 
 **レビュー観点**: 複数の既削除対象がすべて `Deleted` として扱われクラッシュしないこと（AC-05）、既存 `TestRunnerRun_WithRealAtprotoClient` との重複範囲がテストの doc コメントで明示されていること / `context.WithCancel` のみを用いた中断がフレーキーでない決定的な設計になっていること（`WithTimeout` を避けた理由が妥当であること） / 中断後の `Deleted`／`Failed` の rkey 集合が重複せず判別可能であること、2 回目の `Run` で重複削除がすべて 2xx として扱われエラーにならないこと（AC-06） / 新規テストが `runner_integration_test.go` の既存ヘルパー（`publicIPLiteral`・`integrationAppPassword`・`StubPassthroughPDSDoer`）を再定義せず再利用していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
