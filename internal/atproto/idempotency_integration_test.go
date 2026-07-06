@@ -63,7 +63,7 @@ func TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess(t *testing.T) {
 		case strings.HasSuffix(req.URL.Path, "com.atproto.repo.listRecords") && req.URL.Query().Get("collection") == "app.bsky.feed.repost":
 			return atprototestutil.JSONResponse(http.StatusOK, repostPage), nil
 		case strings.HasSuffix(req.URL.Path, "com.atproto.repo.getRecord"):
-			// Simulate that records are already gone.
+			// Simulate that the profile record (pinned post) is already gone.
 			return atprototestutil.JSONResponse(http.StatusBadRequest, `{"error":"RecordNotFound"}`), nil
 		case strings.HasSuffix(req.URL.Path, "com.atproto.repo.deleteRecord"):
 			// deleteRecord returns 2xx even for already-deleted records (idempotent).
@@ -138,6 +138,7 @@ func TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe(t *testing.T) {
 
 	// Create a cancellable context that the mock will cancel.
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	mock := &atprototestutil.MockHTTPDoer{Handler: func(req *http.Request) (*http.Response, error) {
 		switch {
@@ -184,8 +185,9 @@ func TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe(t *testing.T) {
 	// First run: cancel mid-delete.
 	result1, err := runner.Run(ctx, runnerClient, appPassword, 30, true, now)
 	// runner.Run may return an error due to context cancellation.
-	// We care about the result structure, not the error.
-	_ = err
+	// We care about the result structure, but must check err to avoid
+	// a nil-pointer panic if Run returns (nil, err).
+	require.NoError(t, err, "runner.Run should not return an error for mid-delete cancellation")
 
 	// Verify Deleted and Failed are disjoint and cover all rkeys.
 	deletedRkeys := make([]string, len(result1.Deleted))
@@ -197,10 +199,10 @@ func TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe(t *testing.T) {
 		failedRkeys[i] = f.Post.RKey
 	}
 
-	// At least some should be deleted (not all failed).
-	assert.Greater(t, len(result1.Deleted), 0, "some posts should be deleted before cancellation")
-	// At least some should have failed (cancellation happened mid-delete).
-	assert.Greater(t, len(result1.Failed), 0, "some posts should fail due to cancellation")
+	// Cancellation is deterministic (cancelAfter=3), so exactly 3 posts
+	// should be deleted and the remaining 2 should be in Failed.
+	assert.Len(t, result1.Deleted, cancelAfter, "exactly %d posts should be deleted before cancellation", cancelAfter)
+	assert.Len(t, result1.Failed, len(allRkeys)-cancelAfter, "remaining %d posts should fail due to cancellation", len(allRkeys)-cancelAfter)
 
 	// Verify Deleted and Failed are disjoint.
 	for _, rkey := range deletedRkeys {
