@@ -159,7 +159,7 @@ flowchart TD
 2. `config.Load(path)` を呼び出し、`Config` を取得する（`LoadAppConfig` ではない — 本サブコマンドは `schedule` の値のみを必要とし、認証情報のロードは不要である）
 3. `Config.Schedule` が cron 式として構文的に妥当であることを検証する。検証内容は以下の 2 点である：
    - **改行の不在**: `schedule` の値に改行文字（`\n`、`\r`）が含まれていないことを確認する。含まれている場合、即座に非 0 でエラー終了し、標準出力には何も出力しない（AC-02）。これは crontab へのコマンドインジェクション対策であり、改行を含む値をそのまま crontab ファイルに書き込むと、crontab の追加行として任意のコマンドを注入できる脆弱性につながる。
-   - **cron 5 フィールドの構文検証**: 空白で区切られた 5 つのフィールドが、各フィールドの cron 仕様上の値域（分 0-59、時 0-23、日 1-31、月 1-12、曜日 0-7）に収まっていることを確認する。ワイルドカード（`*`）、ステップ（`*/n`）、範囲（`a-b`）、リスト（`a,b`）を含む標準的な cron 式を受理する。不正な値（例: 分に 60、月に 13）の場合は非 0 でエラー終了する（AC-04）。
+   - **cron 5 フィールドの構文検証**: 空白で区切られた 5 つのフィールドが、各フィールドの cron 仕様上の値域（分 0-59、時 0-23、日 1-31、月 1-12、曜日 0-7）に収まっていることを確認する。各フィールドはカンマ区切りの 1 個以上の要素（`item`）からなり、各 `item` は `*` / `*/n`（ステップ）/ `a-b`（範囲）/ `a-b/n`（範囲+ステップ）/ `a`（単一値）のいずれかとする。すなわち `1-10/2`（範囲+ステップ）や `1-5,10-15`（リスト内に範囲を含む）のような組み合わせも受理する。`supercronic` を含む一般的な cron 実装が受理する構文との乖離をなくすため、単純なワイルドカード・単一範囲・単一リストだけでなく、これらの組み合わせも対象とする。`@daily` 等のマクロ形式は 5 フィールド構成ではないため対象外とし、指定された場合はエラー終了する。不正な値（例: 分に 60、月に 13）の場合は非 0 でエラー終了する（AC-04）。
 4. 検証を通過した `schedule` の値を、改行なしの 1 行として標準出力に書き出す（AC-01）
 
 **`config.Load()` の副作用の許容**: `config.Load()` は `schedule` に加えて `retention_days`・`execution_timeout_seconds` も検証する。`print-schedule` の目的は `schedule` のみの出力だが、これらのフィールドに不備がある場合も `config.Load()` がエラーを返し、`print-schedule` は非 0 で終了する。これは要件定義書で意図された動作であり、不完全な設定ファイルで cron が起動してしまうことを防ぐ（AC-10 の fail-closed を満たす）。
@@ -168,7 +168,7 @@ flowchart TD
 
 **フラグパースの分離**: `print-schedule` は既存の `parseFlags` とは別の関数 `parsePrintScheduleFlags` として実装する。既存の `parseFlags` は `--config` 必須・`--apply` オプションの 2 フラグ構成だが、`print-schedule` は `--config` のみで `--apply` を持たない。また、`print-schedule` はサブコマンドとして最初の位置引数で識別され、以後の引数は当該サブコマンドのフラグとして解釈される。具体的には：
 
-- `os.Args` の `[1]` が `"print-schedule"` の場合、`main()` は `parsePrintScheduleFlags(os.Args[2:])` を呼び出す
+- `len(os.Args) > 1` かつ `os.Args[1]` が `"print-schedule"` の場合、`main()` は `parsePrintScheduleFlags(os.Args[2:])` を呼び出す（`len(os.Args) > 1` のチェックが無いと、引数なし起動時に `os.Args[1]` への添字アクセスが index out of range で panic する）
 - それ以外の場合は、既存の `parseFlags` 経路をそのまま通る
 
 **Type definition for cron validation result**:
@@ -211,12 +211,14 @@ func validateSchedule(s string) error
 
 マルチステージビルド構成をとる。
 
-- **ビルドステージ**: Go の公式イメージ（`golang`、Alpine ベース）を使用し、`go build -o /out/bsky-cleaner ./cmd` を実行する。タグではなく digest（例: `golang@sha256:...`）で参照する。
+- **ビルドステージ**: Go の公式イメージ（`golang`、Alpine ベース）を使用し、`go build -o /out/bsky-cleaner ./cmd` を実行する。タグではなく digest（例: `golang@sha256:...`）で参照する。同じステージで `go install github.com/aptible/supercronic@<version>` により `supercronic` バイナリを取得する（下記「`supercronic` の取得方法」を参照）。
 - **実行ステージ**: 軽量な Alpine イメージ（`alpine`、digest 固定）をベースとし、以下を同梱する：
   - ビルド済みバイナリ（`/usr/local/bin/bsky-cleaner`）
-  - 内蔵 cron ツール（`supercronic`）
+  - 内蔵 cron ツール（`supercronic`、ビルドステージから `COPY --from=build` で取得したもの）
   - エントリポイントスクリプト（`entrypoint.sh`）
   - 標準ユーザー（`bsky`、UID 10001）で実行する
+
+**`supercronic` の取得方法**: GitHub releases から `ADD`/`curl` でバイナリを直接取得する方法は、チェックサム検証を別途実装しない限りサプライチェーン上の検証手段を持たない（ダウンロード元が改ざんされた場合に検知できない）。本設計では `go install github.com/aptible/supercronic@<version>` をビルドステージで実行する方式を採用する。この方式は Go の module checksum database（`sum.golang.org`）によるモジュール内容の検証を経るため、ベースイメージの digest 固定と同様にビルドの再現性・完全性を確保できる。バージョンは digest 相当の固定値（具体的なリリースタグ、例: `v0.2.29`）を指定し、`latest` 相当の可変参照は使わない。
 
 **ベースイメージの digest 固定**: タグ（例: `alpine:3.21`）は移動可能なポインタであり、同一タグが異なる時点で異なるイメージを指しうる。digest による固定はビルドの再現性を保証し、ソフトウェアサプライチェーン上のリスクを低減する。
 
@@ -373,7 +375,7 @@ sequenceDiagram
     participant VAL as validateSchedule
     participant RUN as run()
 
-    Main->>Main: os.Args[1] == "print-schedule" ?
+    Main->>Main: len(os.Args) > 1 && os.Args[1] == "print-schedule" ?
     alt print-schedule
         Main->>PPF: parsePrintScheduleFlags(os.Args[2:])
         PPF-->>Main: configPath, err
@@ -437,7 +439,7 @@ sequenceDiagram
 
 | テスト分類 | テスト対象 | 検証する AC |
 |---|---|---|
-| ユニットテスト | `validateSchedule`（正常な cron 式・改行混入・不正な値域・フィールド数不足） | AC-02, AC-04 |
+| ユニットテスト | `validateSchedule`（正常な cron 式・改行混入・不正な値域・フィールド数不足・範囲+ステップ/リスト内範囲などの組み合わせ構文・`@daily` 等のマクロ形式の拒否） | AC-02, AC-04 |
 | ユニットテスト | `parsePrintScheduleFlags`（フラグ正常・不足） | AC-01（間接的） |
 | ユニットテスト | `runPrintSchedule`（TOML 正常・TOML 不在・TOML 不正・schedule 不正） | AC-01, AC-03, AC-04 |
 | コンテナテスト | Docker イメージのビルド成功 | AC-05, AC-06, AC-07 |
@@ -450,7 +452,7 @@ sequenceDiagram
 
 ### 7.2 既存テストへの影響
 
-- `cmd/main_test.go`: `run()` 関数のシグネチャは変更されないが、`main()` 関数が `os.Args[1] == "print-schedule"` の分岐を追加するため、`main()` 自体をテストする場合は新たなテストケースが必要になる。既存の `run()` の単体テスト（`TestRun_*`）は影響を受けない。
+- `cmd/main_test.go`: `run()` 関数のシグネチャは変更されないが、`main()` 関数が `len(os.Args) > 1 && os.Args[1] == "print-schedule"` の分岐を追加するため、`main()` 自体をテストする場合は新たなテストケースが必要になる。既存の `run()` の単体テスト（`TestRun_*`）は影響を受けない。
 - `cmd/main.go` の `parseFlags` は変更されず、既存の `TestParseFlags_*` はそのまま通過する。
 - その他の `internal/` パッケージのテストは影響を受けない。本タスクはどの内部パッケージにも変更を加えない。
 

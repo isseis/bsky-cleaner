@@ -31,7 +31,7 @@
 - `cmd/main.go`
   - 既存: `parseFlags`（`--config` 必須・`--apply` オプションの 2 フラグ構成）、`run`（`config.LoadAppConfig` 経由の完全な実行パス）、`main`（`os.Args[1:]` を `parseFlags` に渡す）、`sendNotification`。終了コード定数 `exitOK`(0)・`exitSetupOrRunFail`(1)・`exitUsageError`(2)・`exitPartialFailure`(3)。
   - 不足: `print-schedule` サブコマンドの分岐、`parsePrintScheduleFlags`、`runPrintSchedule`、`validateSchedule`、`ScheduleValidationError` 型。
-  - 変更: `main()` に `os.Args[1] == "print-schedule"` の分岐を追加。`parsePrintScheduleFlags`・`runPrintSchedule`・`validateSchedule` の 3 関数と `ScheduleValidationError` 型を新規追加。
+  - 変更: `main()` に `len(os.Args) > 1 && os.Args[1] == "print-schedule"` の分岐を追加。`parsePrintScheduleFlags`・`runPrintSchedule`・`validateSchedule` の 3 関数と `ScheduleValidationError` 型を新規追加。
 - `internal/config/config.go`
   - 既存: `Load(path string) (*Config, error)` — TOML 読み込み・`validateConfig` による必須フィールド・値域検証。`Config.Schedule` は `string` 型で保持。
   - 不足: なし。`print-schedule` は `config.Load()` をそのまま再利用する（AC-03）。
@@ -75,8 +75,8 @@
 - [ ] `cmd/main.go`: `ScheduleValidationError` 型を追加する（[02_architecture.md 3.2.1 節](./02_architecture.md#321-print-schedule-サブコマンドac-01〜04) の定義に従う）。
 - [ ] `cmd/main.go`: `validateSchedule(s string) error` 関数を実装する。cron 5 フィールドの構文検証（改行の不在確認・5 フィールドのパース・各フィールドの値域チェック）を標準ライブラリのみで行う。外部ライブラリに依存しない。
 - [ ] `cmd/main.go`: `parsePrintScheduleFlags(args []string) (configPath string, err error)` 関数を実装する。`--config`（または `-c`）フラグのみを受け付け、不足時・不明な位置引数存在時にエラーを返す。`flag.FlagSet` を使用し、`parseFlags` と同じエラー報告パターンに従う。
-- [ ] `cmd/main.go`: `runPrintSchedule(configPath string, stdout, stderr io.Writer) int` 関数を実装する。`config.Load(configPath)` を呼び出し、成功時に `validateSchedule(cfg.Schedule)` で cron 式を検証し、標準出力に書き出す。エラー時は標準エラー出力にエラーメッセージを書き、対応する終了コードを返す。終了コードの使い分けは設計に従い、設定不備（`config.Load` 失敗・`validateSchedule` 失敗）は `exitSetupOrRunFail`(1) を、フラグエラーは `exitUsageError`(2) を返す。
-- [ ] `cmd/main.go`: `main()` 関数に `os.Args[1] == "print-schedule"` の分岐を追加する。`print-schedule` の場合、`parsePrintScheduleFlags(os.Args[2:])` → `runPrintSchedule(configPath, os.Stdout, os.Stderr)` の経路を通る。それ以外は既存の `parseFlags` → `run` 経路をそのまま通る。
+- [ ] `cmd/main.go`: `runPrintSchedule(configPath string, stdout, stderr io.Writer) int` 関数を実装する。`config.Load(configPath)` を呼び出し、成功時に `validateSchedule(cfg.Schedule)` で cron 式を検証し、標準出力に書き出す。エラー時は標準エラー出力にエラーメッセージを書き、`exitSetupOrRunFail`(1) を返す。`runPrintSchedule` はフラグを受け取らないため、フラグエラー（`exitUsageError`(2)）は関与しない — それは `parsePrintScheduleFlags`/`main()` 側で `runPrintSchedule` 呼び出し前に判定・返却する（下記ステップ）。
+- [ ] `cmd/main.go`: `main()` 関数に `len(os.Args) > 1 && os.Args[1] == "print-schedule"` の分岐を追加する（`len(os.Args) > 1` のチェックが無いと、引数なし起動時に `os.Args[1]` の添字アクセスが index out of range で panic する）。`print-schedule` の場合、`parsePrintScheduleFlags(os.Args[2:])` を呼び出し、エラー時は `exitUsageError`(2) を返す。成功時は `runPrintSchedule(configPath, os.Stdout, os.Stderr)` の経路を通る。それ以外は既存の `parseFlags` → `run` 経路をそのまま通る。
 - [ ] `cmd/main_test.go`: `TestValidateSchedule_*` テストを追加する。正常な cron 式・改行混入・不正な値域・フィールド数不足・空文字列の各ケースを検証する（AC-02, AC-04）。
 - [ ] `cmd/main_test.go`: `TestParsePrintScheduleFlags_*` テストを追加する。`--config` 正常・`-c` 正常・`--config` 不足・不明フラグ・余分な位置引数の各ケースを検証する（AC-01 間接的）。
 - [ ] `cmd/main_test.go`: `TestRunPrintSchedule_*` テストを追加する。TOML 正常（`validConfigPath` 再利用）・TOML ファイル不在・TOML パース失敗・`schedule` フィールド不足・`schedule` 値が cron 式として不正の各ケースを検証する（AC-01, AC-03, AC-04）。`config.Load()` のエラーラップ（`ErrFileNotFound`・`ErrParseFailed`・`ErrMissingField`・`ErrInvalidValue`）が標準エラー出力に書き出されることを確認する。
@@ -99,7 +99,7 @@
 
 **対象ファイル**: `Dockerfile`（新規）, `entrypoint.sh`（新規）
 
-- [ ] `Dockerfile` を作成する。マルチステージビルド構成（ビルドステージ: `golang:alpine` を digest 固定、実行ステージ: `alpine` を digest 固定）。実行ステージにビルド済みバイナリ・`supercronic`・`entrypoint.sh` を同梱し、非特権ユーザー（UID 10001）で実行する（AC-05, AC-06, AC-07）。
+- [ ] `Dockerfile` を作成する。マルチステージビルド構成（ビルドステージ: `golang:alpine` を digest 固定、実行ステージ: `alpine` を digest 固定）。ビルドステージで `go install github.com/aptible/supercronic@<version>`（リリースタグ固定、チェックサムは Go module checksum database で検証）を実行し、実行ステージにビルド済みバイナリ・`supercronic`・`entrypoint.sh` を同梱し、非特権ユーザー（UID 10001）で実行する（AC-05, AC-06, AC-07）。
 - [ ] `entrypoint.sh` を作成する。`bsky-cleaner print-schedule --config "$BSKY_CONFIG_PATH"` を呼び出し、終了コードが非 0 なら `exit 1` で異常終了（AC-10, fail-closed）。終了コード 0 なら、標準出力の cron 式に続けて `bsky-cleaner --apply --config "$BSKY_CONFIG_PATH"` を記述した crontab 行を `/tmp/crontab` に書き込み、`exec supercronic /tmp/crontab` で内蔵 cron を起動する（AC-08, AC-09）。crontab 行の形式は `"$SCHEDULE bsky-cleaner --apply --config \"$BSKY_CONFIG_PATH\""` とする（02_architecture.md 3.2.3 節の仕様に従う）。
 - [ ] `docker build` を実行し、イメージが正常にビルドできることを確認する（AC-07）。手動検証。
 
@@ -171,6 +171,8 @@
 | `validateSchedule` | フィールド数超過（`"0 3 * * * extra"`）がエラーを返すこと（AC-04） | `cmd/main_test.go` |
 | `validateSchedule` | 各フィールドの値域違反（分 60・時 24・日 0・月 13・曜日 8）がエラーを返すこと（AC-04） | `cmd/main_test.go` |
 | `validateSchedule` | ワイルドカード（`*`）・ステップ（`*/15`）・範囲（`1-5`）・リスト（`1,3,5`）を含む標準的な cron 式が受理されること | `cmd/main_test.go` |
+| `validateSchedule` | 範囲+ステップ（`1-10/2`）・リスト内に範囲を含む形式（`1-5,10-15`）が受理されること | `cmd/main_test.go` |
+| `validateSchedule` | `@daily` 等のマクロ形式（5 フィールド構成でない値）がエラーを返すこと | `cmd/main_test.go` |
 | `validateSchedule` | 空文字列がエラーを返すこと | `cmd/main_test.go` |
 | `parsePrintScheduleFlags` | `--config path/to.toml` でパスが返ること | `cmd/main_test.go` |
 | `parsePrintScheduleFlags` | `-c path/to.toml` でパスが返ること | `cmd/main_test.go` |
@@ -215,7 +217,7 @@ Docker デーモンを必要とするテストは手動検証手順として記�
 | cron 構文検証の自前実装にバグがある | 不正な cron 式を受理／正常な cron 式を拒否 | テストケースで広範な cron 式パターン（ワイルドカード・ステップ・範囲・リスト・境界値）を網羅する。cron 5 フィールドの値域は単純な整数比較であり、複雑なパースロジックは不要 |
 | `config.Load()` の副次的な検証（`retention_days`・`execution_timeout_seconds`）が `print-schedule` の目的と衝突する | 設定ファイルの他のフィールドに不備がある場合、`print-schedule` が非 0 で終了する | これは設計上の意図された動作（fail-closed）であり、リスクではない。テストでこの挙動を確認する |
 | Docker イメージの digest が更新されない | セキュリティパッチが適用されない | 定期的な digest 更新を運用プロセスとして確立する（本タスクのスコープ外） |
-| `supercronic` のバイナリ取得方法 | ビルド時に `supercronic` を取得できない | Dockerfile 内で `go install github.com/aptible/supercronic@<version>` または `ADD --chmod=755 https://github.com/aptible/supercronic/releases/download/...` で取得する。Go で書かれているため、Go ツールチェーンが利用可能なビルドステージで `go install` する方法が確実 |
+| `supercronic` のバイナリ取得方法 | チェックサム検証なしで GitHub releases から直接取得すると、配布元改ざん時に検知できない（サプライチェーンリスク） | ビルドステージで `go install github.com/aptible/supercronic@<version>` を実行し、Go の module checksum database（`sum.golang.org`）による検証を経由させる（[02_architecture.md 3.2.2 節](./02_architecture.md#322-dockerfileac-05〜07)参照）。バージョンは具体的なリリースタグで固定し、`ADD` によるチェックサム未検証の直接ダウンロードは採用しない |
 
 ## 6. 実装チェックリスト
 
