@@ -47,7 +47,7 @@ const (
 
 // Post is the subset of a post/repost record ListPosts exposes to callers:
 // enough to decide whether and how to delete it, without the full record
-// body (which downstream filtering, 0003_cleanup_engine, does not need).
+// body (which downstream filtering does not need).
 type Post struct {
 	RKey      string
 	Type      PostType

@@ -27,8 +27,8 @@ type DeleteFailure struct {
 }
 
 // Result is the structured outcome of a single run, independent of how it
-// is rendered. FormatText renders it for stdout; a future Slack formatter
-// (0006_slack_notification) renders the same Result for a webhook payload.
+// is rendered. FormatText renders it for stdout; internal/notify's payload
+// construction renders the same Result for a Slack webhook payload.
 type Result struct {
 	Mode    Mode
 	Targets []atproto.Post  // posts SelectDeletionTargets judged eligible
