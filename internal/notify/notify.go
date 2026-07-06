@@ -50,11 +50,8 @@ func (e *SendError) Unwrap() error {
 	return e.Err
 }
 
-// requestTimeout bounds a single webhook HTTP call. It is a package
-// variable (not a const) purely for test injection -- notify_test.go
-// overrides it to exercise the timeout path without a real multi-second
-// wait, restoring the original value via t.Cleanup.
-var requestTimeout = 3 * time.Second
+// defaultRequestTimeout bounds a single webhook HTTP call.
+const defaultRequestTimeout = 3 * time.Second
 
 // defaultRetryPolicy is deliberately lighter than internal/atproto's
 // retry.Policy: a Slack notification failure is non-fatal (it never
@@ -105,6 +102,21 @@ func (d perAttemptTimeoutDoer) Do(req *http.Request) (*http.Response, error) {
 // fake retry.Clock without incurring real backoff waits; production
 // callers (cmd/main.go) pass retry.RealClock{}.
 func Send(ctx context.Context, cfg Config, doer HTTPDoer, clock retry.Clock, outcome Outcome) error {
+	return send(ctx, cfg, doer, clock, outcome, defaultRequestTimeout, defaultRetryPolicy)
+}
+
+// send is Send's implementation, with requestTimeout and retryPolicy taken
+// as parameters (rather than package-level vars) so notify_test.go can
+// inject test-only values without mutating shared package state.
+func send(
+	ctx context.Context,
+	cfg Config,
+	doer HTTPDoer,
+	clock retry.Clock,
+	outcome Outcome,
+	requestTimeout time.Duration,
+	retryPolicy retry.Policy,
+) error {
 	failed := outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)
 
 	dest := cfg.SuccessWebhookURL
@@ -123,7 +135,7 @@ func Send(ctx context.Context, cfg Config, doer HTTPDoer, clock retry.Clock, out
 	}
 
 	timeoutDoer := perAttemptTimeoutDoer{inner: doer, timeout: requestTimeout}
-	redactedDoer := retry.NewDoer(timeoutDoer, defaultRetryPolicy, clock, retry.WithURLRedactor(redactWebhookURL))
+	redactedDoer := retry.NewDoer(timeoutDoer, retryPolicy, clock, retry.WithURLRedactor(redactWebhookURL))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
 	if err != nil {

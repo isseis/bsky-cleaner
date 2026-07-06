@@ -133,9 +133,7 @@ func TestSend_SelectedWebhookURLEmpty_SkipsSendReturnsNil(t *testing.T) {
 }
 
 func TestSend_HTTPTimeout_ReturnsSendError(t *testing.T) {
-	original := requestTimeout
-	requestTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { requestTimeout = original })
+	const testTimeout = 50 * time.Millisecond
 
 	var count atomic.Int32
 	block := make(chan struct{})
@@ -149,13 +147,13 @@ func TestSend_HTTPTimeout_ReturnsSendError(t *testing.T) {
 	t.Cleanup(func() { close(block) })
 
 	cfg := Config{SuccessWebhookURL: newSecretString(t, server.URL)}
-	err := Send(context.Background(), cfg, http.DefaultClient, &fakeClock{}, succeededOutcome())
+	err := send(context.Background(), cfg, http.DefaultClient, &fakeClock{}, succeededOutcome(), testTimeout, defaultRetryPolicy)
 	require.Error(t, err)
 	sendErr, ok := errorsAsSendError(err)
 	require.True(t, ok)
 	assert.Equal(t, 0, sendErr.StatusCode)
 	// Every attempt hangs (the handler never returns), so each individually
-	// exhausts requestTimeout: this asserts the retry loop actually made
+	// exhausts testTimeout: this asserts the retry loop actually made
 	// MaxRetries+1 separate attempts rather than giving up after the first
 	// once a shared deadline expired (see TestSend_EachRetryAttemptGetsFreshTimeout).
 	assert.Equal(t, int32(defaultRetryPolicy.MaxRetries+1), count.Load())
@@ -172,14 +170,12 @@ func TestSend_HTTPTimeout_ReturnsSendError(t *testing.T) {
 // attempt getting its own fresh timeout, a third fast attempt must still
 // succeed within the retry policy's MaxRetries=2 budget.
 func TestSend_EachRetryAttemptGetsFreshTimeout(t *testing.T) {
-	original := requestTimeout
-	requestTimeout = 100 * time.Millisecond
-	t.Cleanup(func() { requestTimeout = original })
+	const testTimeout = 100 * time.Millisecond
 
 	var count atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if count.Add(1) <= 2 {
-			time.Sleep(2 * requestTimeout)
+			time.Sleep(2 * testTimeout)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -188,7 +184,7 @@ func TestSend_EachRetryAttemptGetsFreshTimeout(t *testing.T) {
 
 	cfg := Config{SuccessWebhookURL: newSecretString(t, server.URL)}
 	clock := &fakeClock{}
-	err := Send(context.Background(), cfg, http.DefaultClient, clock, succeededOutcome())
+	err := send(context.Background(), cfg, http.DefaultClient, clock, succeededOutcome(), testTimeout, defaultRetryPolicy)
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(3), count.Load())
@@ -296,7 +292,7 @@ func TestNotifyWorstCaseTime_BoundedBelowExecutionTimeoutGuidance(t *testing.T) 
 	for _, d := range clock.SleepCalls {
 		backoff += d
 	}
-	worstCase := requestTimeout*time.Duration(defaultRetryPolicy.MaxRetries+1) + backoff
+	worstCase := defaultRequestTimeout*time.Duration(defaultRetryPolicy.MaxRetries+1) + backoff
 
 	assert.Equal(t, 12*time.Second, worstCase)
 	// Recommended execution_timeout_seconds guidance (tens of seconds or
