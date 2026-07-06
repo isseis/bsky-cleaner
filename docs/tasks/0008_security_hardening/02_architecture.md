@@ -207,7 +207,7 @@ var ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit e
 新しいエラーが `internal/notify` の `errorKind`（Slack 通知の分類文字列）にどう現れるかを整理する。`errorKind` はフェイルクローズで、未知のエラー型を `"unknown error"` に落とすため、いずれの経路でも秘密は漏れない。
 
 - `ErrResponseTooLarge` は `*HTTPError`（`ErrorName` に固定マーカーを設定、[4.1 節](#41-エラー型)）でラップされるため、`errorKind` は `"atproto http error: <method> status=<code> error=ResponseTooLarge"` として分類する。マーカーが無いと成功応答（`status=200`）由来の超過が正常な 2xx と区別できなくなるため、この固定マーカーによって Slack 上でも中断理由が判別可能になる。
-- `ErrPaginationLimitExceeded` は `*HTTPError` ではないため、`errorKind` は既存の `ErrPaginationStalled` と同様に `"unknown error"` に落ちる。ただし `cmd/main.go` の `run` は実行エラーの `Error()` を stderr へ出力しており、そこには `"pagination page/record limit exceeded"` の具体的文言が残るため、オンコールは stderr から原因を特定できる。この非対称は既存の `ErrPaginationStalled` と同じ挙動であり、本タスクで `errorKind` を変更する必要はない。
+- `ErrPaginationLimitExceeded` は `*HTTPError` ではないため、`errorKind` は既存の `ErrPaginationStalled` と同様に `"unknown error"` に落ちる。ただし `cmd/main.go` の `run` は実行エラーの `Error()` を stderr へ出力しており、そこには `"pagination byte/page/record limit exceeded"` の具体的文言が残るため、オンコールは stderr から原因を特定できる。この非対称は既存の `ErrPaginationStalled` と同じ挙動であり、本タスクで `errorKind` を変更する必要はない。
 
 ## 5. セキュリティ考慮事項
 
