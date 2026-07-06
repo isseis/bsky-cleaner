@@ -331,6 +331,7 @@ func TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult(t *testing.T) {
 	assert.Equal(t, exitOK, code)
 	assert.Contains(t, stdout.String(), "Deleted 1 post(s), 0 failure(s)")
 	assert.Empty(t, stderr.String())
+	assertOnlySlackRequestURL(t, mock, "https://hooks.slack.com/services/success")
 }
 
 func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T) {
@@ -358,18 +359,22 @@ func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T)
 	assert.Equal(t, exitPartialFailure, code)
 	assert.Contains(t, stdout.String(), "1 failure(s)")
 	assert.Contains(t, stdout.String(), failRkey)
+	assertOnlySlackRequestURL(t, mock, "https://hooks.slack.com/services/failure")
 }
 
-// slackRequestCount returns how many recorded requests were sent to the
-// hooks.slack.com webhook destinations, as opposed to the PDS.
-func slackRequestCount(mock *atprototestutil.MockHTTPDoer) int {
-	n := 0
+// assertOnlySlackRequestURL asserts that exactly one request went to
+// hooks.slack.com, and that its URL is wantURL -- proving the run actually
+// routed to the expected channel (success vs. failure), not merely that
+// some hooks.slack.com request was made.
+func assertOnlySlackRequestURL(t *testing.T, mock *atprototestutil.MockHTTPDoer, wantURL string) {
+	t.Helper()
+	var slackURLs []string
 	for _, req := range mock.Requests() {
 		if strings.Contains(req.URL, "hooks.slack.com") {
-			n++
+			slackURLs = append(slackURLs, req.URL)
 		}
 	}
-	return n
+	assert.Equal(t, []string{wantURL}, slackURLs)
 }
 
 func TestRun_ApplyLoginFailure_SendsFailureNotification(t *testing.T) {
@@ -389,14 +394,7 @@ func TestRun_ApplyLoginFailure_SendsFailureNotification(t *testing.T) {
 	code := run(configPath, true, time.Now(), mock, &stdout, &stderr)
 
 	assert.Equal(t, exitSetupOrRunFail, code)
-	assert.Equal(t, 1, slackRequestCount(mock))
-	found := false
-	for _, req := range mock.Requests() {
-		if req.URL == "https://hooks.slack.com/services/failure" {
-			found = true
-		}
-	}
-	assert.True(t, found, "expected a POST to the failure webhook, got requests: %+v", mock.Requests())
+	assertOnlySlackRequestURL(t, mock, "https://hooks.slack.com/services/failure")
 }
 
 func TestRun_Apply_SlackNotifyFails_ExitCodeUnaffected(t *testing.T) {
