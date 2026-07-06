@@ -303,6 +303,19 @@ func deleteRecordHandler(t *testing.T, postsPage string, deleteStatus map[string
 	})
 }
 
+// slackWebhookHandler wraps next, additionally answering any request whose
+// host is hooks.slack.com with the given status -- the Slack webhook
+// destination used by setEnvCredentials/validConfigPath in every apply-mode
+// test in this file.
+func slackWebhookHandler(status int, next func(req *http.Request) (*http.Response, error)) func(req *http.Request) (*http.Response, error) {
+	return func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "hooks.slack.com" {
+			return atprototestutil.JSONResponse(status, "ok"), nil
+		}
+		return next(req)
+	}
+}
+
 func TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
 	setEnvCredentials(t)
@@ -310,13 +323,14 @@ func TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult(t *testing.T) {
 
 	const rkey = "old-post"
 	postsPage := postPageResponse(rkey, "2000-01-01T00:00:00Z")
-	mock := &atprototestutil.MockHTTPDoer{Handler: deleteRecordHandler(t, postsPage, map[string]int{rkey: http.StatusOK})}
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusOK, deleteRecordHandler(t, postsPage, map[string]int{rkey: http.StatusOK}))}
 
 	var stdout, stderr bytes.Buffer
 	code := run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
 
 	assert.Equal(t, exitOK, code)
 	assert.Contains(t, stdout.String(), "Deleted 1 post(s), 0 failure(s)")
+	assert.Empty(t, stderr.String())
 }
 
 func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T) {
@@ -333,10 +347,10 @@ func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T)
 		)
 	}
 	postsPage := atprototestutil.ListRecordsResponseJSON([]string{record(okRkey), record(failRkey)}, "")
-	mock := &atprototestutil.MockHTTPDoer{Handler: deleteRecordHandler(t, postsPage, map[string]int{
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusOK, deleteRecordHandler(t, postsPage, map[string]int{
 		okRkey:   http.StatusOK,
 		failRkey: http.StatusInternalServerError,
-	})}
+	}))}
 
 	var stdout, stderr bytes.Buffer
 	code := run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
@@ -344,4 +358,133 @@ func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T)
 	assert.Equal(t, exitPartialFailure, code)
 	assert.Contains(t, stdout.String(), "1 failure(s)")
 	assert.Contains(t, stdout.String(), failRkey)
+}
+
+// slackRequestCount returns how many recorded requests were sent to the
+// hooks.slack.com webhook destinations, as opposed to the PDS.
+func slackRequestCount(mock *atprototestutil.MockHTTPDoer) int {
+	n := 0
+	for _, req := range mock.Requests() {
+		if strings.Contains(req.URL, "hooks.slack.com") {
+			n++
+		}
+	}
+	return n
+}
+
+func TestRun_ApplyLoginFailure_SendsFailureNotification(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+	configPath := validConfigPath(t)
+
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusOK, hermeticHandler(t, func(req *http.Request) (*http.Response, error) {
+		if strings.HasSuffix(req.URL.Path, "com.atproto.server.createSession") {
+			return atprototestutil.JSONResponse(http.StatusUnauthorized, `{"error":"AuthenticationRequired"}`), nil
+		}
+		t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+		return nil, nil
+	}))}
+
+	var stdout, stderr bytes.Buffer
+	code := run(configPath, true, time.Now(), mock, &stdout, &stderr)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Equal(t, 1, slackRequestCount(mock))
+	found := false
+	for _, req := range mock.Requests() {
+		if req.URL == "https://hooks.slack.com/services/failure" {
+			found = true
+		}
+	}
+	assert.True(t, found, "expected a POST to the failure webhook, got requests: %+v", mock.Requests())
+}
+
+func TestRun_Apply_SlackNotifyFails_ExitCodeUnaffected(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+	configPath := validConfigPath(t)
+
+	const rkey = "old-post"
+	postsPage := postPageResponse(rkey, "2000-06-01T00:00:00Z")
+	// Use a non-429 4xx status so internal/retry does not retry it, keeping
+	// this test fast despite using retry.RealClock (no fakeClock available
+	// through cmd/main.go's wiring).
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusBadRequest, deleteRecordHandler(t, postsPage, map[string]int{rkey: http.StatusOK}))}
+
+	var stdout, stderr bytes.Buffer
+	code := run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
+
+	assert.Equal(t, exitOK, code)
+}
+
+func TestRun_Apply_SlackNotifyFails_StderrContainsMaskedFailureMessage(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+	configPath := validConfigPath(t)
+
+	const rkey = "old-post"
+	postsPage := postPageResponse(rkey, "2000-01-01T00:00:00Z")
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusBadRequest, deleteRecordHandler(t, postsPage, map[string]int{rkey: http.StatusOK}))}
+
+	var stdout, stderr bytes.Buffer
+	run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
+
+	assert.NotEmpty(t, stderr.String())
+	assert.NotContains(t, stderr.String(), "hooks.slack.com/services/success")
+}
+
+func TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+	t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", "")
+	t.Setenv("BSKY_SLACK_WEBHOOK_URL_FAILURE", "")
+	configPath := validConfigPath(t)
+
+	const rkey = "post-no-webhook"
+	postsPage := postPageResponse(rkey, "2000-01-01T00:00:00Z")
+	mock := &atprototestutil.MockHTTPDoer{Handler: deleteRecordHandler(t, postsPage, map[string]int{rkey: http.StatusOK})}
+
+	var stdout, stderr bytes.Buffer
+	code := run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
+
+	assert.Equal(t, exitOK, code)
+	assert.Empty(t, stderr.String())
+}
+
+func TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+	configPath := validConfigPath(t)
+
+	const okRkey = "old-post-ok"
+	const failRkey = "evil\nFAKE LOG LINE"
+	record := func(rkey string) string {
+		// json.Marshal (not a raw %s substitution) so a literal newline in
+		// rkey is properly escaped as \n within the JSON string, rather
+		// than breaking the surrounding JSON syntax.
+		uriJSON, err := json.Marshal(fmt.Sprintf("at://%s/app.bsky.feed.post/%s", testDID, rkey))
+		require.NoError(t, err)
+		return fmt.Sprintf(
+			`{"uri":%s,"cid":"bafycid","value":{"$type":"app.bsky.feed.post","text":"post","createdAt":"2000-01-01T00:00:00Z"}}`,
+			uriJSON,
+		)
+	}
+	postsPage := atprototestutil.ListRecordsResponseJSON([]string{record(okRkey), record(failRkey)}, "")
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusOK, deleteRecordHandler(t, postsPage, map[string]int{
+		okRkey:   http.StatusOK,
+		failRkey: http.StatusInternalServerError,
+	}))}
+
+	var stdout, stderr bytes.Buffer
+	code := run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
+
+	assert.Equal(t, exitPartialFailure, code)
+	// notify.Sanitize strips every C0 control character -- including the
+	// legitimate line breaks in report.FormatText's own multi-line output,
+	// not only ones smuggled in via failRkey -- so a fully sanitized stdout
+	// contains no raw newline at all. The surrounding content is still
+	// there, just newline-free.
+	assert.NotContains(t, stdout.String(), "\n")
+	assert.Contains(t, stdout.String(), "1 failure(s)")
+	assert.Contains(t, stdout.String(), "FAKE LOG LINE")
 }
