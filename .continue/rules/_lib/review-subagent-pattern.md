@@ -6,7 +6,7 @@ calling command supplies. This file defines the procedure once; commands invoke
 it by saying "follow `_lib/review-subagent-pattern.md`" and providing the four
 inputs.
 
-This is project-independent. It depends on nothing in `_context.md`.
+This is project-independent. It depends on nothing in `_lib/context.txt`.
 
 ## Inputs the calling command must supply
 

@@ -23,7 +23,7 @@ models:
   - name: Claude 4 Sonnet
     provider: anthropic
     model: claude-sonnet-4-20250514
-    apiKey: ${{ secrets.ANTHROPIC_API_KEY }}
+    apiKey: YOUR_ANTHROPIC_API_KEY_HERE
     roles:
       - chat
       - edit
