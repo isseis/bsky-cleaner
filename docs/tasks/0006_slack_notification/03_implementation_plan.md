@@ -331,7 +331,7 @@
 
 **レビュー観点**: dry-run時に `notify.Send` が一切呼ばれないこと（AC-04） / 通知の送信失敗が終了コードに影響しないこと（AC-02） / stdout の書き込みが `notify.Send` 呼び出しより先に行われること（設計書 3.5節の順序要件） / `notifyCtx` が `runner.Run` 用の `ctx` から独立していること（設計書 3.5節） / 既存の `cmd/main_test.go` のテスト（`validConfigPath`・`TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` 双方のTOMLフィクスチャ修正を含む）がすべて無退行で成功すること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
