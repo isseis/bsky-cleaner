@@ -239,14 +239,14 @@
 
 ### フェーズ7: ドキュメント更新（設計書 3.5節・8節7番目の項目）
 
-- [ ] **対象ファイル**: `docs/design/configuration.md`
+- [x] **対象ファイル**: `docs/design/configuration.md`
   - **作業内容**:
     1. 20行目の `slack_allowed_host` 行から、末尾の「**未実装（計画中）**: ...」という一文を削除する（本タスクの実装完了によりこの注記は事実と矛盾するため）。
     2. 44〜46行目の「Slack Webhook URL のホスト部が TOML `slack_allowed_host` と一致することの検証は...」の直後にある「> **未実装（計画中）**: ...」の引用ブロック（46行目）を削除する。
     3. 31行目の `execution_timeout_seconds` 運用ガイダンスの段落の末尾に、次の趣旨の一文を追記する: Slack通知処理（[0006_slack_notification アーキテクチャ設計書](../tasks/0006_slack_notification/02_architecture.md#35-副作用契約dry-run--apply-とネットワーク送信) 3.5節）が、削除処理とは独立したタイムアウト予算（既定で約12秒: 単発HTTPタイムアウト3秒 × 最大3試行 + バックオフ1秒+2秒）を追加で消費するため、`execution_timeout_seconds` とスケジュール間隔の余裕を検討する際はこの追加分も考慮すること。
   - **完了基準**: `rg -n "未実装（計画中）" docs/design/configuration.md` の実行結果が0件であること。`rg -n "約12秒" docs/design/configuration.md` の実行結果が1件以上であること。
 
-- [ ] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
+- [x] **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
   - **作業内容**:
     1. 「Directory Structure」の `internal/` 一覧（17行目 `retry/` の次）に次の1行を追加する。
        ```
@@ -333,8 +333,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/51）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-4 作成ポイント: documentation updates
 
@@ -344,8 +344,8 @@
 
 **レビュー観点**: `docs/design/configuration.md` から「未実装（計画中）」の注記が過不足なく削除されていること / 追記した約12秒の説明が設計書 3.6節の数値計算と一致していること / `package_reference.md` の追記が既存の記述粒度・文体と一致していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/52）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
