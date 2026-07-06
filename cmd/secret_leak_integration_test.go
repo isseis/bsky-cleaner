@@ -1,7 +1,7 @@
 //go:build test
 
 // Package main holds the CLI-level integration tests for secret non-leakage
-// (AC-01, AC-02). Every test uses high-distinction secret literals distinct
+// (happy path and error paths). Every test uses high-distinction secret literals distinct
 // from setEnvCredentials — which uses weak values ("app-password",
 // "access-jwt") that would produce false-negative passes.
 package main
@@ -134,7 +134,7 @@ func secretLeakDeleteRecordHandler(t *testing.T, postsPage string, deleteStatus 
 	})
 }
 
-// ---------- AC-01: Happy path (dry-run and --apply) ----------
+// ---------- Happy path (dry-run and --apply) ----------
 
 func TestRun_SecretNonLeak_HappyPath_DryRun(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
@@ -170,9 +170,9 @@ func TestRun_SecretNonLeak_HappyPath_Apply(t *testing.T) {
 	assertNoSecrets(t, stdout.String(), stderr.String(), slackBodies...)
 }
 
-// ---------- AC-02: Error paths ----------
+// ---------- Error paths ----------
 
-// AC-02 (a): Auth failure — createSession returns non-2xx.
+// Auth failure — createSession returns non-2xx.
 func TestRun_SecretNonLeak_AuthFailure(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
 	setupSecretLeakEnv(t)
@@ -194,7 +194,7 @@ func TestRun_SecretNonLeak_AuthFailure(t *testing.T) {
 	assertNoSecrets(t, stdout.String(), stderr.String(), slackBodies...)
 }
 
-// AC-02 (b): Network error — the HTTPDoer returns a connection-level error.
+// Network error — the HTTPDoer returns a connection-level error.
 // This path fails during DID resolution, before createSession produces any
 // AccessJWT, but the validation should still catch app password / webhook
 // URL leaks in the stderr output.
@@ -213,7 +213,7 @@ func TestRun_SecretNonLeak_NetworkError(t *testing.T) {
 	assertNoSecrets(t, stdout.String(), stderr.String())
 }
 
-// AC-02 (c): DID resolution error — the well-known endpoints return non-2xx.
+// DID resolution error — the well-known endpoints return non-2xx.
 // This path fails before createSession: AccessJWT / Bearer assertions are
 // vacuous, but the test still validates app password and webhook URLs do not
 // leak in stderr.
@@ -236,7 +236,7 @@ func TestRun_SecretNonLeak_DIDResolutionError(t *testing.T) {
 	assertNoSecrets(t, stdout.String(), stderr.String())
 }
 
-// AC-02 (d): Delete failure — deleteRecord returns non-2xx.
+// Delete failure — deleteRecord returns non-2xx.
 func TestRun_SecretNonLeak_DeleteFailure(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
 	setupSecretLeakEnv(t)
@@ -254,7 +254,7 @@ func TestRun_SecretNonLeak_DeleteFailure(t *testing.T) {
 	assertNoSecrets(t, stdout.String(), stderr.String(), slackBodies...)
 }
 
-// AC-02 (e): Slack send failure — hooks.slack.com returns non-2xx.
+// Slack send failure — hooks.slack.com returns non-2xx.
 // Uses a non-429 4xx so internal/retry does not retry, keeping this test fast.
 func TestRun_SecretNonLeak_SlackSendFailure(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
@@ -273,7 +273,7 @@ func TestRun_SecretNonLeak_SlackSendFailure(t *testing.T) {
 	assertNoSecrets(t, stdout.String(), stderr.String(), slackBodies...)
 }
 
-// AC-02 (f): Execution timeout — the configured timeout fires during DID
+// Execution timeout — the configured timeout fires during DID
 // resolution. This path fails before createSession: AccessJWT / Bearer
 // assertions are vacuous; the test validates app password and webhook URLs.
 func TestRun_SecretNonLeak_ExecutionTimeout(t *testing.T) {
