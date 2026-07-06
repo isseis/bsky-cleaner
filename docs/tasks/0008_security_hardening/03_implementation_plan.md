@@ -132,18 +132,18 @@
 
 **対象ファイル**: `cmd/secret_leak_integration_test.go`（新規, `package main`）
 
-- [ ] **識別性の高い秘密リテラルを定義する**。app パスワード・`AccessJWT`・成功／失敗 Webhook URL には、部分文字列一致が偶然当たらない固定リテラル（例: `secretAppPassword = "SECRET-APP-PW-xyz789"`、`secretAccessJWT = "SECRET-ACCESS-JWT-abc123"`、成功／失敗 Webhook URL も `hooks.slack.com` 配下の識別性の高いパス）を本ファイル内の定数として定義する。既存 `setEnvCredentials`（`"app-password"`・`"access-jwt"` 相当）の値は短く弱いため**本 Phase では使用しない**。
-- [ ] **単一の Phase-3 セットアップヘルパー**（例: `setupSecretLeakEnv(t)`）を用意し、上記の識別性の高い app パスワードと両 Webhook URL を環境変数／TOML に注入する。**AC-01・AC-02 の全 `run()` 駆動テストがこのヘルパーを必ず呼ぶ**こととし、いずれのテストも `setEnvCredentials` にフォールバックしない。フォールバックすると、禁止文字列集合が実際には一度も設定されていない値を探すことになり、テストが常に通ってしまう（漏洩を見逃す偽陰性になる）ためである。
-- [ ] **`createSession` が識別性の高い `AccessJWT` を返す Phase-3 ローカルのハンドラ**を用意する。既存 `listRecordsHandler`（`cmd/main_test.go`）は `createSession` 応答を `CreateSessionResponseJSON(testDID, "access-jwt")` と決め打つため、その `createSession` 分岐を**そのままは再利用しない**。本 Phase のハンドラは `createSession` 分岐で `CreateSessionResponseJSON(testDID, secretAccessJWT)` を返し、`listRecords`／`getRecord`／`deleteRecord`／Slack POST の各分岐は `hermeticHandler`・`postPageResponse`・`emptyPageResponse`・`slackWebhookHandler`・`JSONResponse` を再利用して構成する（JWT を注入する `createSession` 分岐のみ独自実装する）。
-- [ ] 禁止文字列集合 **{`secretAppPassword`, `secretAccessJWT`, `"Bearer " + secretAccessJWT`, 成功 Webhook URL, 失敗 Webhook URL}** を組み立てるヘルパーを用意する（[02_architecture.md 6.1 節の禁止文字列集合](./02_architecture.md#61-秘密非漏洩の結合テスト ac-01ac-02)）。集合の各値は上記セットアップヘルパー／`createSession` ハンドラが注入した実値と一致させる。
-- [ ] 3 出力面（stdout バッファ・stderr バッファ・捕捉した Slack ペイロード）を集める共通検証ヘルパーを用意する。Slack ペイロードは `mock.Requests()` を `req.URL` の host が `hooks.slack.com` のものに絞って `RecordedRequest.Body` から取得する（`MockHTTPDoer` の既存記録機構を再利用）。各面に対し禁止文字列集合の各要素が部分文字列として現れないことを表明する。
-- [ ] AC-01（正常系）のテストを追加する。ログイン成功→一覧取得→削除→Slack 通知まで通し、秘密が現れないことを検証する。副作用契約（[02_architecture.md 5.3 節](./02_architecture.md#53-副作用契約 dry-run-と---apply)）に従い **dry-run と `--apply` の両方**を対象とする（dry-run では Slack 通知が抑止されるため検証面は stdout・stderr、`--apply` では 3 面すべて）。
-- [ ] AC-02 (a) 認証失敗のテストを追加する。`createSession` に非 2xx を返し、適用面に秘密が現れないことを検証する。
-- [ ] AC-02 (b) ネットワークエラーのテストを追加する。モックの `Do` が通信エラー（`return nil, errors.New(...)`）を返す。
-- [ ] AC-02 (c) DID/PDS エンドポイント解決エラーのテストを追加する。`.well-known/atproto-did` または `.well-known/did.json` 応答を不正値／非 2xx にする（`hermeticHandler` を使わず DID 解決段で失敗させる）。**この経路は `createSession` に到達しないため `AccessJWT`／Bearer に対する非漏洩表明は空振り（vacuous）**であり、実効的な検証は app パスワード・Webhook URL の非漏洩に対して働く。テストコメントにこの点を明記する。
-- [ ] AC-02 (d) 削除呼び出し失敗のテストを追加する。`deleteRecord` に非 2xx を返す（`--apply`）。
-- [ ] AC-02 (e) Slack 通知送信失敗のテストを追加する。`hooks.slack.com` への POST に非 2xx を返す（`--apply`）。retry の実時間待機を避けるため非 429 の 4xx を用いる（既存 `TestRun_Apply_SlackNotifyFails_*` と同じ配慮）。
-- [ ] AC-02 (f) 実行タイムアウト到達のテストを追加する。`execution_timeout_seconds = 1`（`LoadAppConfig` の最小値）の設定と、`ctx` を尊重して `<-req.Context().Done()` で待機するモックで deadline 到達を発生させる（既存 `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` の配線を踏襲）。DID 解決段で中断するため **(c) と同様に `AccessJWT`／Bearer への表明は空振り**であり、実効検証は app パスワード・Webhook URL に働く。検証面は stdout・stderr。テストコメントにこの点を明記する。
+- [x] **識別性の高い秘密リテラルを定義する**。app パスワード・`AccessJWT`・成功／失敗 Webhook URL には、部分文字列一致が偶然当たらない固定リテラル（例: `secretAppPassword = "SECRET-APP-PW-xyz789"`、`secretAccessJWT = "SECRET-ACCESS-JWT-abc123"`、成功／失敗 Webhook URL も `hooks.slack.com` 配下の識別性の高いパス）を本ファイル内の定数として定義する。既存 `setEnvCredentials`（`"app-password"`・`"access-jwt"` 相当）の値は短く弱いため**本 Phase では使用しない**。
+- [x] **単一の Phase-3 セットアップヘルパー**（例: `setupSecretLeakEnv(t)`）を用意し、上記の識別性の高い app パスワードと両 Webhook URL を環境変数／TOML に注入する。**AC-01・AC-02 の全 `run()` 駆動テストがこのヘルパーを必ず呼ぶ**こととし、いずれのテストも `setEnvCredentials` にフォールバックしない。フォールバックすると、禁止文字列集合が実際には一度も設定されていない値を探すことになり、テストが常に通ってしまう（漏洩を見逃す偽陰性になる）ためである。
+- [x] **`createSession` が識別性の高い `AccessJWT` を返す Phase-3 ローカルのハンドラ**を用意する。既存 `listRecordsHandler`（`cmd/main_test.go`）は `createSession` 応答を `CreateSessionResponseJSON(testDID, "access-jwt")` と決め打つため、その `createSession` 分岐を**そのままは再利用しない**。本 Phase のハンドラは `createSession` 分岐で `CreateSessionResponseJSON(testDID, secretAccessJWT)` を返し、`listRecords`／`getRecord`／`deleteRecord`／Slack POST の各分岐は `hermeticHandler`・`postPageResponse`・`emptyPageResponse`・`slackWebhookHandler`・`JSONResponse` を再利用して構成する（JWT を注入する `createSession` 分岐のみ独自実装する）。
+- [x] 禁止文字列集合 **{`secretAppPassword`, `secretAccessJWT`, `"Bearer " + secretAccessJWT`, 成功 Webhook URL, 失敗 Webhook URL}** を組み立てるヘルパーを用意する（[02_architecture.md 6.1 節の禁止文字列集合](./02_architecture.md#61-秘密非漏洩の結合テスト ac-01ac-02)）。集合の各値は上記セットアップヘルパー／`createSession` ハンドラが注入した実値と一致させる。
+- [x] 3 出力面（stdout バッファ・stderr バッファ・捕捉した Slack ペイロード）を集める共通検証ヘルパーを用意する。Slack ペイロードは `mock.Requests()` を `req.URL` の host が `hooks.slack.com` のものに絞って `RecordedRequest.Body` から取得する（`MockHTTPDoer` の既存記録機構を再利用）。各面に対し禁止文字列集合の各要素が部分文字列として現れないことを表明する。
+- [x] AC-01（正常系）のテストを追加する。ログイン成功→一覧取得→削除→Slack 通知まで通し、秘密が現れないことを検証する。副作用契約（[02_architecture.md 5.3 節](./02_architecture.md#53-副作用契約 dry-run-と---apply)）に従い **dry-run と `--apply` の両方**を対象とする（dry-run では Slack 通知が抑止されるため検証面は stdout・stderr、`--apply` では 3 面すべて）。
+- [x] AC-02 (a) 認証失敗のテストを追加する。`createSession` に非 2xx を返し、適用面に秘密が現れないことを検証する。
+- [x] AC-02 (b) ネットワークエラーのテストを追加する。モックの `Do` が通信エラー（`return nil, errors.New(...)`）を返す。
+- [x] AC-02 (c) DID/PDS エンドポイント解決エラーのテストを追加する。`.well-known/atproto-did` または `.well-known/did.json` 応答を不正値／非 2xx にする（`hermeticHandler` を使わず DID 解決段で失敗させる）。**この経路は `createSession` に到達しないため `AccessJWT`／Bearer に対する非漏洩表明は空振り（vacuous）**であり、実効的な検証は app パスワード・Webhook URL の非漏洩に対して働く。テストコメントにこの点を明記する。
+- [x] AC-02 (d) 削除呼び出し失敗のテストを追加する。`deleteRecord` に非 2xx を返す（`--apply`）。
+- [x] AC-02 (e) Slack 通知送信失敗のテストを追加する。`hooks.slack.com` への POST に非 2xx を返す（`--apply`）。retry の実時間待機を避けるため非 429 の 4xx を用いる（既存 `TestRun_Apply_SlackNotifyFails_*` と同じ配慮）。
+- [x] AC-02 (f) 実行タイムアウト到達のテストを追加する。`execution_timeout_seconds = 1`（`LoadAppConfig` の最小値）の設定と、`ctx` を尊重して `<-req.Context().Done()` で待機するモックで deadline 到達を発生させる（既存 `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` の配線を踏襲）。DID 解決段で中断するため **(c) と同様に `AccessJWT`／Bearer への表明は空振り**であり、実効検証は app パスワード・Webhook URL に働く。検証面は stdout・stderr。テストコメントにこの点を明記する。
 
 **完了基準**: `make test` が緑。AC-01（両モード）・AC-02 (a)〜(f) の各テストが、意図した失敗経路を通過したうえで 3 面（または適用面）に秘密文字列を含まないことを確認する。
 
@@ -155,8 +155,8 @@
 
 **レビュー観点**: 識別性の高い秘密リテラル（app password・`AccessJWT`・両 Webhook URL）を注入する専用セットアップヘルパーを全テストが必ず呼び、既存の弱い `setEnvCredentials` にフォールバックしていないこと（偽陰性回避） / 禁止文字列集合が stdout・stderr・Slack ペイロードの 3 面（dry-run では 2 面）で漏洩していないことを一貫して検証していること / AC-02 (c)・(f) は DID 解決段で中断するため `AccessJWT`／Bearer への非漏洩表明が空振り（vacuous）である旨がテストコメントに明記されていること / AC-01 が dry-run と `--apply` の両方を対象とし副作用契約（Slack 通知の抑止有無）と整合していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した (https://github.com/isseis/bsky-cleaner/pull/62)
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -244,7 +244,7 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 
 - [x] PR-1 マージ済み（対象ステップ：Phase 1。`errors.go` のセンチネル 2 種、`http.go` の `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数、`doXRPC` の応答サイズ上限、`newRestrictedDoer` の `timeout` 引数、`posts.go` の 3 上限定数と `listAllRecords` の検査、`http_test.go`・`posts_test.go` の単体テスト追加）
 - [ ] PR-2 マージ済み（対象ステップ：Phase 2。`internal/atproto/idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
-- [ ] PR-3 マージ済み（対象ステップ：Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証）
+- [ ] PR-3 マージ済み（対象ステップ：Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証。PR: https://github.com/isseis/bsky-cleaner/pull/62）
 - [ ] PR-4 マージ済み（対象ステップ：Phase 4。本計画書 [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) の棚卸し一覧・決定記録を確定）
 - [ ] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
 
