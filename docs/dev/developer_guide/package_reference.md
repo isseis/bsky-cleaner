@@ -15,6 +15,7 @@ codebase grows.
   - `atproto/`: thin, self-written AT Protocol (XRPC) client for login, post listing, and post deletion (see docs/tasks/0002_atproto_client)
     - `testutil/`: `HTTPDoer` test double and lexicon-checked response fixtures for `internal/atproto`'s own tests
   - `retry/`: generic `HTTPDoer` decorator that retries transient failures (transport errors, 429, 5xx) with bounded exponential backoff, with no dependency on internal/atproto (see docs/tasks/0005_retry_timeout)
+  - `notify/`: builds a Slack Incoming Webhook payload from a report.Result/error outcome, sanitizes/escapes externally-sourced identifiers and error text, and sends it via internal/retry with a URL-redacting retry log (see docs/tasks/0006_slack_notification)
   - `cleanup/`: filters an account's post inventory down to deletion targets based on retention days, post type, and pinned status (see docs/tasks/0003_cleanup_engine)
   - `runner/`: wires config/atproto/cleanup together into a single dry-run/apply run, producing a report.Result (see docs/tasks/0004_cli_entrypoint)
   - `report/`: structured run result (Result/Mode/DeleteFailure) and its stdout text rendering (FormatText), independent of how the result was produced (see docs/tasks/0004_cli_entrypoint)
@@ -25,7 +26,7 @@ codebase grows.
 
 **Configuration**
 
-- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
+- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. `LoadAppConfig` also validates that any configured Slack webhook URL's host matches the TOML `slack_allowed_host` allowlist, failing closed if it is missing or does not match (see docs/tasks/0006_slack_notification/01_requirements.md). See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
 
 **AT Protocol Client**
 
@@ -33,7 +34,7 @@ codebase grows.
 
 **Retry**
 
-- `internal/retry`: a generic `HTTPDoer` decorator (`Doer`) that retries transient failures (transport errors, HTTP 429, HTTP 5xx) with bounded exponential backoff, honoring a server's `Retry-After` header when positive and always capping the wait at `Policy.MaxDelay`. Never retries an error satisfying the unexported `permanentError` interface or a non-429 4xx status. Depends only on the standard library, so `internal/atproto` is the only consumer that imports it (see docs/tasks/0005_retry_timeout/01_requirements.md).
+- `internal/retry`: a generic `HTTPDoer` decorator (`Doer`) that retries transient failures (transport errors, HTTP 429, HTTP 5xx) with bounded exponential backoff, honoring a server's `Retry-After` header when positive and always capping the wait at `Policy.MaxDelay`. Never retries an error satisfying the unexported `permanentError` interface or a non-429 4xx status. Depends only on the standard library, so `internal/atproto` is the only consumer that imports it (see docs/tasks/0005_retry_timeout/01_requirements.md). `WithURLRedactor` lets a caller whose request URL itself carries a secret (e.g. a Slack Incoming Webhook token) override the URL text emitted by the retry/give-up log, without affecting internal/atproto's existing unredacted logging (see docs/tasks/0006_slack_notification/01_requirements.md).
 
 **Cleanup Engine**
 
@@ -45,7 +46,11 @@ codebase grows.
 
 **Report**
 
-- `internal/report`: the structured outcome of a run (`Result`/`Mode`/`DeleteFailure`), independent of how it is rendered, plus `FormatText` for stdout rendering. Reused as-is by a future Slack formatter (see docs/tasks/0006_slack_notification/01_requirements.md).
+- `internal/report`: the structured outcome of a run (`Result`/`Mode`/`DeleteFailure`), independent of how it is rendered, plus `FormatText` for stdout rendering. Reused as-is by `internal/notify`'s Slack payload construction (see docs/tasks/0006_slack_notification/01_requirements.md).
+
+**Notification**
+
+- `internal/notify`: builds a Slack Incoming Webhook payload (`text` field only) from a `report.Result`/error outcome, routing to a success or failure webhook URL based on whether the run errored or had partial delete failures (`Send`). Sanitizes control characters/newlines and escapes Slack mrkdwn mention syntax in externally-sourced identifiers and error text before including them, and never includes post body content. Delegates HTTP timeout/retry to `internal/retry`, redacting the webhook URL from its retry/give-up logging. A delivery failure never affects the CLI's own exit code (see docs/tasks/0006_slack_notification/01_requirements.md).
 
 ## Key Design Patterns
 
