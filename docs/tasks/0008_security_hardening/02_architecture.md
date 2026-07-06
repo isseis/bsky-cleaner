@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-06 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-06 |
+| Reviewer | isseis |
 | Comments | - |
 
 ## 1. 設計の全体像
@@ -158,7 +158,7 @@ XRPC 呼び出しに使う `http.Client`（`newRestrictedDoer` が構築する `
 
 - `http.Client.Timeout` は接続・送信・応答ボディ読み取りまでの1リクエストの総時間を上限とし、応答遅延（slowloris 的挙動）によるハングを、実行タイムアウトの残り予算とは独立した1回あたりの上限として抑える。
 - `restrictedDoer` は `retry.Doer` にラップされて呼ばれ、リトライの各試行が個別の `Do` 呼び出しになるため、`http.Client.Timeout` は各試行に独立して適用される（試行間で共有されない）。`internal/notify` が `perAttemptTimeoutDoer` で実現している「試行ごとの独立タイムアウト」と同じ性質を、XRPC 経路では `http.Client.Timeout` そのもので満たす。
-- **テスト用の差し替え口**: `xrpcRequestTimeout` は本番では固定の定数値だが、[7.1 節](#71-単体テストdos-系防御)の遅延応答サーバーによる挙動テストが実待機なしで発火を確認できるよう、`newPDSDoer`（`client.go`、`//go:build test` の `StubPassthroughPDSDoer` が差し替える既存パターン）と同様に、テストからのみ短い値へ上書きできる差し替え口を1つ設ける。本番経路の値・挙動は変えない。
+- **テスト用の差し替え口**: `xrpcRequestTimeout` 自体は本番専用の定数のままとし、パッケージ変数化はしない。`newRestrictedDoer` のシグネチャに `timeout time.Duration` 引数を追加し（`newRestrictedDoer(verifiedAddrs []net.IP, host string, timeout time.Duration)`）、本番の唯一の呼び出し元 `newPDSDoer`（`client.go`）は定数 `xrpcRequestTimeout` をそのまま渡す。[7.1 節](#71-単体テストdos-系防御)の遅延応答サーバーによる挙動テストは `internal/atproto` パッケージ内部（`http_test.go`、`package atproto`）から `newRestrictedDoer` を短い `timeout` 値で直接呼び出して検証する。`newPDSDoer` のようなパッケージ変数の save/restore（`t.Cleanup` によるグローバル状態の一時書き換え）を用いないため、このパッケージのテストが将来 `t.Parallel()` を使っても壊れない。
 
 > **DID 解決経路の扱い（本タスクのスコープ外だが記録）**: DID 解決（`resolveHandleToDID`／`resolveDIDDocument`）は `cmd/main.go` が渡す `http.DefaultClient`（全体タイムアウトなし）を用いる。この経路は AC-04 が挙げる「XRPC の `http.Client`」ではなく、また `did.go` が応答サイズ上限を、`context.WithTimeout`（実行タイムアウト）が deadline を既に付与しているため、ハングは実行タイムアウトの範囲に収まる。本タスクでは AC-04 が名指しする XRPC 経路のみを対象とし、DID 解決経路への独立タイムアウト付与は行わない。この残余は棚卸し（AC-03）に記録する。
 
