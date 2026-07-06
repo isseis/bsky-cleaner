@@ -305,11 +305,13 @@ func deleteRecordHandler(t *testing.T, postsPage string, deleteStatus map[string
 
 // slackWebhookHandler wraps next, additionally answering any request whose
 // host is hooks.slack.com with the given status -- the Slack webhook
-// destination used by setEnvCredentials/validConfigPath in every apply-mode
-// test in this file.
+// destination configured by setEnvCredentials/validConfigPath in apply-mode
+// tests that set up a webhook (not every apply-mode test in this file: some,
+// like TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError, deliberately
+// leave no webhook configured).
 func slackWebhookHandler(status int, next func(req *http.Request) (*http.Response, error)) func(req *http.Request) (*http.Response, error) {
 	return func(req *http.Request) (*http.Response, error) {
-		if req.URL.Host == "hooks.slack.com" {
+		if req.URL.Hostname() == "hooks.slack.com" {
 			return atprototestutil.JSONResponse(status, "ok"), nil
 		}
 		return next(req)
@@ -368,9 +370,10 @@ func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T)
 // some hooks.slack.com request was made.
 func assertOnlySlackRequestURL(t *testing.T, mock *atprototestutil.MockHTTPDoer, wantURL string) {
 	t.Helper()
+	const slackBaseURL = "https://hooks.slack.com/"
 	var slackURLs []string
 	for _, req := range mock.Requests() {
-		if strings.Contains(req.URL, "hooks.slack.com") {
+		if strings.HasPrefix(req.URL, slackBaseURL) {
 			slackURLs = append(slackURLs, req.URL)
 		}
 	}
