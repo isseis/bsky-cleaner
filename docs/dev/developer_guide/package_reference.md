@@ -34,7 +34,7 @@ codebase grows.
 
 **Retry**
 
-- `internal/retry`: a generic `HTTPDoer` decorator (`Doer`) that retries transient failures (transport errors, HTTP 429, HTTP 5xx) with bounded exponential backoff, honoring a server's `Retry-After` header when positive and always capping the wait at `Policy.MaxDelay`. Never retries an error satisfying the unexported `permanentError` interface or a non-429 4xx status. Depends only on the standard library, so `internal/atproto` is the only consumer that imports it (see docs/tasks/0005_retry_timeout/01_requirements.md). `WithURLRedactor` lets a caller whose request URL itself carries a secret (e.g. a Slack Incoming Webhook token) override the URL text emitted by the retry/give-up log, without affecting internal/atproto's existing unredacted logging (see docs/tasks/0006_slack_notification/01_requirements.md).
+- `internal/retry`: a generic `HTTPDoer` decorator (`Doer`) that retries transient failures (transport errors, HTTP 429, HTTP 5xx) with bounded exponential backoff, honoring a server's `Retry-After` header when positive and always capping the wait at `Policy.MaxDelay`. Never retries an error satisfying the unexported `permanentError` interface or a non-429 4xx status. Depends only on the standard library, so it can be reused by multiple internal packages (currently `internal/atproto` and `internal/notify`) (see docs/tasks/0005_retry_timeout/01_requirements.md). `WithURLRedactor` lets a caller whose request URL itself carries a secret (e.g. a Slack Incoming Webhook token) override the URL text emitted by the retry/give-up log, without affecting `internal/atproto`'s existing unredacted logging (see docs/tasks/0006_slack_notification/01_requirements.md).
 
 **Cleanup Engine**
 
