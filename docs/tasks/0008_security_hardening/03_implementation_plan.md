@@ -73,8 +73,8 @@
 
 **対象ファイル**: `internal/atproto/errors.go`, `internal/atproto/http.go`, `internal/atproto/posts.go`, `internal/atproto/client.go`, `internal/atproto/test_helpers.go`, `internal/atproto/http_test.go`, `internal/atproto/posts_test.go`
 
-- [ ] `errors.go`: センチネル `ErrResponseTooLarge = errors.New("XRPC response exceeds size limit")` を追加する。
-- [ ] `errors.go`: センチネル `ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit exceeded")` を追加する。
+- [x] `errors.go`: センチネル `ErrResponseTooLarge = errors.New("XRPC response exceeds size limit")` を追加する。
+- [x] `errors.go`: センチネル `ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit exceeded")` を追加する。
 - [ ] `http.go`: 定数 `maxXRPCResponseBytes`（8 MiB = `8 << 20`）を追加する。1ページ最大100レコードの正当な応答が数 MB に収まる前提の余裕値（[02_architecture.md 3.1 節](./02_architecture.md#31-応答サイズ上限doxrpc)）。
 - [ ] `http.go`: リクエスト全体タイムアウトを表す定数 `xrpcRequestTimeout`（`const xrpcRequestTimeout = 30 * time.Second`）を追加する。`dialTimeout`（10秒）を上回る値。
 - [ ] `http.go`: `newRestrictedDoer` のシグネチャに `timeout time.Duration` 引数を追加し（`newRestrictedDoer(verifiedAddrs []net.IP, host string, timeout time.Duration)`）、構築する `http.Client` に `Timeout: timeout` を設定する。パッケージ変数を使わず引数で渡すのは、`t.Cleanup` によるグローバル状態の save/restore（`newPDSDoer` の既存パターン）だとこのパッケージのテストが将来 `t.Parallel()` を使った際にデータ競合になり得るためである。本番の唯一の呼び出し元 `newPDSDoer`（`client.go`）は定数 `xrpcRequestTimeout` を渡すよう更新する。テストは `newRestrictedDoer` を短い `timeout` で直接呼び出すことで、遅延応答サーバーに対するタイムアウト発火を実時間を待たずに確認できる（[02_architecture.md 3.3 節](./02_architecture.md#33-リクエスト全体タイムアウトrestricteddoer)）。
@@ -97,8 +97,8 @@
 
 **レビュー観点**: `doXRPC` の成功／エラー両方のボディ読み取りに `maxXRPCResponseBytes` 上限が正しく適用され、境界値（上限ちょうど＝成功、上限＋1＝超過）が設計書3.1節と一致していること / `newRestrictedDoer` への `timeout` 引数追加がパッケージ変数の save/restore を使わず、`newPDSDoer`・`newTestRestrictedDoer` の呼び出し元をすべて更新済みであること（将来の `t.Parallel()` 導入時のデータ競合回避という設計意図どおりであること） / `listAllRecords` の累積バイト・総ページ・総レコード上限が既存の `ErrPaginationStalled` と同じラップ形式で `ErrPaginationLimitExceeded` を返すこと / 上限内の既存ケース（`TestClient_ListPosts_Pagination` 等）が無退行であること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した (https://github.com/isseis/bsky-cleaner/pull/59)
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 

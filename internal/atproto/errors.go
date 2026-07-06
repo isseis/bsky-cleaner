@@ -15,6 +15,13 @@ var (
 	ErrHTTPStatus           = errors.New("unexpected HTTP status")
 	ErrTransportFailure     = errors.New("HTTP transport failure")            // timeout, DNS failure, connection refused, etc.
 	ErrPaginationStalled    = errors.New("pagination cursor did not advance") // server protocol misbehavior, not a transport failure
+	// ErrResponseTooLarge is returned when an XRPC response body exceeds
+	// maxXRPCResponseBytes. It is wrapped in *HTTPError and returned to
+	// the caller.
+	ErrResponseTooLarge = errors.New("XRPC response exceeds size limit")
+	// ErrPaginationLimitExceeded is returned when listAllRecords exceeds
+	// any of its limits: total bytes, total pages, or total records.
+	ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit exceeded")
 )
 
 // SSRFStage identifies which validation step rejected a PDS endpoint, so a

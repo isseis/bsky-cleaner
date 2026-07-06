@@ -293,3 +293,94 @@ func mustParseQuery(t *testing.T, rawURL string) url.Values {
 	require.NoError(t, err)
 	return u.Query()
 }
+
+func TestClient_ListPosts_TotalBytesLimit(t *testing.T) {
+	// Use small thresholds to test limit behavior without consuming large memory.
+	// The exact byte count per page is not meaningful — the test just needs enough
+	// pages to exceed the configured maxBytes cap.
+	recordValueSize := 100
+	numPages := 3
+	maxBytes := 200
+
+	pages := make([]string, numPages)
+	for i := range pages {
+		value := make([]byte, recordValueSize)
+		for j := range value {
+			value[j] = 'x'
+		}
+		valueJSON := fmt.Sprintf(`{"$type":"app.bsky.feed.post","createdAt":"2024-01-01T00:00:00Z","text":"%s"}`, string(value))
+		rkey := fmt.Sprintf("p%d", i)
+		records := []string{postRecordJSON(rkey, valueJSON)}
+		cursor := ""
+		if i < len(pages)-1 {
+			cursor = fmt.Sprintf("cursor-%d", i)
+		}
+		pages[i] = buildListRecordsBody(records, cursor)
+	}
+
+	handler := newListPostsHandler(t, pages, []string{buildListRecordsBody(nil, "")}, http.StatusBadRequest, `{"error":"RecordNotFound"}`)
+	client, _ := newPostsTestClient(handler)
+
+	// Use listAllRecordsWithLimits to test with small thresholds
+	_, err := client.listAllRecordsWithLimits(context.Background(), collectionFeedPost, maxBytes, 100, 1000000)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
+}
+
+func TestClient_ListPosts_TotalPagesLimit(t *testing.T) {
+	// Use small thresholds to test limit behavior without generating many pages
+	// Each page provides a distinct cursor; 3 pages exceeds the 2-page limit
+	numPages := 3
+	maxPages := 2
+
+	pages := make([]string, numPages)
+	for i := range pages {
+		cursor := ""
+		if i < len(pages)-1 {
+			cursor = fmt.Sprintf("cursor-%d", i)
+		}
+		pages[i] = buildListRecordsBody(nil, cursor)
+	}
+
+	handler := newListPostsHandler(t, pages, []string{buildListRecordsBody(nil, "")}, http.StatusBadRequest, `{"error":"RecordNotFound"}`)
+	client, _ := newPostsTestClient(handler)
+
+	// Use listAllRecordsWithLimits to test with small thresholds
+	_, err := client.listAllRecordsWithLimits(context.Background(), collectionFeedPost, 1000000, maxPages, 1000000)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
+}
+
+func TestClient_ListPosts_TotalRecordsLimit(t *testing.T) {
+	// Use small thresholds to test limit behavior without generating many records
+	// Each page has 3 records, 2 pages = 6 records > 5 record limit
+	recordsPerPage := 3
+	numPages := 2
+	maxRecords := 5
+
+	pages := make([]string, numPages)
+	for i := range pages {
+		records := make([]string, 0, recordsPerPage)
+		for j := 0; j < recordsPerPage; j++ {
+			rkey := fmt.Sprintf("p%d-%d", i, j)
+			valueJSON := `{"$type":"app.bsky.feed.post","createdAt":"2024-01-01T00:00:00Z","text":"x"}`
+			records = append(records, postRecordJSON(rkey, valueJSON))
+		}
+		cursor := ""
+		if i < len(pages)-1 {
+			cursor = fmt.Sprintf("cursor-%d", i)
+		}
+		pages[i] = buildListRecordsBody(records, cursor)
+	}
+
+	handler := newListPostsHandler(t, pages, []string{buildListRecordsBody(nil, "")}, http.StatusBadRequest, `{"error":"RecordNotFound"}`)
+	client, _ := newPostsTestClient(handler)
+
+	// Use listAllRecordsWithLimits to test with small thresholds
+	_, err := client.listAllRecordsWithLimits(context.Background(), collectionFeedPost, 1000000, 100, maxRecords)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
+}

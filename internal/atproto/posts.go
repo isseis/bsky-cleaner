@@ -31,6 +31,24 @@ const (
 // request for any account with a realistic number of posts.
 const listRecordsPageLimit = "100"
 
+// maxListTotalBytes is the maximum total bytes of all record values
+// accumulated during listAllRecords pagination. A legitimate account's
+// posts should fit within a few hundred MB. 256 MiB provides ample margin
+// while protecting against memory exhaustion from a malicious PDS.
+const maxListTotalBytes = 256 << 20 // 256 MiB
+
+// maxListPages is the maximum number of pages listAllRecords will fetch.
+// A legitimate large account should not need more than 10,000 pages
+// (1,000,000 posts at 100 per page). This protects against a malicious
+// PDS returning empty pages with different cursors forever.
+const maxListPages = 10000
+
+// maxListRecords is the maximum total number of records listAllRecords
+// will accumulate. A legitimate large account should not have more than
+// 1,000,000 posts. This protects against a malicious PDS returning many
+// tiny records to exhaust memory via slice/struct overhead.
+const maxListRecords = 1_000_000
+
 // PostType classifies an app.bsky.feed.post record, or marks a record
 // retrieved from the separate app.bsky.feed.repost collection.
 type PostType int
@@ -165,10 +183,20 @@ func (c *Client) ListPosts(ctx context.Context) ([]Post, error) {
 // fails to advance between two consecutive non-empty responses (a server
 // protocol misbehavior distinct from a transport failure, 6.2 architecture
 // note), it stops and returns ErrPaginationStalled rather than looping
-// forever.
+// forever. It also enforces limits on total bytes, total pages, and total
+// records to protect against a malicious PDS exhausting memory.
 func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listRecord, error) {
+	return c.listAllRecordsWithLimits(ctx, collection, maxListTotalBytes, maxListPages, maxListRecords)
+}
+
+// listAllRecordsWithLimits is like listAllRecords but accepts custom limits.
+// This is useful for tests that want to verify limit behavior with small
+// thresholds instead of the production defaults.
+func (c *Client) listAllRecordsWithLimits(ctx context.Context, collection string, maxBytes, maxPages, maxRecords int) ([]listRecord, error) {
 	var all []listRecord
 	cursor := ""
+	var totalPages, totalRecords int
+	var totalBytes int
 	for {
 		query := url.Values{}
 		query.Set("repo", c.did)
@@ -182,7 +210,32 @@ func (c *Client) listAllRecords(ctx context.Context, collection string) ([]listR
 		if err := doXRPC(ctx, c.httpDoer, c.pdsBaseURL, http.MethodGet, "com.atproto.repo.listRecords", query, nil, &resp, ""); err != nil {
 			return nil, err
 		}
+
+		// Compute this page's contribution before appending
+		pageRecords := len(resp.Records)
+		var pageBytes int
+		for _, rec := range resp.Records {
+			pageBytes += len(rec.Value)
+		}
+
+		// Check limits BEFORE appending to prevent memory exhaustion from a malicious PDS
+		if totalBytes+pageBytes > maxBytes {
+			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
+		}
+		if totalPages+1 > maxPages {
+			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
+		}
+		if totalRecords+pageRecords > maxRecords {
+			return nil, fmt.Errorf("list posts: list %s: %w", collection, ErrPaginationLimitExceeded)
+		}
+
+		// Safe to append now that limits are verified
 		all = append(all, resp.Records...)
+
+		// Accumulate totals
+		totalPages++
+		totalRecords += pageRecords
+		totalBytes += pageBytes
 
 		if resp.Cursor == "" {
 			return all, nil
