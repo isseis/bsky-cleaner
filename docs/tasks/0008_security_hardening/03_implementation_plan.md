@@ -18,7 +18,7 @@
 
 - **DoS 系防御の新規実装（AC-04）**: [セキュリティ設計](../../design/security.md) が「防御が抜けている」と明記する 3 項目（`doXRPC` の応答サイズ上限・`listAllRecords` のページネーション上限・XRPC `http.Client` のリクエスト全体タイムアウト）を `internal/atproto` に実装する。本タスク唯一の新規プロダクションコードである（設計は [02_architecture.md 3 章](./02_architecture.md#3-コンポーネント設計)）。
 - **横断的な結合テスト（AC-01・AC-02・AC-05・AC-06）**: エンドツーエンドの秘密情報非漏洩と、削除処理全体の冪等性・異常系を、既存のテストハーネスを再利用した結合テストで固定する。新しいプロダクションコードは追加しない。
-- **棚卸しと決定の記録（AC-03・AC-04）**: [セキュリティ設計](../../design/security.md) の全リスクカテゴリのトレーサビリティ一覧と、未対応項目の対応可否判断を、本計画書の [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) に静的成果物として記載する。
+- **棚卸しと決定の記録（AC-03・AC-04）**: [セキュリティ設計](../../design/security.md) の全リスクカテゴリのトレーサビリティ一覧と、未対応項目の対応可否判断を、本計画書の [7 章](#7-セキュリティ設計の棚卸しac-03ac-04) に静的成果物として記載する。
 
 ### 1.2 実装方針
 
@@ -46,7 +46,7 @@
   - 変更: センチネル `ErrResponseTooLarge`・`ErrPaginationLimitExceeded` を追加（追加のみ、[02_architecture.md 3.4 節](./02_architecture.md#34-追加する型定数インターフェイス定義)）。
 - `internal/atproto/test_helpers.go`（`//go:build test`, `package atproto`）
   - 既存: `newTestClient`・`StubPassthroughPDSDoer`。
-  - 変更: なし。`xrpcRequestTimeout` の差し替えはパッケージ変数の save/restore ではなく `newRestrictedDoer` への引数渡しで行うため、本ファイルへの追加は不要（[Phase 1](#phase-1-dos-系防御の実装と単体テスト ac-04)）。
+  - 変更: なし。`xrpcRequestTimeout` の差し替えはパッケージ変数の save/restore ではなく `newRestrictedDoer` への引数渡しで行うため、本ファイルへの追加は不要（[Phase 1](#phase-1-dos-系防御の実装と単体テストac-04)）。
 
 **変更不要だが Phase 1 が再利用する既存資産**
 
@@ -60,7 +60,7 @@
 - `internal/atproto/runner_integration_test.go`（`package atproto_test`）: `publicIPLiteral`（25 行目）・`integrationAppPassword`（27 行目）・`StubPassthroughPDSDoer` を使った実 `*atproto.Client` ＋モックの配線パターン。**Phase 2 の新規ファイルは同一 `package atproto_test` に置くため、これらを再定義せず直接再利用する。**
 - `cmd/main_test.go`（`package main`）: `publicIPLiteral`・`testDID`・`validConfigPath`・`hermeticHandler`・`setEnvCredentials`・`listRecordsHandler`・`deleteRecordHandler`・`slackWebhookHandler`・`postPageResponse`・`emptyPageResponse`。**Phase 3 の新規ファイルは同一 `package main` に置くため、これらを再定義せず直接再利用する。** 既存の `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1`（154 行目）は実行タイムアウト到達の配線パターンの参照。
 
-**AC ↔ 実装コードの現状対応（棚卸しの下地、[7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) で完成させる）**
+**AC ↔ 実装コードの現状対応（棚卸しの下地、[7 章](#7-セキュリティ設計の棚卸しac-03ac-04) で完成させる）**
 
 - 秘密マスキング機構は各パッケージに実装済み（`config.SecretString`／`atproto` の `HTTPError`・`SSRFError` の秘密非包含／`notify.errorKind`・`redactWebhookURL`）。AC-01・AC-02 はこれらを結合状態で検証するのみで、変更しない。
 - `DeleteRecord`（`delete.go`）は既存の冪等性（2xx を成功として扱う）を持つ。AC-05・AC-06 はこれを結合状態で検証するのみ。
@@ -106,14 +106,14 @@
 
 **対象ファイル**: `internal/atproto/idempotency_integration_test.go`（新規, `package atproto_test`）
 
-- [x] AC-05 のテスト関数（`TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`）を追加する。実 `*atproto.Client` ＋ `MockHTTPDoer` を `runner.Run`（apply=true）で駆動し、**複数**の対象 rkey すべての `deleteRecord` に 2xx を返すことで、一覧取得後に対象が消えていてもクラッシュせず正常系（全件 `Deleted` に入り `Failed` は空）として扱われることを検証する。配線は `runner_integration_test.go` の `TestRunnerRun_WithRealAtprotoClient` を踏襲し、`publicIPLiteral`・`integrationAppPassword`・`StubPassthroughPDSDoer` を再利用する（[02_architecture.md 6.2 節 AC-05](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)）。**既存テストとの差別化**: 単一投稿・2xx→成功の基本経路は既存 `TestRunnerRun_WithRealAtprotoClient` が既に担保するため、本テストは重複を避け「複数対象がすべて既削除でも全件成功として扱われる」という AC-05 固有のシナリオ（一覧取得後に対象が消えているケース）を明示的に検証する点で区別する。テストの doc コメントで既存テストとの重なりを明記し、本テストの独自表明が「複数の既削除対象の一括成功」であることを述べる。
+- [x] AC-05 のテスト関数（`TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`）を追加する。実 `*atproto.Client` ＋ `MockHTTPDoer` を `runner.Run`（apply=true）で駆動し、**複数**の対象 rkey すべての `deleteRecord` に 2xx を返すことで、一覧取得後に対象が消えていてもクラッシュせず正常系（全件 `Deleted` に入り `Failed` は空）として扱われることを検証する。配線は `runner_integration_test.go` の `TestRunnerRun_WithRealAtprotoClient` を踏襲し、`publicIPLiteral`・`integrationAppPassword`・`StubPassthroughPDSDoer` を再利用する（[02_architecture.md 6.2 節 AC-05](./02_architecture.md#62-冪等性異常系の結合テストac-05ac-06)）。**既存テストとの差別化**: 単一投稿・2xx→成功の基本経路は既存 `TestRunnerRun_WithRealAtprotoClient` が既に担保するため、本テストは重複を避け「複数対象がすべて既削除でも全件成功として扱われる」という AC-05 固有のシナリオ（一覧取得後に対象が消えているケース）を明示的に検証する点で区別する。テストの doc コメントで既存テストとの重なりを明記し、本テストの独自表明が「複数の既削除対象の一括成功」であることを述べる。
 - [x] AC-06 のテスト関数（`TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe`）を追加する。複数削除対象を用意し、`context.WithCancel`（`WithTimeout` ではない）で得た `ctx` を `runner.Run` に渡す。`MockHTTPDoer.Handler` の `deleteRecord` 分岐で削除呼び出しを計数し、(a) 入口で `req.Context().Err()` が非 nil なら即座にそのエラーを返す（net/http が canceled ctx に対して返す挙動の再現）、(b) N 件目までは 2xx、(c) N+1 件目でテストの `cancel()` を呼んでから `ctx.Err()` を返す。
   - **なぜ決定的か**: `WithCancel` を使い `cancel()` のみを中断契機とすることで、実時間に一切依存しない決定的な中断を作る（`WithTimeout` の短いタイマーは低速ランナー上で N 未満の時点で発火し N を非決定にするため採用しない）。
-  - **エラー種別の扱い**: この経路の `ctx.Err()` は `context.Canceled` であり `context.DeadlineExceeded` ではない。`runner.Run` は両者を同じ「削除失敗」として `Failed` に振り分ける（`runner.go` は `ctx` の種別を区別しない）ため、テストは `Canceled`／`DeadlineExceeded` の種別を表明せず、「残り対象が `Failed` に入る」ことのみを表明する。実行タイムアウトの強行中断（deadline 到達）も本番では同一経路を通るため、この決定的モデルで AC-06 の趣旨を満たす（[02_architecture.md 6.2 節 AC-06](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)）。
+  - **エラー種別の扱い**: この経路の `ctx.Err()` は `context.Canceled` であり `context.DeadlineExceeded` ではない。`runner.Run` は両者を同じ「削除失敗」として `Failed` に振り分ける（`runner.go` は `ctx` の種別を区別しない）ため、テストは `Canceled`／`DeadlineExceeded` の種別を表明せず、「残り対象が `Failed` に入る」ことのみを表明する。実行タイムアウトの強行中断（deadline 到達）も本番では同一経路を通るため、この決定的モデルで AC-06 の趣旨を満たす（[02_architecture.md 6.2 節 AC-06](./02_architecture.md#62-冪等性異常系の結合テストac-05ac-06)）。
 - [x] 同テストで、終端状態が `Deleted`（N 件）と `Failed`（残り全件）に分かれること、および `Deleted` の rkey 集合と `Failed` の rkey 集合が重複せず判別可能であることを表明する（AC-06 の「削除済みと未処理が判別可能」）。実装は `ctx` を削除ループ内で明示確認しないため未着手バケットは存在しない、という実挙動に合わせる。
 - [x] 同テストで、続けて同じ対象集合に対し 2 回目の `runner.Run`（`ctx` は未キャンセルの新規）を駆動し、既削除 rkey への再削除がすべて 2xx を返して `Failed` が空になる（重複削除がエラーにならない）ことを検証する（AC-06 の「次回実行時に重複削除の試行でエラーにならない」）。
 
-**完了基準**: `make test -tags test` 相当（`make test`）が緑。AC-05・AC-06 の両関数が [02_architecture.md 6.2 節](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06) の実挙動どおりに通る。
+**完了基準**: `make test -tags test` 相当（`make test`）が緑。AC-05・AC-06 の両関数が [02_architecture.md 6.2 節](./02_architecture.md#62-冪等性異常系の結合テストac-05ac-06) の実挙動どおりに通る。
 
 ### PR-2 作成ポイント：idempotency and cancellation integration tests
 
@@ -135,7 +135,7 @@
 - [x] **識別性の高い秘密リテラルを定義する**。app パスワード・`AccessJWT`・成功／失敗 Webhook URL には、部分文字列一致が偶然当たらない固定リテラル（例: `secretAppPassword = "SECRET-APP-PW-xyz789"`、`secretAccessJWT = "SECRET-ACCESS-JWT-abc123"`、成功／失敗 Webhook URL も `hooks.slack.com` 配下の識別性の高いパス）を本ファイル内の定数として定義する。既存 `setEnvCredentials`（`"app-password"`・`"access-jwt"` 相当）の値は短く弱いため**本 Phase では使用しない**。
 - [x] **単一の Phase-3 セットアップヘルパー**（例: `setupSecretLeakEnv(t)`）を用意し、上記の識別性の高い app パスワードと両 Webhook URL を環境変数／TOML に注入する。**AC-01・AC-02 の全 `run()` 駆動テストがこのヘルパーを必ず呼ぶ**こととし、いずれのテストも `setEnvCredentials` にフォールバックしない。フォールバックすると、禁止文字列集合が実際には一度も設定されていない値を探すことになり、テストが常に通ってしまう（漏洩を見逃す偽陰性になる）ためである。
 - [x] **`createSession` が識別性の高い `AccessJWT` を返す Phase-3 ローカルのハンドラ**を用意する。既存 `listRecordsHandler`（`cmd/main_test.go`）は `createSession` 応答を `CreateSessionResponseJSON(testDID, "access-jwt")` と決め打つため、その `createSession` 分岐を**そのままは再利用しない**。本 Phase のハンドラは `createSession` 分岐で `CreateSessionResponseJSON(testDID, secretAccessJWT)` を返し、`listRecords`／`getRecord`／`deleteRecord`／Slack POST の各分岐は `hermeticHandler`・`postPageResponse`・`emptyPageResponse`・`slackWebhookHandler`・`JSONResponse` を再利用して構成する（JWT を注入する `createSession` 分岐のみ独自実装する）。
-- [x] 禁止文字列集合 **{`secretAppPassword`, `secretAccessJWT`, `"Bearer " + secretAccessJWT`, 成功 Webhook URL, 失敗 Webhook URL}** を組み立てるヘルパーを用意する（[02_architecture.md 6.1 節の禁止文字列集合](./02_architecture.md#61-秘密非漏洩の結合テスト ac-01ac-02)）。集合の各値は上記セットアップヘルパー／`createSession` ハンドラが注入した実値と一致させる。
+- [x] 禁止文字列集合 **{`secretAppPassword`, `secretAccessJWT`, `"Bearer " + secretAccessJWT`, 成功 Webhook URL, 失敗 Webhook URL}** を組み立てるヘルパーを用意する（[02_architecture.md 6.1 節の禁止文字列集合](./02_architecture.md#61-秘密非漏洩の結合テストac-01ac-02)）。集合の各値は上記セットアップヘルパー／`createSession` ハンドラが注入した実値と一致させる。
 - [x] 3 出力面（stdout バッファ・stderr バッファ・捕捉した Slack ペイロード）を集める共通検証ヘルパーを用意する。Slack ペイロードは `mock.Requests()` を `req.URL` の host が `hooks.slack.com` のものに絞って `RecordedRequest.Body` から取得する（`MockHTTPDoer` の既存記録機構を再利用）。各面に対し禁止文字列集合の各要素が部分文字列として現れないことを表明する。
 - [x] AC-01（正常系）のテストを追加する。ログイン成功→一覧取得→削除→Slack 通知まで通し、秘密が現れないことを検証する。副作用契約（[02_architecture.md 5.3 節](./02_architecture.md#53-副作用契約 dry-run-と---apply)）に従い **dry-run と `--apply` の両方**を対象とする（dry-run では Slack 通知が抑止されるため検証面は stdout・stderr、`--apply` では 3 面すべて）。
 - [x] AC-02 (a) 認証失敗のテストを追加する。`createSession` に非 2xx を返し、適用面に秘密が現れないことを検証する。
@@ -157,17 +157,17 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した (https://github.com/isseis/bsky-cleaner/pull/62)
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 4: 棚卸し一覧・決定記録（AC-03・AC-04）
 
-**対象ファイル**: 本計画書 [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04)
+**対象ファイル**: 本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)
 
-- [ ] AC-03: [セキュリティ設計](../../design/security.md) に列挙された全リスクカテゴリのトレーサビリティ一覧を [7.1 節](#71-トレーサビリティ一覧 ac-03) に記載する。列挙は同文書を正とする（[02_architecture.md 7.3 節](./02_architecture.md#73-棚卸しの検証 ac-03ac-04)）。
-- [ ] AC-04: 未対応・不十分と判明した項目の対応可否判断を [7.2 節](#72-対応可否判断 ac-04) に記載する。DoS 系 3 項目は本タスクで対応済みとし元タスクへ差し戻さない。DID 解決経路の独立タイムアウトとファイルシステム権限管理は本タスク非対応とその理由を記録する。
+- [x] AC-03: [セキュリティ設計](../../design/security.md) に列挙された全リスクカテゴリのトレーサビリティ一覧を [7.1 節](#71-トレーサビリティ一覧ac-03) に記載する。列挙は同文書を正とする（[02_architecture.md 7.3 節](./02_architecture.md#73-棚卸しの検証ac-03ac-04)）。
+- [x] AC-04: 未対応・不十分と判明した項目の対応可否判断を [7.2 節](#72-対応可否判断ac-04) に記載する。DoS 系 3 項目は本タスクで対応済みとし元タスクへ差し戻さない。DID 解決経路の独立タイムアウトとファイルシステム権限管理は本タスク非対応とその理由を記録する。
 
-**完了基準**: Phase 1〜3 の結果（実装・見送りの確定）を反映し、[7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) が [8 章の AC 検証](#8-受け入れ基準の検証) の `static` チェックを満たす。
+**完了基準**: Phase 1〜3 の結果（実装・見送りの確定）を反映し、[7 章](#7-セキュリティ設計の棚卸しac-03ac-04) が [8 章の AC 検証](#8-受け入れ基準の検証) の `static` チェックを満たす。
 
 ### PR-4 作成ポイント：security design traceability documentation
 
@@ -175,10 +175,10 @@
 
 **推奨タイトル**: `docs(0008-security-hardening): record security design traceability and disposition`
 
-**レビュー観点**: [7.1 節](#71-トレーサビリティ一覧 ac-03) のトレーサビリティ一覧が [セキュリティ設計](../../design/security.md) の 9 カテゴリすべてを網羅していること / [7.2 節](#72-対応可否判断 ac-04) の対応可否判断が PR-1〜PR-3 実装後の実際のファイル・シンボルと矛盾しないこと（Phase 1〜3 マージ後に `rg` で再確認済みであること） / DID 解決経路の独立タイムアウトとファイルシステム権限管理を「本タスク非対応」とした理由が要件定義書のスコープ外規定と整合していること
+**レビュー観点**: [7.1 節](#71-トレーサビリティ一覧ac-03) のトレーサビリティ一覧が [セキュリティ設計](../../design/security.md) の 9 カテゴリすべてを網羅していること / [7.2 節](#72-対応可否判断ac-04) の対応可否判断が PR-1〜PR-3 実装後の実際のファイル・シンボルと矛盾しないこと（Phase 1〜3 マージ後に `rg` で再確認済みであること） / DID 解決経路の独立タイムアウトとファイルシステム権限管理を「本タスク非対応」とした理由が要件定義書のスコープ外規定と整合していること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した (https://github.com/isseis/bsky-cleaner/pull/63)
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -189,7 +189,7 @@
 | M1 | Phase 1 完了 | DoS 系 3 防御が実装され、単体テストが緑。`make test`・`make lint` が緑 |
 | M2 | Phase 2 完了 | AC-05・AC-06 の結合テストが緑 |
 | M3 | Phase 3 完了 | AC-01・AC-02 の結合テストが緑 |
-| M4 | Phase 4 完了 | 棚卸し一覧・決定記録が [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) に揃い、[8 章](#8-受け入れ基準の検証) の全 AC が緑 |
+| M4 | Phase 4 完了 | 棚卸し一覧・決定記録が [7 章](#7-セキュリティ設計の棚卸しac-03ac-04) に揃い、[8 章](#8-受け入れ基準の検証) の全 AC が緑 |
 
 Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_architecture.md 8 章](./02_architecture.md#8-実装優先順位) を参照。
 
@@ -200,7 +200,7 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 | PR-1 | Phase 1 | `internal/atproto` に XRPC 応答サイズ上限・リクエスト全体タイムアウト・`listAllRecords` の累積バイト/総ページ/総レコード上限を実装し、単体テストを追加する |
 | PR-2 | Phase 2 | `internal/atproto/idempotency_integration_test.go` を新規追加し、AC-05（既削除対象の正常系扱い）・AC-06（中断後の判別可能性・再実行安全性）を結合テストで検証する |
 | PR-3 | Phase 3 | `cmd/secret_leak_integration_test.go` を新規追加し、AC-01（正常系）・AC-02 (a)〜(f)（代表的なエラー経路）で秘密情報が 3 出力面に現れないことを検証する |
-| PR-4 | Phase 4 | 本計画書 [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) に、セキュリティ設計の全リスクカテゴリのトレーサビリティ一覧と未対応項目の対応可否判断を確定する |
+| PR-4 | Phase 4 | 本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04) に、セキュリティ設計の全リスクカテゴリのトレーサビリティ一覧と未対応項目の対応可否判断を確定する |
 
 ## 4. テスト戦略
 
@@ -221,8 +221,8 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 
 ### 4.2 結合テスト（横断的検証、Phase 2・3）
 
-- 冪等性・異常系（AC-05・AC-06）: `internal/atproto/idempotency_integration_test.go`。詳細は [Phase 2](#phase-2-冪等性異常系の結合テスト ac-05ac-06) と [02_architecture.md 6.2 節](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)。
-- 秘密非漏洩（AC-01・AC-02）: `cmd/secret_leak_integration_test.go`。詳細は [Phase 3](#phase-3-秘密非漏洩の結合テスト ac-01ac-02) と [02_architecture.md 6.1 節](./02_architecture.md#61-秘密非漏洩の結合テスト ac-01ac-02)。
+- 冪等性・異常系（AC-05・AC-06）: `internal/atproto/idempotency_integration_test.go`。詳細は [Phase 2](#phase-2-冪等性異常系の結合テストac-05ac-06) と [02_architecture.md 6.2 節](./02_architecture.md#62-冪等性異常系の結合テストac-05ac-06)。
+- 秘密非漏洩（AC-01・AC-02）: `cmd/secret_leak_integration_test.go`。詳細は [Phase 3](#phase-3-秘密非漏洩の結合テストac-01ac-02) と [02_architecture.md 6.1 節](./02_architecture.md#61-秘密非漏洩の結合テストac-01ac-02)。
 - いずれも実 Bluesky API に依存せず、`atprototestutil.MockHTTPDoer` によりネットワークを遮断する（NF-002）。
 
 ### 4.3 テストヘルパー方針
@@ -236,17 +236,17 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 | リスク | 影響 | 緩和策 |
 |---|---|---|
 | 上限値が正当な大規模アカウントに対して過小 | 正常系で `ErrResponseTooLarge`／`ErrPaginationLimitExceeded` が誤発火 | [02_architecture.md 3.1・3.2 節](./02_architecture.md#3-コンポーネント設計) の根拠（1 ページ 100 件・数 MB、常駐メモリ数百 MiB）に沿って余裕値を設定。将来のチューニングは [02_architecture.md 9 章](./02_architecture.md#9-将来の拡張性) のとおり定数調整で対応可能 |
-| AC-06 テストの非決定性（実時間依存） | フレーキーテスト | モックにテストの `cancel()` を呼ばせ、`ctx.Err()` を即座に返すことで deadline 到達を決定的に再現（[Phase 2](#phase-2-冪等性異常系の結合テスト ac-05ac-06)） |
+| AC-06 テストの非決定性（実時間依存） | フレーキーテスト | モックにテストの `cancel()` を呼ばせ、`ctx.Err()` を即座に返すことで deadline 到達を決定的に再現（[Phase 2](#phase-2-冪等性異常系の結合テストac-05ac-06)） |
 | タイムアウト単体テストのゴルーチン滞留 | テストプロセスのリーク | 遅延サーバーを `t.Cleanup(server.Close)` で確実に閉じ、`xrpcRequestTimeout` を短縮して即座に発火させる |
-| 秘密検出の偽陰性（短い/弱い禁止文字列が偶然マッチしない） | 実際の漏洩を検出できない | 識別性の高い固定リテラルを禁止文字列に使う（[Phase 3](#phase-3-秘密非漏洩の結合テスト ac-01ac-02)） |
+| 秘密検出の偽陰性（短い/弱い禁止文字列が偶然マッチしない） | 実際の漏洩を検出できない | 識別性の高い固定リテラルを禁止文字列に使う（[Phase 3](#phase-3-秘密非漏洩の結合テストac-01ac-02)） |
 
 ## 6. 実装チェックリスト
 
 - [x] PR-1 マージ済み（対象ステップ：Phase 1。`errors.go` のセンチネル 2 種、`http.go` の `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数、`doXRPC` の応答サイズ上限、`newRestrictedDoer` の `timeout` 引数、`posts.go` の 3 上限定数と `listAllRecords` の検査、`http_test.go`・`posts_test.go` の単体テスト追加）
-- [ ] PR-2 マージ済み（対象ステップ：Phase 2。`internal/atproto/idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
-- [ ] PR-3 マージ済み（対象ステップ：Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証。PR: https://github.com/isseis/bsky-cleaner/pull/62）
-- [ ] PR-4 マージ済み（対象ステップ：Phase 4。本計画書 [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) の棚卸し一覧・決定記録を確定）
-- [ ] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
+- [x] PR-2 マージ済み（対象ステップ：Phase 2。`internal/atproto/idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
+- [x] PR-3 マージ済み（対象ステップ：Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証。PR: https://github.com/isseis/bsky-cleaner/pull/62）
+- [ ] PR-4 マージ済み（対象ステップ：Phase 4。本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04) の棚卸し一覧・決定記録を確定）
+- [x] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
 
 ## 7. セキュリティ設計の棚卸し（AC-03・AC-04）
 
@@ -259,11 +259,11 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 | 1 | 投稿本文経由の間接的なインジェクション（メンション拡散・ANSI・ログ改行） | `internal/notify/sanitize.go`（`notify.Sanitize`）、`cmd/main.go`（stdout 出力を `notify.Sanitize` でサニタイズ） | `internal/notify/sanitize_test.go`、`cmd/main_test.go::TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey` |
 | 2 | AT Protocol フェデレーション構造起因の SSRF | `internal/atproto/did.go`（`validatePDSEndpoint`・`checkRequestHostSafety`・`isUnsafeIP`）、`internal/atproto/http.go`（`restrictedDoer`・`newRestrictedDialContext`・`rejectRedirect`） | `internal/atproto/did_test.go`、`internal/atproto/http_test.go`（`TestRestrictedDialContext_*`・`TestCheckRedirect_AlwaysRejects`・`TestRestrictedDoer_Do`） |
 | 3 | 壊れた・攻撃者管理下の PDS 起因のリソース枯渇（DoS） | **本タスク Phase 1**: `http.go`（`maxXRPCResponseBytes`・`xrpcRequestTimeout`）、`posts.go`（`maxListTotalBytes`・`maxListPages`・`maxListRecords`）。既存: `did.go`（`maxDIDResponseBytes`・`maxDIDDocumentResponseBytes`）、`retry/doer.go`（`maxDrainBytes`） | **本タスク Phase 1**: `http_test.go`・`posts_test.go`（[4.1 節](#41-単体テスト dos-系防御 phase-1)） |
-| 4 | エラーメッセージ・スタックトレース経由の秘密情報漏洩 | `internal/atproto/errors.go`（`HTTPError`・`SSRFError` の秘密非包含）、`internal/notify/errorkind.go`（`errorKind` のフェイルクローズ）、`internal/notify/notify.go`（`redactWebhookURL`）、`internal/config`（`SecretString`） | **本タスク Phase 3**: `cmd/secret_leak_integration_test.go`（[6.1 節](./02_architecture.md#61-秘密非漏洩の結合テスト ac-01ac-02)）。既存: `internal/notify/errorkind_test.go` 等の各コンポーネント単体テスト |
+| 4 | エラーメッセージ・スタックトレース経由の秘密情報漏洩 | `internal/atproto/errors.go`（`HTTPError`・`SSRFError` の秘密非包含）、`internal/notify/errorkind.go`（`errorKind` のフェイルクローズ）、`internal/notify/notify.go`（`redactWebhookURL`）、`internal/config`（`SecretString`） | **本タスク Phase 3**: `cmd/secret_leak_integration_test.go`（[6.1 節](./02_architecture.md#61-秘密非漏洩の結合テストac-01ac-02)）。既存: `internal/notify/errorkind_test.go` 等の各コンポーネント単体テスト |
 | 5 | リトライ・cron 起因の自滅的アクセス制限（リトライ過多） | `internal/retry/doer.go`（`Policy`・`backoffDelay` の指数バックオフ上限）、`internal/atproto/client.go`（`defaultRetryPolicy`） | `internal/retry/doer_test.go` |
 | 6 | 多重起動によるリソース枯渇 | `cmd/main.go`（`context.WithTimeout(ctx, cfg.ExecutionTimeout)` による実行タイムアウト） | `cmd/main_test.go::TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` |
-| 7 | 設定ファイルの改ざん・権限 | `internal/config/validate.go`（`retention_days` 等のバリデーション）。ファイルシステム権限管理は**未実装**（[7.2 節](#72-対応可否判断 ac-04)） | `internal/config` の各バリデーションテスト |
-| 8 | 削除処理の冪等性 | `internal/atproto/delete.go`（`DeleteRecord` が 2xx を成功として扱う）、`internal/runner/runner.go`（個別失敗を継続して `Failed` に集約） | **本タスク Phase 2**: `internal/atproto/idempotency_integration_test.go`（[6.2 節](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)）。既存: `internal/atproto/delete_test.go` |
+| 7 | 設定ファイルの改ざん・権限 | `internal/config/validate.go`（`retention_days` 等のバリデーション）。ファイルシステム権限管理は**未実装**（[7.2 節](#72-対応可否判断ac-04)） | `internal/config` の各バリデーションテスト |
+| 8 | 削除処理の冪等性 | `internal/atproto/delete.go`（`DeleteRecord` が 2xx を成功として扱う）、`internal/runner/runner.go`（個別失敗を継続して `Failed` に集約） | **本タスク Phase 2**: `internal/atproto/idempotency_integration_test.go`（[6.2 節](./02_architecture.md#62-冪等性異常系の結合テストac-05ac-06)）。既存: `internal/atproto/delete_test.go` |
 | 9 | Docker イメージのサプライチェーンリスク | ベースイメージの digest ピン留めはタスク 0007（Docker 配布）の責務。本タスク時点では `Dockerfile` は未作成であり、対策の実装・検証はタスク 0007 のスコープ（本タスクの対象外） | タスク 0007 の検証（本タスクの対象外） |
 
 > 実装列・テスト列に挙げた既存ファイルのパス・シンボルは、Phase 4 の確定時に実在を再確認する（[8 章](#8-受け入れ基準の検証) の AC-03 静的チェックで担保）。
@@ -287,17 +287,17 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 |---|---|---|
 | AC-01 | test | `cmd/secret_leak_integration_test.go::TestRun_SecretNonLeak_HappyPath`（dry-run・apply の両モード）。stdout・stderr・Slack ペイロードの各面に禁止文字列集合の要素が現れないことを表明 |
 | AC-02 | test | `cmd/secret_leak_integration_test.go` の (a)〜(f) 各テスト（`..._AuthFailure` / `..._NetworkError` / `..._DIDResolutionError` / `..._DeleteFailure` / `..._SlackSendFailure` / `..._ExecutionTimeout`）。各失敗経路で AC-01 と同じ非漏洩表明 |
-| AC-03 | static | 本計画書 [7.1 節](#71-トレーサビリティ一覧 ac-03) に 9 カテゴリが揃うこと。検証コマンド：`rg -c '^\| [0-9]' docs/tasks/0008_security_hardening/03_implementation_plan.md` が [7.1 節](#71-トレーサビリティ一覧 ac-03) の行数 9 を含む区間で 9 を返す。加えて `rg -n -e '投稿本文' -e 'SSRF' -e 'DoS' -e '秘密情報漏洩' -e 'リトライ過多' -e '多重起動' -e '設定ファイルの改ざん' -e '削除処理の冪等性' -e 'サプライチェーン' docs/tasks/0008_security_hardening/03_implementation_plan.md` が全 9 語にマッチ（security.md の全カテゴリが記載されていること） |
-| AC-04 | static | 本計画書 [7.2 節](#72-対応可否判断 ac-04) に DoS 系 3 項目の「本タスクで対応」、DID 解決経路の独立タイムアウトとファイルシステム権限管理の「本タスク非対応」＋理由が揃うこと。検証コマンド：`rg -n -e 'maxXRPCResponseBytes' -e 'maxListPages' -e 'xrpcRequestTimeout' -e 'DID 解決経路' -e 'ファイルシステム権限' docs/tasks/0008_security_hardening/03_implementation_plan.md` が [7.2 節](#72-対応可否判断 ac-04) の各行にマッチ |
+| AC-03 | static | 本計画書 [7.1 節](#71-トレーサビリティ一覧ac-03) に 9 カテゴリが揃うこと。検証コマンド：`rg -c '^\| [0-9]' docs/tasks/0008_security_hardening/03_implementation_plan.md` が [7.1 節](#71-トレーサビリティ一覧ac-03) の行数 9 を含む区間で 9 を返す。加えて `rg -n -e '投稿本文' -e 'SSRF' -e 'DoS' -e '秘密情報漏洩' -e 'リトライ過多' -e '多重起動' -e '設定ファイルの改ざん' -e '削除処理の冪等性' -e 'サプライチェーン' docs/tasks/0008_security_hardening/03_implementation_plan.md` が全 9 語にマッチ（security.md の全カテゴリが記載されていること） |
+| AC-04 | static | 本計画書 [7.2 節](#72-対応可否判断ac-04) に DoS 系 3 項目の「本タスクで対応」、DID 解決経路の独立タイムアウトとファイルシステム権限管理の「本タスク非対応」＋理由が揃うこと。検証コマンド：`rg -n -e 'maxXRPCResponseBytes' -e 'maxListPages' -e 'xrpcRequestTimeout' -e 'DID 解決経路' -e 'ファイルシステム権限' docs/tasks/0008_security_hardening/03_implementation_plan.md` が [7.2 節](#72-対応可否判断ac-04) の各行にマッチ |
 | AC-05 | test | `internal/atproto/idempotency_integration_test.go::TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`（複数の既削除対象がすべて `Deleted` に入り `Failed` が空になることを表明）。基本経路の 2xx→成功は既存 `internal/atproto/runner_integration_test.go::TestRunnerRun_WithRealAtprotoClient` も担保する |
 | AC-06 | test | `internal/atproto/idempotency_integration_test.go::TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe`。中断後に `Deleted`（N 件）と `Failed`（残り）が判別可能で、2 回目実行が全件 2xx で `Failed` 空になることを表明 |
 
-> AC-04 の DoS 系実装そのもの（`maxXRPCResponseBytes` 等が実際に発火する挙動）は Phase 1 の単体テスト（[4.1 節](#41-単体テスト dos-系防御 phase-1)）が `test` として担保する。[7.2 節](#72-対応可否判断 ac-04) の `static` チェックは「判断が計画書に記録されていること」を担保する補完である。
+> AC-04 の DoS 系実装そのもの（`maxXRPCResponseBytes` 等が実際に発火する挙動）は Phase 1 の単体テスト（[4.1 節](#41-単体テスト dos-系防御 phase-1)）が `test` として担保する。[7.2 節](#72-対応可否判断ac-04) の `static` チェックは「判断が計画書に記録されていること」を担保する補完である。
 
 ## 9. 成功基準
 
 - AC-01〜AC-06 が [8 章](#8-受け入れ基準の検証) の `test`／`static` で緑（[01_requirements.md 6 章](./01_requirements.md#6-成功基準要約)）。
-- [セキュリティ設計](../../design/security.md) の全リスクカテゴリが [7.1 節](#71-トレーサビリティ一覧 ac-03) でトレース可能。
+- [セキュリティ設計](../../design/security.md) の全リスクカテゴリが [7.1 節](#71-トレーサビリティ一覧ac-03) でトレース可能。
 - `make fmt`・`make test`・`make lint` が緑（NF-001）、Go 1.26.2 以上でビルド可能（NF-003）。
 - 結合テストが実 Bluesky API に依存しない（NF-002）。
 
@@ -305,9 +305,9 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 
 `make lint`・`make test` が検出しない項目のみを挙げる（追加中心のため最小限）。
 
-- [ ] 新規センチネル名（`ErrResponseTooLarge`・`ErrPaginationLimitExceeded`）が既存名と衝突しないこと：`rg -n 'ErrResponseTooLarge|ErrPaginationLimitExceeded' internal/` が `errors.go` の定義と利用箇所のみを返す。
-- [ ] 超過マーカー文字列（例 `"ResponseTooLarge"`）が `errorKind` の出力と整合すること（[02_architecture.md 4.2 節](./02_architecture.md#42-errorkind-との連携と可観測性)）。`errorkind.go` は `HTTPError.ErrorName` を `error=%s` として汎用に埋め込むだけで、マーカー文字列リテラルを持たない（`rg -n 'ResponseTooLarge' internal/notify/` は 0 件が正しい）。したがって検証は `rg` の突き合わせではなく、`http.go` が設定するマーカー値が `errorkind.go:33` の `error=%s` 経由で `"atproto http error: <method> status=200 error=ResponseTooLarge"` として現れることを目視確認する（マーカー定義箇所は `rg -n 'ResponseTooLarge' internal/atproto/` で 1 件確認）。
+- [x] 新規センチネル名（`ErrResponseTooLarge`・`ErrPaginationLimitExceeded`）が既存名と衝突しないこと：`rg -n 'ErrResponseTooLarge|ErrPaginationLimitExceeded' internal/` が `errors.go` の定義と利用箇所のみを返す。
+- [x] 超過マーカー文字列（例 `"ResponseTooLarge"`）が `errorKind` の出力と整合すること（[02_architecture.md 4.2 節](./02_architecture.md#42-errorkind-との連携と可観測性)）。`errorkind.go` は `HTTPError.ErrorName` を `error=%s` として汎用に埋め込むだけで、マーカー文字列リテラルを持たない（`rg -n 'ResponseTooLarge' internal/notify/` は 0 件が正しい）。したがって検証は `rg` の突き合わせではなく、`http.go` が設定するマーカー値が `errorkind.go:33` の `error=%s` 経由で `"atproto http error: <method> status=200 error=ResponseTooLarge"` として現れることを目視確認する（マーカー定義箇所は `rg -n 'ResponseTooLarge' internal/atproto/` で 1 件確認）。
 
 ## 11. 次のステップ
 
-- Phase 3 の実装を開始する。
+- すべてのフェーズが完了した。PR-4 を作成しマージする。
