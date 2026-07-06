@@ -106,12 +106,12 @@
 
 **対象ファイル**: `internal/atproto/idempotency_integration_test.go`（新規, `package atproto_test`）
 
-- [ ] AC-05 のテスト関数（例: `TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`）を追加する。実 `*atproto.Client` ＋ `MockHTTPDoer` を `runner.Run`（apply=true）で駆動し、**複数**の対象 rkey すべての `deleteRecord` に 2xx を返すことで、一覧取得後に対象が消えていてもクラッシュせず正常系（全件 `Deleted` に入り `Failed` は空）として扱われることを検証する。配線は `runner_integration_test.go` の `TestRunnerRun_WithRealAtprotoClient` を踏襲し、`publicIPLiteral`・`integrationAppPassword`・`StubPassthroughPDSDoer` を再利用する（[02_architecture.md 6.2 節 AC-05](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)）。**既存テストとの差別化**: 単一投稿・2xx→成功の基本経路は既存 `TestRunnerRun_WithRealAtprotoClient` が既に担保するため、本テストは重複を避け「複数対象がすべて既削除でも全件成功として扱われる」という AC-05 固有のシナリオ（一覧取得後に対象が消えているケース）を明示的に検証する点で区別する。テストの doc コメントで既存テストとの重なりを明記し、本テストの独自表明が「複数の既削除対象の一括成功」であることを述べる。
-- [ ] AC-06 のテスト関数（例: `TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe`）を追加する。複数削除対象を用意し、`context.WithCancel`（`WithTimeout` ではない）で得た `ctx` を `runner.Run` に渡す。`MockHTTPDoer.Handler` の `deleteRecord` 分岐で削除呼び出しを計数し、(a) 入口で `req.Context().Err()` が非 nil なら即座にそのエラーを返す（net/http が canceled ctx に対して返す挙動の再現）、(b) N 件目までは 2xx、(c) N+1 件目でテストの `cancel()` を呼んでから `ctx.Err()` を返す。
+- [x] AC-05 のテスト関数（`TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`）を追加する。実 `*atproto.Client` ＋ `MockHTTPDoer` を `runner.Run`（apply=true）で駆動し、**複数**の対象 rkey すべての `deleteRecord` に 2xx を返すことで、一覧取得後に対象が消えていてもクラッシュせず正常系（全件 `Deleted` に入り `Failed` は空）として扱われることを検証する。配線は `runner_integration_test.go` の `TestRunnerRun_WithRealAtprotoClient` を踏襲し、`publicIPLiteral`・`integrationAppPassword`・`StubPassthroughPDSDoer` を再利用する（[02_architecture.md 6.2 節 AC-05](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)）。**既存テストとの差別化**: 単一投稿・2xx→成功の基本経路は既存 `TestRunnerRun_WithRealAtprotoClient` が既に担保するため、本テストは重複を避け「複数対象がすべて既削除でも全件成功として扱われる」という AC-05 固有のシナリオ（一覧取得後に対象が消えているケース）を明示的に検証する点で区別する。テストの doc コメントで既存テストとの重なりを明記し、本テストの独自表明が「複数の既削除対象の一括成功」であることを述べる。
+- [x] AC-06 のテスト関数（`TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe`）を追加する。複数削除対象を用意し、`context.WithCancel`（`WithTimeout` ではない）で得た `ctx` を `runner.Run` に渡す。`MockHTTPDoer.Handler` の `deleteRecord` 分岐で削除呼び出しを計数し、(a) 入口で `req.Context().Err()` が非 nil なら即座にそのエラーを返す（net/http が canceled ctx に対して返す挙動の再現）、(b) N 件目までは 2xx、(c) N+1 件目でテストの `cancel()` を呼んでから `ctx.Err()` を返す。
   - **なぜ決定的か**: `WithCancel` を使い `cancel()` のみを中断契機とすることで、実時間に一切依存しない決定的な中断を作る（`WithTimeout` の短いタイマーは低速ランナー上で N 未満の時点で発火し N を非決定にするため採用しない）。
   - **エラー種別の扱い**: この経路の `ctx.Err()` は `context.Canceled` であり `context.DeadlineExceeded` ではない。`runner.Run` は両者を同じ「削除失敗」として `Failed` に振り分ける（`runner.go` は `ctx` の種別を区別しない）ため、テストは `Canceled`／`DeadlineExceeded` の種別を表明せず、「残り対象が `Failed` に入る」ことのみを表明する。実行タイムアウトの強行中断（deadline 到達）も本番では同一経路を通るため、この決定的モデルで AC-06 の趣旨を満たす（[02_architecture.md 6.2 節 AC-06](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06)）。
-- [ ] 同テストで、終端状態が `Deleted`（N 件）と `Failed`（残り全件）に分かれること、および `Deleted` の rkey 集合と `Failed` の rkey 集合が重複せず判別可能であることを表明する（AC-06 の「削除済みと未処理が判別可能」）。実装は `ctx` を削除ループ内で明示確認しないため未着手バケットは存在しない、という実挙動に合わせる。
-- [ ] 同テストで、続けて同じ対象集合に対し 2 回目の `runner.Run`（`ctx` は未キャンセルの新規）を駆動し、既削除 rkey への再削除がすべて 2xx を返して `Failed` が空になる（重複削除がエラーにならない）ことを検証する（AC-06 の「次回実行時に重複削除の試行でエラーにならない」）。
+- [x] 同テストで、終端状態が `Deleted`（N 件）と `Failed`（残り全件）に分かれること、および `Deleted` の rkey 集合と `Failed` の rkey 集合が重複せず判別可能であることを表明する（AC-06 の「削除済みと未処理が判別可能」）。実装は `ctx` を削除ループ内で明示確認しないため未着手バケットは存在しない、という実挙動に合わせる。
+- [x] 同テストで、続けて同じ対象集合に対し 2 回目の `runner.Run`（`ctx` は未キャンセルの新規）を駆動し、既削除 rkey への再削除がすべて 2xx を返して `Failed` が空になる（重複削除がエラーにならない）ことを検証する（AC-06 の「次回実行時に重複削除の試行でエラーにならない」）。
 
 **完了基準**: `make test -tags test` 相当（`make test`）が緑。AC-05・AC-06 の両関数が [02_architecture.md 6.2 節](./02_architecture.md#62-冪等性異常系の結合テスト ac-05ac-06) の実挙動どおりに通る。
 
@@ -310,4 +310,4 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 
 ## 11. 次のステップ
 
-- Phase 2 の実装を開始する。
+- Phase 3 の実装を開始する。
