@@ -33,8 +33,9 @@ const maxXRPCResponseBytes = 8 << 20 // 8 MiB
 const xrpcRequestTimeout = 30 * time.Second
 
 // responseTooLargeErrorName is the ErrorName marker set on *HTTPError
-// when a 2xx response body exceeds maxXRPCResponseBytes. This distinguishes
-// a size-limit failure from a normal 2xx success in errorKind classification.
+// when any response body (2xx or non-2xx) exceeds maxXRPCResponseBytes.
+// This distinguishes a size-limit failure from normal success or error
+// responses in errorKind classification.
 const responseTooLargeErrorName = "ResponseTooLarge"
 
 // HTTPDoer is the minimal interface this package needs from an HTTP
