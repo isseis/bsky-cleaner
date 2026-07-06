@@ -88,7 +88,7 @@ func slackRequestBodies(t *testing.T, mock *atprototestutil.MockHTTPDoer) []stri
 	return bodies
 }
 
-// ---------- Phase-3-specific handler factories ----------
+// ---------- Handler factories for secret non-leakage tests ----------
 
 // secretLeakListRecordsHandler handles listRecords and createSession
 // similarly to listRecordsHandler in main_test.go, but returns
