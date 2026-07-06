@@ -132,6 +132,11 @@ func TestSend_SelectedWebhookURLEmpty_SkipsSendReturnsNil(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// Wall-clock cost note (also applies to TestSend_EachRetryAttemptGetsFreshTimeout):
+// perAttemptTimeoutDoer's context.WithTimeout is real-time, so fakeClock
+// only skips retry backoff, not this test's testTimeout wait (~0.16s/0.30s
+// measured). Fine at today's scale; if more tests pile onto this pattern,
+// split timeout-path tests into a separate job instead of chasing zero-wait.
 func TestSend_HTTPTimeout_ReturnsSendError(t *testing.T) {
 	const testTimeout = 50 * time.Millisecond
 
