@@ -1,15 +1,15 @@
 # Task Implementation Command for Continue
 
-**Project context (read first)**: Read `.continue/rules/_lib/context.md`. It is the
+**Project context (read first)**: Read `.continue/rules/_lib/context.txt`. It is the
 single source of truth for every project-specific value below — the task root,
 guide paths, document/status conventions, build checks (`make fmt`/`make test`/
 `make lint`/`make deadcode`), the green gate, source layout, and test-helper
 placement (`testutil/`, `test_helpers.go`, `//go:build test`). Where this command
-names such a path or command, treat the entry in `_lib/context.md` as canonical. The
+names such a path or command, treat the entry in `_lib/context.txt` as canonical. The
 domain-specific invariant examples in step 5 (per-call request identifiers, `--dry-run`
 side-effects, session teardown) are illustrative for this project; see
-`_lib/context.md` (Domain-specific) before reusing them elsewhere. When porting,
-follow the porting steps in `_lib/context.md`: that includes editing this command body
+`_lib/context.txt` (Domain-specific) before reusing them elsewhere. When porting,
+follow the porting steps in `_lib/context.txt`: that includes editing this command body
 for domain-specific examples (step 5) and for Go-specific rules (`testutil/`,
 `test_helpers.go`, `//go:build test`) when changing tech stacks. The review step
 uses the shared procedure in `.continue/rules/_lib/review-subagent-pattern.md`.
@@ -56,7 +56,7 @@ Work in order.
 - When complete, update checkboxes (`[x]` done, `[-]` skipped with a note) and commit.
 
 5a. **PR checkpoint** (reached when step 4 directed you here instead of step 5).
-- Verify the green gate (defined in `_lib/context.md`) passes. Fix any failures before continuing.
+- Verify the green gate (defined in `_lib/context.txt`) passes. Fix any failures before continuing.
 - Mark the first PR checkpoint checkbox (the green gate confirmation line) as `[x]` and commit.
 - Push the current branch with an upstream tracking reference (e.g. `git push -u origin HEAD`) so `gh pr create` does not prompt interactively for where to push.
 - Run `gh pr create --title "<推奨タイトル>" --body "<レビュー観点を含む本文>"`, using the `推奨タイトル` value from the `### PR-N 作成ポイント` section as `--title` and including the `レビュー観点` items in `--body`. Use explicit flags to avoid interactive prompts.
@@ -101,10 +101,10 @@ Work in order.
 7. Run the critical-review subagent procedure in `.continue/rules/_lib/review-subagent-pattern.md` with these inputs:
    - **ARTIFACT**: this phase group's code changes.
    - **PERSONA**: an experienced senior Go engineer and senior SRE. Direct it to surface bugs, missing test coverage, architecture drift, and unclear code.
-   - **FILES**: the architecture document and the implementation plan document (paths in `_lib/context.md`), as resolved absolute-path strings; instruct the subagent to read both in full before evaluating the code. Also list the source files added or modified in this phase group as resolved absolute-path strings (read in full). Provide the specific commit range for this phase group (e.g., `HEAD~N..HEAD`) and instruct the subagent to run `git diff <range>` to see exactly what changed.
+   - **FILES**: the architecture document and the implementation plan document (paths in `_lib/context.txt`), as resolved absolute-path strings; instruct the subagent to read both in full before evaluating the code. Also list the source files added or modified in this phase group as resolved absolute-path strings (read in full). Provide the specific commit range for this phase group (e.g., `HEAD~N..HEAD`) and instruct the subagent to run `git diff <range>` to see exactly what changed.
    - **CRITERIA**: every item from the phase-group review checklist below, copied verbatim.
 
-   Extra rule: when fixing Critical and Major issues, run the build checks (defined in `_lib/context.md`) and commit before spawning the verification pass.
+   Extra rule: when fixing Critical and Major issues, run the build checks (defined in `_lib/context.txt`) and commit before spawning the verification pass.
 
 Phase-group review checklist (use verbatim as evaluation criteria in the subagent prompt above):
 - [ ] Implementation is consistent with `02_architecture.md`.
