@@ -17,7 +17,9 @@ import (
 
 	"github.com/isseis/bsky-cleaner/internal/atproto"
 	"github.com/isseis/bsky-cleaner/internal/config"
+	"github.com/isseis/bsky-cleaner/internal/notify"
 	"github.com/isseis/bsky-cleaner/internal/report"
+	"github.com/isseis/bsky-cleaner/internal/retry"
 	"github.com/isseis/bsky-cleaner/internal/runner"
 )
 
@@ -33,6 +35,13 @@ const (
 	exitSetupOrRunFail = 1
 	exitPartialFailure = 3
 )
+
+// notifyTimeout bounds internal/notify.Send's own retry loop. It is set to
+// roughly the architecture doc's ~12s worst-case Send duration (3s HTTP
+// timeout x up to 3 attempts + 1s/2s backoff) plus a safety margin, so a
+// slow-but-not-hung Slack endpoint cannot silently exceed this budget before
+// Send's own bounded retries give up.
+const notifyTimeout = 15 * time.Second
 
 // parseFlags parses args (excluding the program name) into a config path
 // and the apply flag. It returns an error -- never calling os.Exit --
@@ -93,17 +102,47 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 		return exitSetupOrRunFail
 	}
 
-	result, err := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)
-	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-		return exitSetupOrRunFail
+	result, runErr := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)
+	if runErr != nil {
+		_, _ = fmt.Fprintln(stderr, runErr.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	} else {
+		_, _ = fmt.Fprint(stdout, notify.Sanitize(report.FormatText(*result))) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	}
 
-	_, _ = fmt.Fprint(stdout, report.FormatText(*result)) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	if len(result.Failed) > 0 {
-		return exitPartialFailure
+	// apply-only, and independent of ctx above: ctx's execution-timeout
+	// budget may already be nearly spent by the time runner.Run returns, and
+	// reusing it here would make notification least reliable exactly when
+	// the run itself errored (architecture doc section 3.5).
+	if apply {
+		if sendErr := sendNotification(cfg, httpDoer, result, runErr); sendErr != nil {
+			_, _ = fmt.Fprintln(stderr, sendErr.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		}
 	}
-	return exitOK
+
+	switch {
+	case runErr != nil:
+		return exitSetupOrRunFail
+	case len(result.Failed) > 0:
+		return exitPartialFailure
+	default:
+		return exitOK
+	}
+}
+
+// sendNotification builds and sends the Slack notification for one apply
+// run, using its own timeout/context independent of run's execution-timeout
+// ctx (see the comment at its call site). A delivery failure is returned to
+// the caller for stderr reporting only -- it never influences run's exit
+// code.
+func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *report.Result, runErr error) error {
+	notifyCtx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
+	defer cancel()
+
+	notifyCfg := notify.Config{
+		SuccessWebhookURL: cfg.SlackSuccessWebhookURL,
+		FailureWebhookURL: cfg.SlackFailureWebhookURL,
+	}
+	return notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, notify.Outcome{Result: result, Err: runErr})
 }
 
 func main() {

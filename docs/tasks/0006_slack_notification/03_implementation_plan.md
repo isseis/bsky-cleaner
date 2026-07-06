@@ -212,7 +212,7 @@
 
 ### フェーズ6: `cmd/main.go` への統合（設計書 2.2節・3.5節）
 
-- [ ] **対象ファイル**: `cmd/main.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `cmd/main.go`（既存ファイルの変更）
   - **作業内容**:
     - `internal/notify`・`internal/retry` を import する。
     - `notifyTimeout`（新規の非公開定数、例: `const notifyTimeout = 15 * time.Second`）を定義する。設計書 3.6節が示す通知処理の最悪ケース所要時間（約12秒）に安全マージンを加えた値とし、その根拠をコメントに明記する（設計書 3.5節がこの値を明示していないため、本計画で採用する値として決定する）。
@@ -224,18 +224,18 @@
     - `client, err := atproto.NewClient(...)` 以前の設定読み込み・クライアント初期化の失敗パス（既存の早期 `return exitSetupOrRunFail`）は変更しない（1.3節の通り、これらの失敗は `notify.Send` を呼ばない）。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更・追加）
+- [x] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更・追加）
   - **作業内容**:
-    - [ ] `validConfigPath`（33行目）が書き込む TOML本文に `slack_allowed_host = "hooks.slack.com"` の行を追加する（1.3節の通り、これを行わないと `TestRun_ClientInitFailure_ReturnsExitCode1`・`TestRun_LoginFailure_ReturnsExitCode1`・`TestRun_DryRunWithTargets_ReturnsExitCode0AndPrintsTargets`・`TestRun_DryRunNoTargets_ReturnsExitCode0AndPrintsNoTargetsMessage`・`TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`・`TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures` の6件が Slack 通知と無関係な理由で失敗するようになる）。
-    - [ ] `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1`（157行目）が独自に組み立てる TOML本文にも同様に `slack_allowed_host = "hooks.slack.com"` の行を追加する（1.3節、`validConfigPath` とは別に組み立てられているため個別の修正が必要）。
-    - [ ] `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`（既存）のモックハンドラ（`deleteRecordHandler`）に、`hooks.slack.com/services/success` 宛のPOSTリクエストに200を返す分岐を追加し、既存のアサーション（終了コード・stdout内容）が無変更のまま成功することを確認する（AC-05の結合確認を兼ねる）。
-    - [ ] `TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures`（既存）のモックハンドラに、`hooks.slack.com/services/failure` 宛のPOSTリクエストに200を返す分岐を追加し、既存のアサーションが無変更のまま成功することを確認する（AC-07の結合確認を兼ねる）。
-    - [ ] `TestRun_ApplyLoginFailure_SendsFailureNotification`（新規）: `apply=true` でログイン失敗（`com.atproto.server.createSession` が401を返す）を発生させ、`hooks.slack.com/services/failure` 宛のPOSTリクエストが1回発生すること、かつ終了コードが `exitSetupOrRunFail`（従来通り）のままであることを検証する（AC-06。既存の `TestRun_LoginFailure_ReturnsExitCode1` は `apply=false` であり、apply モードでの異常系ルーティングを検証する既存テストがないため新規に追加する）。
-    - [ ] `TestRun_Apply_SlackNotifyFails_ExitCodeUnaffected`（新規）: 削除は全件成功させつつ、`hooks.slack.com/services/success` 宛のPOSTに400（非429、再試行対象外のステータス）を返すモックを用意し、終了コードが `exitOK`（Slack通知の失敗に影響されない）のままであることを検証する（AC-02）。モック応答を非429の4xxにすることで、`retry.RealClock` による実際のバックオフ待機を発生させず高速に完了させる（1.3節の設計判断）。
-    - [ ] `TestRun_Apply_SlackNotifyFails_StderrContainsMaskedFailureMessage`（新規）: 上記と同じ400応答の設定で、stderr に通知失敗を示す文言が出力されること、かつ `hooks.slack.com/services/success` のパス（Webhook URLそのもの）が出力に含まれないことを検証する（AC-03, AC-19）。
-    - [ ] `TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError`（新規）: `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` を両方とも空文字列に上書き（`slack_allowed_host` の検証も自動的にスキップされる、AC-21後段）した状態で `apply=true`・全件成功のシナリオを実行し、`hooks.slack.com` 宛のリクエストが一切発生せず（モックハンドラが該当ホストへのリクエストで `t.Fatalf` する作りのまま）、終了コードが `exitOK` のままであることを検証する（設計書 3.5節の回帰防止テスト）。
-    - [ ] `TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey`（新規）: 削除失敗する投稿の `rkey` に改行文字を含む値（例: `"evil\nFAKE LOG LINE"`）を設定し、`apply=true` で実行した際、stdout に生の改行を含む行注入が発生しないこと（`notify.Sanitize` でラップされた出力の改行数が期待通りであること）を検証する（AC-17）。
-  - **完了基準**: `make test` で `cmd` パッケージの全テストが成功する。
+    - [x] `validConfigPath`（33行目）が書き込む TOML本文に `slack_allowed_host = "hooks.slack.com"` の行を追加する（1.3節の通り、これを行わないと `TestRun_ClientInitFailure_ReturnsExitCode1`・`TestRun_LoginFailure_ReturnsExitCode1`・`TestRun_DryRunWithTargets_ReturnsExitCode0AndPrintsTargets`・`TestRun_DryRunNoTargets_ReturnsExitCode0AndPrintsNoTargetsMessage`・`TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`・`TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures` の6件が Slack 通知と無関係な理由で失敗するようになる）。**実装時点で確認**: フェーズ2完了時の前倒し修正（フェーズ2の実装チェックリスト参照）により既に追加済みだった。
+    - [x] `TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1`（157行目）が独自に組み立てる TOML本文にも同様に `slack_allowed_host = "hooks.slack.com"` の行を追加する（1.3節、`validConfigPath` とは別に組み立てられているため個別の修正が必要）。**実装時点で確認**: こちらもフェーズ2の前倒し修正で既に追加済みだった。
+    - [x] `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`（既存）のモックハンドラ（`deleteRecordHandler`）に、`hooks.slack.com/services/success` 宛のPOSTリクエストに200を返す分岐を追加し、既存のアサーション（終了コード・stdout内容）が無変更のまま成功することを確認する（AC-05の結合確認を兼ねる）。新規の `slackWebhookHandler` ラッパーで実装した。
+    - [x] `TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures`（既存）のモックハンドラに、`hooks.slack.com/services/failure` 宛のPOSTリクエストに200を返す分岐を追加し、既存のアサーションが無変更のまま成功することを確認する（AC-07の結合確認を兼ねる）。
+    - [x] `TestRun_ApplyLoginFailure_SendsFailureNotification`（新規）: `apply=true` でログイン失敗（`com.atproto.server.createSession` が401を返す）を発生させ、`hooks.slack.com/services/failure` 宛のPOSTリクエストが1回発生すること、かつ終了コードが `exitSetupOrRunFail`（従来通り）のままであることを検証する（AC-06。既存の `TestRun_LoginFailure_ReturnsExitCode1` は `apply=false` であり、apply モードでの異常系ルーティングを検証する既存テストがないため新規に追加する）。
+    - [x] `TestRun_Apply_SlackNotifyFails_ExitCodeUnaffected`（新規）: 削除は全件成功させつつ、`hooks.slack.com/services/success` 宛のPOSTに400（非429、再試行対象外のステータス）を返すモックを用意し、終了コードが `exitOK`（Slack通知の失敗に影響されない）のままであることを検証する（AC-02）。モック応答を非429の4xxにすることで、`retry.RealClock` による実際のバックオフ待機を発生させず高速に完了させる（1.3節の設計判断）。
+    - [x] `TestRun_Apply_SlackNotifyFails_StderrContainsMaskedFailureMessage`（新規）: 上記と同じ400応答の設定で、stderr に通知失敗を示す文言が出力されること、かつ `hooks.slack.com/services/success` のパス（Webhook URLそのもの）が出力に含まれないことを検証する（AC-03, AC-19）。
+    - [x] `TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError`（新規）: `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` を両方とも空文字列に上書き（`slack_allowed_host` の検証も自動的にスキップされる、AC-21後段）した状態で `apply=true`・全件成功のシナリオを実行し、`hooks.slack.com` 宛のリクエストが一切発生せず（モックハンドラが該当ホストへのリクエストで `t.Fatalf` する作りのまま）、終了コードが `exitOK` のままであることを検証する（設計書 3.5節の回帰防止テスト）。
+    - [x] `TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey`（新規）: 削除失敗する投稿の `rkey` に改行文字を含む値（例: `"evil\nFAKE LOG LINE"`）を設定し、`apply=true` で実行した際、stdout に生の改行を含む行注入が発生しないこと（`notify.Sanitize` でラップされた出力の改行数が期待通りであること）を検証する（AC-17）。**実装時の分岐**: `notify.Sanitize` は全ての C0 制御文字（=改行含む）を無条件に除去する実装（フェーズ3で確定済み）であるため、`report.FormatText` 自身が本来持つ改行（サマリ行・失敗行の区切り）も含めて全て除去される。したがって本テストの検証内容は「改行数が期待通り(2)」ではなく「生の改行が一切残らない(0件)」に補正し、代わりに内容（件数・rkey文字列）が引き続き含まれることを確認する形にした。
+  - **完了基準**: `make test` で `cmd` パッケージの全テストが成功する。実行結果: 2026-07-06、`make fmt && make test && make lint && make deadcode` すべて成功。
 
 ### フェーズ7: ドキュメント更新（設計書 3.5節・8節7番目の項目）
 
@@ -307,8 +307,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/49）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-2 作成ポイント: internal/notify package
 
@@ -320,8 +320,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/50、base: `issei/0006-slack-notification-04`）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-3 作成ポイント: cmd/main.go integration
 
@@ -331,8 +331,8 @@
 
 **レビュー観点**: dry-run時に `notify.Send` が一切呼ばれないこと（AC-04） / 通知の送信失敗が終了コードに影響しないこと（AC-02） / stdout の書き込みが `notify.Send` 呼び出しより先に行われること（設計書 3.5節の順序要件） / `notifyCtx` が `runner.Run` 用の `ctx` から独立していること（設計書 3.5節） / 既存の `cmd/main_test.go` のテスト（`validConfigPath`・`TestRun_ExecutionTimeoutExceeded_ReturnsExitCode1` 双方のTOMLフィクスチャ修正を含む）がすべて無退行で成功すること
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/51）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
