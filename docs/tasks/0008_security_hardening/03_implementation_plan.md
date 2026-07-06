@@ -164,8 +164,8 @@
 
 **対象ファイル**: 本計画書 [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04)
 
-- [ ] AC-03: [セキュリティ設計](../../design/security.md) に列挙された全リスクカテゴリのトレーサビリティ一覧を [7.1 節](#71-トレーサビリティ一覧 ac-03) に記載する。列挙は同文書を正とする（[02_architecture.md 7.3 節](./02_architecture.md#73-棚卸しの検証 ac-03ac-04)）。
-- [ ] AC-04: 未対応・不十分と判明した項目の対応可否判断を [7.2 節](#72-対応可否判断 ac-04) に記載する。DoS 系 3 項目は本タスクで対応済みとし元タスクへ差し戻さない。DID 解決経路の独立タイムアウトとファイルシステム権限管理は本タスク非対応とその理由を記録する。
+- [x] AC-03: [セキュリティ設計](../../design/security.md) に列挙された全リスクカテゴリのトレーサビリティ一覧を [7.1 節](#71-トレーサビリティ一覧 ac-03) に記載する。列挙は同文書を正とする（[02_architecture.md 7.3 節](./02_architecture.md#73-棚卸しの検証 ac-03ac-04)）。
+- [x] AC-04: 未対応・不十分と判明した項目の対応可否判断を [7.2 節](#72-対応可否判断 ac-04) に記載する。DoS 系 3 項目は本タスクで対応済みとし元タスクへ差し戻さない。DID 解決経路の独立タイムアウトとファイルシステム権限管理は本タスク非対応とその理由を記録する。
 
 **完了基準**: Phase 1〜3 の結果（実装・見送りの確定）を反映し、[7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) が [8 章の AC 検証](#8-受け入れ基準の検証) の `static` チェックを満たす。
 
@@ -243,10 +243,10 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 ## 6. 実装チェックリスト
 
 - [x] PR-1 マージ済み（対象ステップ：Phase 1。`errors.go` のセンチネル 2 種、`http.go` の `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数、`doXRPC` の応答サイズ上限、`newRestrictedDoer` の `timeout` 引数、`posts.go` の 3 上限定数と `listAllRecords` の検査、`http_test.go`・`posts_test.go` の単体テスト追加）
-- [ ] PR-2 マージ済み（対象ステップ：Phase 2。`internal/atproto/idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
-- [ ] PR-3 マージ済み（対象ステップ：Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証。PR: https://github.com/isseis/bsky-cleaner/pull/62）
+- [x] PR-2 マージ済み（対象ステップ：Phase 2。`internal/atproto/idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
+- [x] PR-3 マージ済み（対象ステップ：Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証。PR: https://github.com/isseis/bsky-cleaner/pull/62）
 - [ ] PR-4 マージ済み（対象ステップ：Phase 4。本計画書 [7 章](#7-セキュリティ設計の棚卸し ac-03ac-04) の棚卸し一覧・決定記録を確定）
-- [ ] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
+- [x] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
 
 ## 7. セキュリティ設計の棚卸し（AC-03・AC-04）
 
@@ -305,9 +305,9 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 
 `make lint`・`make test` が検出しない項目のみを挙げる（追加中心のため最小限）。
 
-- [ ] 新規センチネル名（`ErrResponseTooLarge`・`ErrPaginationLimitExceeded`）が既存名と衝突しないこと：`rg -n 'ErrResponseTooLarge|ErrPaginationLimitExceeded' internal/` が `errors.go` の定義と利用箇所のみを返す。
-- [ ] 超過マーカー文字列（例 `"ResponseTooLarge"`）が `errorKind` の出力と整合すること（[02_architecture.md 4.2 節](./02_architecture.md#42-errorkind-との連携と可観測性)）。`errorkind.go` は `HTTPError.ErrorName` を `error=%s` として汎用に埋め込むだけで、マーカー文字列リテラルを持たない（`rg -n 'ResponseTooLarge' internal/notify/` は 0 件が正しい）。したがって検証は `rg` の突き合わせではなく、`http.go` が設定するマーカー値が `errorkind.go:33` の `error=%s` 経由で `"atproto http error: <method> status=200 error=ResponseTooLarge"` として現れることを目視確認する（マーカー定義箇所は `rg -n 'ResponseTooLarge' internal/atproto/` で 1 件確認）。
+- [x] 新規センチネル名（`ErrResponseTooLarge`・`ErrPaginationLimitExceeded`）が既存名と衝突しないこと：`rg -n 'ErrResponseTooLarge|ErrPaginationLimitExceeded' internal/` が `errors.go` の定義と利用箇所のみを返す。
+- [x] 超過マーカー文字列（例 `"ResponseTooLarge"`）が `errorKind` の出力と整合すること（[02_architecture.md 4.2 節](./02_architecture.md#42-errorkind-との連携と可観測性)）。`errorkind.go` は `HTTPError.ErrorName` を `error=%s` として汎用に埋め込むだけで、マーカー文字列リテラルを持たない（`rg -n 'ResponseTooLarge' internal/notify/` は 0 件が正しい）。したがって検証は `rg` の突き合わせではなく、`http.go` が設定するマーカー値が `errorkind.go:33` の `error=%s` 経由で `"atproto http error: <method> status=200 error=ResponseTooLarge"` として現れることを目視確認する（マーカー定義箇所は `rg -n 'ResponseTooLarge' internal/atproto/` で 1 件確認）。
 
 ## 11. 次のステップ
 
-- Phase 3 の実装を開始する。
+- すべてのフェーズが完了した。PR-4 を作成しマージする。
