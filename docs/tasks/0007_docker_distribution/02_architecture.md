@@ -173,11 +173,14 @@ flowchart TD
 
 **Type definition for cron validation result**:
 ```go
-// ScheduleValidationError is returned when the schedule field fails
-// cron-syntax validation. It wraps the underlying reason so callers
-// can inspect the category of failure without matching on error text.
+// ScheduleValidationError reports that the schedule field failed
+// cron-syntax validation.
 type ScheduleValidationError struct {
     Reason string
+}
+
+func (e *ScheduleValidationError) Error() string {
+    return "schedule validation failed: " + e.Reason
 }
 ```
 
