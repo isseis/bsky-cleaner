@@ -243,8 +243,8 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 ## 6. 実装チェックリスト
 
 - [ ] PR-1 マージ済み（対象ステップ: Phase 1。`errors.go` のセンチネル2種、`http.go` の `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数、`doXRPC` の応答サイズ上限、`newRestrictedDoer` の `timeout` 引数、`posts.go` の3上限定数と `listAllRecords` の検査、`http_test.go`・`posts_test.go` の単体テスト追加）
-- [ ] PR-2 マージ済み（対象ステップ: Phase 2。`idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
-- [ ] PR-3 マージ済み（対象ステップ: Phase 3。`secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証）
+- [ ] PR-2 マージ済み（対象ステップ: Phase 2。`internal/atproto/idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
+- [ ] PR-3 マージ済み（対象ステップ: Phase 3。`cmd/secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証）
 - [ ] PR-4 マージ済み（対象ステップ: Phase 4。本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)の棚卸し一覧・決定記録を確定）
 - [ ] 全体: `make fmt`・`make test`・`make lint` が緑（NF-001）
 
