@@ -13,9 +13,9 @@ than ~4000 bytes. To work around this:
 - For shell pipelines with many arguments, use a script file instead of a
   single long `command` string.
 - Example (PR body):
-  ```
-  gh pr create ... --body-file /tmp/pr-body.md
-  ```
+    ```
+    gh pr create ... --body-file /tmp/pr-body.md
+    ```
   instead of `gh pr create --body "...長い本文..."`.
 - If a command still gets truncated, split it into two steps (e.g. create
   the PR with a short title first, then `gh pr edit $NUM --body-file ...`).
