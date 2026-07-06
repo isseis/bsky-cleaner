@@ -63,9 +63,10 @@ func assertNoSecrets(t *testing.T, stdout, stderr string, slackBodies ...string)
 	t.Helper()
 	secrets := forbiddenSecrets()
 	check := func(name, content string) {
-		for _, s := range secrets {
-			assert.NotContains(t, content, s,
-				"forbidden secret %q found in %s", s, name)
+		for i, s := range secrets {
+			if strings.Contains(content, s) {
+				t.Errorf("forbidden secret at index %d found in %s", i, name)
+			}
 		}
 	}
 	check("stdout", stdout)
