@@ -67,11 +67,11 @@
 
 ## 2. 実装ステップ
 
-各フェーズは [02_architecture.md 8 章](./02_architecture.md#8-実装優先順位)のフェーズ定義と順序に一致する。
+各フェーズは [02_architecture.md 8 章](./02_architecture.md#8-実装優先順位)のフェーズ定義と順序に一致する。本計画書はステップを `X-Y` 形式の番号ではなく Phase 単位で管理しているため、以降の PR 作成ポイントの `**対象ステップ**` 欄は Phase 番号（Phase 1〜4）を単位として記載する。各 Phase は対応する PR に1:1で対応する。
 
 ### Phase 1: DoS 系防御の実装と単体テスト（AC-04）
 
-**対象ファイル**: `internal/atproto/errors.go`, `internal/atproto/http.go`, `internal/atproto/posts.go`, `internal/atproto/test_helpers.go`, `internal/atproto/http_test.go`, `internal/atproto/posts_test.go`
+**対象ファイル**: `internal/atproto/errors.go`, `internal/atproto/http.go`, `internal/atproto/posts.go`, `internal/atproto/client.go`, `internal/atproto/test_helpers.go`, `internal/atproto/http_test.go`, `internal/atproto/posts_test.go`
 
 - [ ] `errors.go`: センチネル `ErrResponseTooLarge = errors.New("XRPC response exceeds size limit")` を追加する。
 - [ ] `errors.go`: センチネル `ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit exceeded")` を追加する。
@@ -89,6 +89,19 @@
 
 **完了基準**: `make test`・`make lint` が緑。新規センチネルと上限を検査する単体テストが、超過時に対応するセンチネルを返し、上限内では従来どおり全件取得・デコードされることを確認する。
 
+### PR-1 作成ポイント: internal/atproto DoS defenses
+
+**対象ステップ**: Phase 1
+
+**推奨タイトル**: `feat(0008-security-hardening): add XRPC response size, request timeout, and pagination limits`
+
+**レビュー観点**: `doXRPC` の成功／エラー両方のボディ読み取りに `maxXRPCResponseBytes` 上限が正しく適用され、境界値（上限ちょうど＝成功、上限＋1＝超過）が設計書3.1節と一致していること / `newRestrictedDoer` への `timeout` 引数追加がパッケージ変数の save/restore を使わず、`newPDSDoer`・`newTestRestrictedDoer` の呼び出し元をすべて更新済みであること（将来の `t.Parallel()` 導入時のデータ競合回避という設計意図どおりであること） / `listAllRecords` の累積バイト・総ページ・総レコード上限が既存の `ErrPaginationStalled` と同じラップ形式で `ErrPaginationLimitExceeded` を返すこと / 上限内の既存ケース（`TestClient_ListPosts_Pagination` 等）が無退行であること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### Phase 2: 冪等性・異常系の結合テスト（AC-05・AC-06）
 
 **対象ファイル**: `internal/atproto/idempotency_integration_test.go`（新規, `package atproto_test`）
@@ -101,6 +114,19 @@
 - [ ] 同テストで、続けて同じ対象集合に対し2回目の `runner.Run`（`ctx` は未キャンセルの新規）を駆動し、既削除 rkey への再削除がすべて 2xx を返して `Failed` が空になる（重複削除がエラーにならない）ことを検証する（AC-06 の「次回実行時に重複削除の試行でエラーにならない」）。
 
 **完了基準**: `make test -tags test` 相当（`make test`）が緑。AC-05・AC-06 の両関数が [02_architecture.md 6.2 節](./02_architecture.md#62-冪等性異常系の結合テストac-05ac-06)の実挙動どおりに通る。
+
+### PR-2 作成ポイント: idempotency and cancellation integration tests
+
+**対象ステップ**: Phase 2
+
+**推奨タイトル**: `test(0008-security-hardening): add idempotency and mid-run cancellation integration tests`
+
+**レビュー観点**: 複数の既削除対象がすべて `Deleted` として扱われクラッシュしないこと（AC-05）、既存 `TestRunnerRun_WithRealAtprotoClient` との重複範囲がテストの doc コメントで明示されていること / `context.WithCancel` のみを用いた中断がフレーキーでない決定的な設計になっていること（`WithTimeout` を避けた理由が妥当であること） / 中断後の `Deleted`／`Failed` の rkey 集合が重複せず判別可能であること、2回目の `Run` で重複削除がすべて 2xx として扱われエラーにならないこと（AC-06） / 新規テストが `runner_integration_test.go` の既存ヘルパー（`publicIPLiteral`・`integrationAppPassword`・`StubPassthroughPDSDoer`）を再定義せず再利用していること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 3: 秘密非漏洩の結合テスト（AC-01・AC-02）
 
@@ -121,6 +147,19 @@
 
 **完了基準**: `make test` が緑。AC-01（両モード）・AC-02 (a)〜(f) の各テストが、意図した失敗経路を通過したうえで 3面（または適用面）に秘密文字列を含まないことを確認する。
 
+### PR-3 作成ポイント: secret non-leakage integration tests
+
+**対象ステップ**: Phase 3
+
+**推奨タイトル**: `test(0008-security-hardening): add secret non-leakage integration tests`
+
+**レビュー観点**: 識別性の高い秘密リテラル（app password・`AccessJWT`・両 Webhook URL）を注入する専用セットアップヘルパーを全テストが必ず呼び、既存の弱い `setEnvCredentials` にフォールバックしていないこと（偽陰性回避） / 禁止文字列集合が stdout・stderr・Slack ペイロードの3面（dry-run では2面）で漏洩していないことを一貫して検証していること / AC-02 (c)・(f) は DID 解決段で中断するため `AccessJWT`／Bearer への非漏洩表明が空振り（vacuous）である旨がテストコメントに明記されていること / AC-01 が dry-run と `--apply` の両方を対象とし副作用契約（Slack通知の抑止有無）と整合していること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### Phase 4: 棚卸し一覧・決定記録（AC-03・AC-04）
 
 **対象ファイル**: 本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)
@@ -129,6 +168,19 @@
 - [ ] AC-04: 未対応・不十分と判明した項目の対応可否判断を [7.2 節](#72-対応可否判断ac-04)に記載する。DoS 系3項目は本タスクで対応済みとし元タスクへ差し戻さない。DID 解決経路の独立タイムアウトとファイルシステム権限管理は本タスク非対応とその理由を記録する。
 
 **完了基準**: Phase 1〜3 の結果（実装・見送りの確定）を反映し、[7 章](#7-セキュリティ設計の棚卸しac-03ac-04)が [8 章の AC 検証](#8-受け入れ基準の検証)の `static` チェックを満たす。
+
+### PR-4 作成ポイント: security design traceability documentation
+
+**対象ステップ**: Phase 4
+
+**推奨タイトル**: `docs(0008-security-hardening): record security design traceability and disposition`
+
+**レビュー観点**: [7.1 節](#71-トレーサビリティ一覧ac-03)のトレーサビリティ一覧が [セキュリティ設計](../../design/security.md) の9カテゴリすべてを網羅していること / [7.2 節](#72-対応可否判断ac-04)の対応可否判断が PR-1〜PR-3 実装後の実際のファイル・シンボルと矛盾しないこと（Phase 1〜3 マージ後に `rg` で再確認済みであること） / DID 解決経路の独立タイムアウトとファイルシステム権限管理を「本タスク非対応」とした理由が要件定義書のスコープ外規定と整合していること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ## 3. 実装順序とマイルストーン
 
@@ -140,6 +192,15 @@
 | M4 | Phase 4 完了 | 棚卸し一覧・決定記録が [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)に揃い、[8 章](#8-受け入れ基準の検証)の全 AC が緑 |
 
 Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_architecture.md 8 章](./02_architecture.md#8-実装優先順位)を参照。
+
+### 3.2 PR 構成
+
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | Phase 1 | `internal/atproto` に XRPC 応答サイズ上限・リクエスト全体タイムアウト・`listAllRecords` の累積バイト/総ページ/総レコード上限を実装し、単体テストを追加する |
+| PR-2 | Phase 2 | `internal/atproto/idempotency_integration_test.go` を新規追加し、AC-05（既削除対象の正常系扱い）・AC-06（中断後の判別可能性・再実行安全性）を結合テストで検証する |
+| PR-3 | Phase 3 | `cmd/secret_leak_integration_test.go` を新規追加し、AC-01（正常系）・AC-02 (a)〜(f)（代表的なエラー経路）で秘密情報が3出力面に現れないことを検証する |
+| PR-4 | Phase 4 | 本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)に、セキュリティ設計の全リスクカテゴリのトレーサビリティ一覧と未対応項目の対応可否判断を確定する |
 
 ## 4. テスト戦略
 
@@ -181,15 +242,10 @@ Phase 1 を先行させる理由、Phase 4 を最後に置く理由は [02_archi
 
 ## 6. 実装チェックリスト
 
-- [ ] Phase 1: `errors.go` にセンチネル2種を追加
-- [ ] Phase 1: `http.go` に `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数を追加
-- [ ] Phase 1: `doXRPC` の成功／エラー両ボディに応答サイズ上限を適用
-- [ ] Phase 1: `newRestrictedDoer` に `timeout` 引数を追加し `http.Client` の `Timeout` に設定。`newPDSDoer`・`newTestRestrictedDoer` の呼び出し元を更新
-- [ ] Phase 1: `posts.go` に3上限定数を追加し `listAllRecords` で検査
-- [ ] Phase 1: `http_test.go`・`posts_test.go` に単体テストを追加
-- [ ] Phase 2: `idempotency_integration_test.go` を新規作成（AC-05・AC-06）
-- [ ] Phase 3: `secret_leak_integration_test.go` を新規作成（AC-01・AC-02）
-- [ ] Phase 4: 本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)の棚卸し一覧・決定記録を確定
+- [ ] PR-1 マージ済み（対象ステップ: Phase 1。`errors.go` のセンチネル2種、`http.go` の `maxXRPCResponseBytes`・`xrpcRequestTimeout`・超過マーカー定数、`doXRPC` の応答サイズ上限、`newRestrictedDoer` の `timeout` 引数、`posts.go` の3上限定数と `listAllRecords` の検査、`http_test.go`・`posts_test.go` の単体テスト追加）
+- [ ] PR-2 マージ済み（対象ステップ: Phase 2。`idempotency_integration_test.go` を新規作成し AC-05・AC-06 を検証）
+- [ ] PR-3 マージ済み（対象ステップ: Phase 3。`secret_leak_integration_test.go` を新規作成し AC-01・AC-02 を検証）
+- [ ] PR-4 マージ済み（対象ステップ: Phase 4。本計画書 [7 章](#7-セキュリティ設計の棚卸しac-03ac-04)の棚卸し一覧・決定記録を確定）
 - [ ] 全体: `make fmt`・`make test`・`make lint` が緑（NF-001）
 
 ## 7. セキュリティ設計の棚卸し（AC-03・AC-04）
