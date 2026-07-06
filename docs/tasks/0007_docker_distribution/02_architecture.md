@@ -275,8 +275,8 @@ NF-003 が要求する「選定理由の実装計画書への記載」は、実�
 | 失敗箇所 | エラー型 | 終了コード | 標準出力 | 標準エラー出力 |
 |---|---|---|---|---|
 | `--config` 不足 | `parsePrintScheduleFlags` のエラー | 2（usage） | （なし） | 使用方法 |
-| TOML ファイル不在 | `config.ErrFileNotFound`（`FieldError` でラップ） | 1（setup fail） | （なし） | エラーメッセージ |
-| TOML パース失敗 | `config.ErrParseFailed`（`FieldError` でラップ） | 1（setup fail） | （なし） | エラーメッセージ |
+| TOML ファイル不在 | `config.ErrFileNotFound`（`fmt.Errorf("load config: %w: %w", ErrFileNotFound, err)` でラップ） | 1（setup fail） | （なし） | エラーメッセージ |
+| TOML パース失敗 | `config.ErrParseFailed`（`fmt.Errorf("load config: %w: %w", ErrParseFailed, err)` でラップ） | 1（setup fail） | （なし） | エラーメッセージ |
 | 必須フィールド不足 | `config.ErrMissingField`（`FieldError` でラップ） | 1（setup fail） | （なし） | エラーメッセージ |
 | 値域不正 | `config.ErrInvalidValue`（`FieldError` でラップ） | 1（setup fail） | （なし） | エラーメッセージ |
 | `schedule` に改行含む | `*ScheduleValidationError` | 1（setup fail） | （なし） | エラーメッセージ |
