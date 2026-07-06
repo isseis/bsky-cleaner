@@ -345,7 +345,7 @@
 **レビュー観点**: `docs/design/configuration.md` から「未実装（計画中）」の注記が過不足なく削除されていること / 追記した約12秒の説明が設計書 3.6節の数値計算と一致していること / `package_reference.md` の追記が既存の記述粒度・文体と一致していること
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/52）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
