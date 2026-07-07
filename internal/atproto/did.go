@@ -117,6 +117,10 @@ const didTXTRecordPrefix = "did="
 // if any, is preserved via %w so it remains available to
 // errors.AsType[*net.DNSError] and similar.
 func resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error) {
+	if strings.ContainsAny(handle, invalidHandleChars) {
+		return "", fmt.Errorf("resolve handle to DID via DNS: invalid handle %q: %w", handle, ErrDNSHandleResolutionFailed)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, dnsTXTLookupTimeout)
 	defer cancel()
 
