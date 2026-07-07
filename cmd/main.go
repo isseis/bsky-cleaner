@@ -255,6 +255,23 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 	fs.BoolVar(&help, "help", false, "show this help message and exit")
 	fs.BoolVar(&help, "h", false, "show this help message and exit (shorthand for --help)")
 
+	// Scan for a help token before calling fs.Parse: fs.Parse returns
+	// immediately on the first unknown/invalid flag, so if -h/--help appeared
+	// alongside a malformed flag (e.g. "--help --unknown"), the help check
+	// below would never be reached and the command would exit as a usage
+	// error instead of showing help. Checking args directly here guarantees
+	// -h/--help always succeeds regardless of other flags.
+	for _, arg := range args {
+		if arg == "-h" || arg == "--help" {
+			fs.Usage()
+			return "", false, flag.ErrHelp
+		}
+		if arg == "--" {
+			// Everything after "--" is positional, not a flag.
+			break
+		}
+	}
+
 	if err := fs.Parse(args); err != nil {
 		return "", false, err
 	}
