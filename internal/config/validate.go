@@ -24,9 +24,9 @@ func validateConfig(raw rawConfig) (Config, error) {
 		return Config{}, &FieldError{Field: "execution_timeout_seconds", Err: ErrMissingField}
 	}
 
-	// schedule is optional: only print-schedule (Docker/cron deployments)
-	// needs it. runPrintSchedule's validateSchedule call rejects an empty
-	// value with a clear error when the subcommand is actually used.
+	// schedule is optional: only the print-schedule subcommand (Docker/cron
+	// deployments) needs it. That subcommand's schedule validation rejects
+	// an empty value with a clear error when the subcommand is actually used.
 	schedule := ""
 	if raw.Schedule != nil {
 		schedule = *raw.Schedule

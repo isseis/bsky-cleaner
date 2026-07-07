@@ -10,7 +10,7 @@
 
 ## TOML 設定ファイル
 
-`internal/config.Load(path)` が読み込む。`slack_allowed_host` と `schedule` を除く項目は必須であり、いずれかが欠落している場合は読み込みが失敗する（デフォルト値での黙った補完は行わない）。秘匿情報（app パスワード・Slack Webhook URL）は TOML には書かず、下記「環境変数」の節で扱う。`slack_allowed_host` は Webhook URL 自体とは異なりそれ単体では投稿権限を持たないため秘匿情報として扱わず、TOML 側に置く（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) 参照）。
+`internal/config.Load(path)` が読み込む。`slack_allowed_host` と `schedule` を除く項目は必須であり、いずれかが欠落している場合は読み込みが失敗する（必須項目についてはデフォルト値での黙った補完は行わない）。任意項目のデフォルト値は下記テーブルに明示する。秘匿情報（app パスワード・Slack Webhook URL）は TOML には書かず、下記「環境変数」の節で扱う。`slack_allowed_host` は Webhook URL 自体とは異なりそれ単体では投稿権限を持たないため秘匿情報として扱わず、TOML 側に置く（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) 参照）。
 
 | 項目名 | 型 | 必須/任意 | デフォルト値 | 書式・制約 |
 |---|---|---|---|---|
