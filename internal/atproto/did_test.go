@@ -389,6 +389,15 @@ func TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionF
 	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
 }
 
+func TestResolveHandleToDIDViaDNS_DuplicateIdenticalDIDRecords_Succeeds(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123", "did=did:plc:test123"}})
+
+	did, err := resolveHandleToDIDViaDNS(context.Background(), "dave.test")
+
+	require.NoError(t, err)
+	assert.Equal(t, "did:plc:test123", did)
+}
+
 func TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError(t *testing.T) {
 	dnsErr := &net.DNSError{Err: "no such host", Name: "_atproto.eve.test", IsNotFound: true}
 	stubTXTLookuper(t, &fakeTXTLookuper{err: dnsErr})
@@ -400,4 +409,81 @@ func TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError(t *testing.T) 
 	extracted, ok := errors.AsType[*net.DNSError](err)
 	require.True(t, ok)
 	assert.Equal(t, dnsErr, extracted)
+}
+
+func TestResolveHandle_DNSSucceeds_DoesNotCallHTTPS(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123"}})
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected HTTPS request when DNS TXT resolution already succeeded: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	did, err := resolveHandle(context.Background(), mock, "alice.test")
+
+	require.NoError(t, err)
+	assert.Equal(t, "did:plc:test123", did)
+	assert.Equal(t, 0, mock.CallCount(), "HTTPS well-known must not be tried when DNS TXT resolution succeeds")
+}
+
+func TestResolveHandle_DNSFails_FallsBackToHTTPS(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: nil})
+	const handle = "alice.test"
+	const did = "did:plc:test123"
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			if req.URL.Host == handle && req.URL.Path == "/.well-known/atproto-did" {
+				return atprototestutil.JSONResponse(http.StatusOK, did), nil
+			}
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	got, err := resolveHandle(context.Background(), mock, handle)
+
+	require.NoError(t, err)
+	assert.Equal(t, did, got)
+	assert.Equal(t, 1, mock.CallCount(), "expected exactly one HTTPS well-known request after DNS TXT resolution failed")
+}
+
+func TestResolveHandle_BothFail_ReturnsErrDIDResolutionFailed(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: nil})
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(_ *http.Request) (*http.Response, error) {
+			return atprototestutil.JSONResponse(http.StatusNotFound, ""), nil
+		},
+	}
+
+	_, err := resolveHandle(context.Background(), mock, "alice.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDIDResolutionFailed, "must be classifiable as an overall DID resolution failure")
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed, "the DNS-side failure reason must survive the errors.Join into the returned error")
+}
+
+// fatalTXTLookuper fails the test if LookupTXT is ever called, so tests can
+// prove a code path never reaches DNS resolution.
+type fatalTXTLookuper struct{ t *testing.T }
+
+func (f fatalTXTLookuper) LookupTXT(_ context.Context, name string) ([]string, error) {
+	f.t.Fatalf("unexpected DNS TXT lookup for %q", name)
+	return nil, nil
+}
+
+func TestResolveHandle_RejectsMalformedHandle_NoDNSOrHTTPSAttempt(t *testing.T) {
+	stubTXTLookuper(t, fatalTXTLookuper{t: t})
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected HTTPS request for malformed handle: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	_, err := resolveHandle(context.Background(), mock, "alice.test/evil")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+	assert.Equal(t, 0, mock.CallCount(), "must not send an HTTPS request for a malformed handle")
 }

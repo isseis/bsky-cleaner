@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -136,14 +138,52 @@ func resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error
 		}
 	}
 
+	// Per spec, resolution only fails on multiple *different* DIDs;
+	// duplicate records for the same DID are not an error.
+	slices.Sort(candidates)
+	candidates = slices.Compact(candidates)
+
 	switch len(candidates) {
 	case 0:
 		return "", fmt.Errorf("resolve handle to DID via DNS: no %q TXT record found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
 	case 1:
 		return candidates[0], nil
 	default:
-		return "", fmt.Errorf("resolve handle to DID via DNS: multiple %q TXT records found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
+		return "", fmt.Errorf("resolve handle to DID via DNS: multiple conflicting %q TXT records found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
 	}
+}
+
+// resolveHandle resolves handle to a DID, trying the DNS TXT method first
+// and falling back to the HTTPS well-known method if DNS resolution does
+// not yield a unique DID. It is the single entry point NewClient uses for
+// handle resolution: its return type matches resolveHandleToDID's exactly,
+// so the DID document / PDS endpoint pipeline downstream of NewClient is
+// unaffected by which method produced the DID.
+func resolveHandle(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error) {
+	if strings.ContainsAny(handle, invalidHandleChars) {
+		return "", fmt.Errorf("resolve handle: invalid handle %q: %w", handle, ErrDIDResolutionFailed)
+	}
+
+	dnsDID, dnsErr := resolveHandleToDIDViaDNS(ctx, handle)
+	if dnsErr == nil {
+		slog.Default().Info("resolved handle via DNS TXT", "handle", handle)
+		return dnsDID, nil
+	}
+
+	// A canceled/expired caller context means the DNS failure isn't a real
+	// resolution failure; the HTTPS fallback would fail identically, so don't try it.
+	if ctx.Err() != nil || errors.Is(dnsErr, context.Canceled) || errors.Is(dnsErr, context.DeadlineExceeded) {
+		return "", fmt.Errorf("resolve handle: %w: %w", ErrDIDResolutionFailed, dnsErr)
+	}
+
+	slog.Default().Warn("DNS TXT handle resolution failed, falling back to HTTPS well-known", "handle", handle, "error", dnsErr)
+	httpsDID, httpsErr := resolveHandleToDID(ctx, httpDoer, handle)
+	if httpsErr == nil {
+		slog.Default().Info("resolved handle via HTTPS well-known", "handle", handle)
+		return httpsDID, nil
+	}
+
+	return "", fmt.Errorf("resolve handle: %w: %w", ErrDIDResolutionFailed, errors.Join(dnsErr, httpsErr))
 }
 
 // didDocument is the subset of a DID document this package needs: the
