@@ -138,7 +138,7 @@
 **レビュー観点**: `docker-compose.yml` に秘匿情報が直接書かれていないこと（AC-11） / `dot.env.example` が 4 つの環境変数をダミー値で列挙していること（AC-12） / volume mount 設定が正しいこと（AC-13） / `docker compose up` でコンテナが起動し定期実行が開始されること（AC-14）
 
 - [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（[#75](https://github.com/isseis/bsky-cleaner/pull/75)）
 - [ ] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
