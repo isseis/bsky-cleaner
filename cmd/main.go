@@ -131,7 +131,7 @@ func validateCronItem(item string, r cronField) error {
 
 // parseCronItem parses a single cron field item and returns its numeric
 // bounds. It handles wildcards, step expressions, ranges, and single values.
-// For wildcards and wildcard-based steps, 0,0 is returned as a signal to
+// For wildcards and wildcard-based steps, -1,-1 is returned as a signal to
 // validateCronItem to skip the bounds check.
 func parseCronItem(item, fieldName string) (int, int, error) {
 	switch {
