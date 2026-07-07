@@ -91,12 +91,14 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 
 ### F-005: `ci.yml` への Docker イメージビルド確認ジョブの追加
 
-タグ push でリリースを公開する前に、Dockerfile の壊れ（依存追加漏れ・COPY 対象の欠落等によるビルド失敗）を PR の時点で検知できるようにする。既存の `ci.yml`（PR/push 契機の test/lint ジョブ）に、Docker イメージのビルドのみを行い GHCR には push しない新規ジョブを追加する。
+タグ push でリリースを公開する前に、Dockerfile の壊れ（依存追加漏れ・COPY 対象の欠落等によるビルド失敗）を PR の時点で検知できるようにする。既存の `ci.yml`（PR/push 契機の test/lint ジョブ）に、Docker イメージのビルドのみを行い GHCR には push しない新規ジョブを追加する。ビルド実行そのものに時間がかかるため、(a) ビルド結果に影響しうるパスの変更時のみジョブを実行するパスフィルタと、(b) レイヤーキャッシュの活用により、実行頻度・1回あたりの所要時間の両方を最小限に抑える。
 
 **Acceptance Criteria**:
 - **AC-18**: `ci.yml` に、PR/push を契機として `docker build .`（GHCR への push なし）を実行するジョブが追加されている
 - **AC-19**: Dockerfile に問題がありビルドが失敗する場合、AC-18 のジョブが失敗し CI 全体が red になる
 - **AC-20**: AC-18 のジョブ追加により、既存の test/lint ジョブのトリガー条件・挙動には変更がない（並行して追加されるのみ）
+- **AC-21**: AC-18 のジョブは、Docker イメージのビルド結果に影響しうるパス（`Dockerfile`、`go.mod`/`go.sum`、`cmd/`・`internal/` 配下等）に変更がある場合にのみ実行される。ドキュメントのみの変更等、無関係な PR/push では実行されない
+- **AC-22**: AC-18 のジョブはビルド高速化のためのレイヤーキャッシュ（例: `docker/build-push-action` の `cache-to`/`cache-from`、GitHub Actions cache）を利用する
 
 ## 4. 非機能要件
 
@@ -104,6 +106,7 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 - **NF-002**: `.github/workflows/ci.yml` に追加する Docker ビルド確認ジョブ（F-005）は、既存の test/lint ジョブのトリガー条件・挙動を変更しない。GHCR への公開（F-001）は引き続き別ワークフローファイルとして tag push 契機で行う
 - **NF-003**: GHCR への公開に、リポジトリの `GITHUB_TOKEN` 以外の追加シークレット登録を必要としない
 - **NF-004**: `vX.Y.Z` タグの push に成功する前に失敗したワークフロー実行は、タグの手動削除等の後始末なしに再実行できる（AC-03b の冪等性要件）
+- **NF-005**: AC-18 のビルド確認ジョブは、キャッシュヒット時に CI 全体の所要時間へ与える影響が軽微な範囲に収まる（具体的な許容時間の数値化はアーキテクチャ設計時に検討する）
 
 ## 5. スコープ外の根拠
 
@@ -111,7 +114,7 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 
 ## 6. 成功基準（要約）
 
-- AC-01〜AC-20（AC-03a・AC-03b・AC-11a を含む）が test/static/manual で緑
+- AC-01〜AC-22（AC-03a・AC-03b・AC-11a を含む）が test/static/manual で緑
 - タグ push（または動作確認用の `workflow_dispatch`）だけで GHCR にイメージが公開され、公開済み `vX.Y.Z` タグは上書きされないこと
 - 利用者は `docker-compose.yml`・`.env`・TOML を用意し、バージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行するだけでコンテナを起動・更新できる状態になっていること
-- PR/push 時の CI で Dockerfile のビルド失敗が検知できる状態になっていること
+- Docker ビルド結果に影響するパスの変更時のみ、PR/push 時の CI で Dockerfile のビルド失敗が検知できる状態になっていること
