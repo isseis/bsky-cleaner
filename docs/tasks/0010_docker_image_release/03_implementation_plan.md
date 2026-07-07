@@ -89,6 +89,24 @@
 
 ## 2. 実装ステップ
 
+### PR-1 作成ポイント
+- **対象ステップ**: フェーズ1: バージョン埋め込みと `--version`
+
+**推奨タイトル**: feat: add --version flag and build-time version embedding
+
+**レビュー観点**:
+- `--version`/`-v` が `-h`/`--help` と同じ早期検出パターン（`fs.Parse` 前の直接走査 + `fs.Parse` 後のフォールバック）を実装しているか
+- `formatVersion` が commit 空文字時に括弧なしのバージョンのみを返すか
+- `Dockerfile` の `ARG VERSION`/`ARG COMMIT` と `-ldflags` が正しく追加されているか
+- `--config` 未指定でも `--version` がエラーにならないか（AC-11a）
+- 既存の `TestParseFlags_*`／`TestRun_*` が非影響であること
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた
+
 ### フェーズ1: バージョン埋め込みと `--version`（AC-08〜09, AC-10 の一部, AC-11〜11a）
 
 **対象ファイル**: `cmd/main.go`, `cmd/main_test.go`, `Dockerfile`
@@ -162,6 +180,27 @@
 
 **完了基準**: `make fmt && make test && make lint` が緑。上記7テストがすべてパスする。
 
+### PR-2 作成ポイント
+- **対象ステップ**: フェーズ2: GHCR 公開ワークフロー
+
+**推奨タイトル**: feat: add GHCR release workflow with tag validation and existing-tag protection
+
+**レビュー観点**:
+- `release.yml` のトリガー設定（`tags: ['v*']` + `workflow_dispatch.inputs.tag`）が AC-01 を満たすか
+- semver 検証（`^v[0-9]+\.[0-9]+\.[0-9]+$`）が fail-closed で動作するか（AC-02）
+- `docker/login-action`/`docker/build-push-action` がコミット SHA 固定されているか（AC-06）
+- `concurrency` 設定がタグ名をキーとし、`cancel-in-progress: false` であるか（AC-03a）
+- `scripts/check-existing-tag.sh` の fail-closed 判定ロジックが3ケースすべてを正しく処理するか
+- push 順序が `latest` → `vX` → `vX.Y` → `vX.Y.Z` であるか（AC-03b）
+- `permissions` が `contents: read, packages: write` のみであるか
+- `timeout-minutes: 15` が設定されているか
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた
+
 ### フェーズ2: GHCR 公開ワークフロー（AC-01〜07, AC-10 の残り, NF-003, NF-004）
 
 **対象ファイル**: `.github/workflows/release.yml`（新規）, `scripts/check-existing-tag.sh`（新規）, `scripts/check_existing_tag_test.go`（新規）
@@ -195,6 +234,28 @@
 - [ ] ドライラン検証が完了したら、GitHub の Package 設定画面から `v0.0.1` の4タグ（`latest`/`v0`/`v0.0`/`v0.0.1`）を手動削除する。本番のリリース履歴（フェーズ3ステップ8の `v1.0.0` 初回リリース）に検証専用のタグを残さないためである。
 
 **完了基準**: `.github/workflows/release.yml`・`scripts/check-existing-tag.sh`・`scripts/check_existing_tag_test.go` が上記すべての要素を含む。`make test` で `scripts/check_existing_tag_test.go` の3ケースが緑。ドライラン実行（正常系・浮動タグ push 失敗からの再実行・GHCR タグ削除）が完了している。実際に GHCR へ公開される点に留意する。
+
+### PR-3 作成ポイント
+- **対象ステップ**: フェーズ3: 配布経路とドキュメント, フェーズ4: CI ビルド確認
+
+**推奨タイトル**: feat: add docker-compose image reference, release docs, and CI build check
+
+**レビュー観点**:
+- `docker-compose.yml` の `image:` 参照が `latest` 以外の特定バージョンタグを指しているか（AC-12）
+- コメントにバージョン更新方法・digest 参照・`latest` の位置づけの3点が記載されているか（AC-13）
+- `docs/design/docker_deployment.md` にリリース公開手順と可視性切り替え手順が記載されているか（AC-15, AC-17）
+- `README.md` に `docker compose pull && docker compose up -d` 手順と `--version` 使用例が記載されているか（AC-16）
+- `ci.yml` の `docker-build-check` ジョブが既存 `test`/`lint` ジョブを変更せず並行追加されているか（AC-20）
+- パスフィルタ（`dorny/paths-filter`）が正しく設定されているか（AC-21）
+- `cache-from`/`cache-to` に `type=gha` が設定されているか（AC-22）
+- `timeout-minutes: 10` が設定されているか（NF-005）
+- `docker-compose.yml` の `image:` 変更は実タグリリース後にのみ `main` へマージするロールアウト順序の制約が守られているか
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた
 
 ### フェーズ3: 配布経路とドキュメント（AC-05 の運用手順, AC-12〜17）
 
