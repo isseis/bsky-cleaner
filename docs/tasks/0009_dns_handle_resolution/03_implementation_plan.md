@@ -175,7 +175,7 @@
 （注: この PR は本タスクで最大の diff になる。PR 説明では、1.3 節の対応方針1〜6にあたる「機械的な `StubDNSTXTLookup(t)` 呼び出し追加」6箇所と、「実質的な変更」（`client.go` の1行差し替え、および新規追加の `TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline`）を明示的に区別して記載し、レビュアーが後者に注意を集中できるようにする。）
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/82）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
