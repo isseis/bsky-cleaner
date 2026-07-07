@@ -1,0 +1,22 @@
+# Setup: copy dot.env.example to .env and fill in real values before running
+# `docker compose up` — Compose only expands ${...} from a file literally
+# named .env in this directory (see dot.env.example).
+#
+# restart: unless-stopped means a container that fails print-schedule
+# validation (e.g. an invalid schedule in the mounted TOML) will crash-loop
+# indefinitely rather than exit once. This is an accepted trade-off of the
+# fail-closed design (docs/tasks/0007_docker_distribution/02_architecture.md
+# section 3.2.4): the crash loop is visible via `docker ps`/`docker logs`,
+# and monitoring that is left to the operator (out of scope for this task).
+services:
+  bsky-cleaner:
+    build: .
+    restart: unless-stopped
+    environment:
+      BSKY_HANDLE: ${BSKY_HANDLE}
+      BSKY_APP_PASSWORD: ${BSKY_APP_PASSWORD}
+      BSKY_SLACK_WEBHOOK_URL_SUCCESS: ${BSKY_SLACK_WEBHOOK_URL_SUCCESS}
+      BSKY_SLACK_WEBHOOK_URL_FAILURE: ${BSKY_SLACK_WEBHOOK_URL_FAILURE}
+      BSKY_CONFIG_PATH: /config/config.toml
+    volumes:
+      - ./config:/config:ro

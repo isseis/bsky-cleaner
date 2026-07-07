@@ -222,6 +222,8 @@ func validateSchedule(s string) error
 
 **ベースイメージの digest 固定**: タグ（例: `alpine:3.21`）は移動可能なポインタであり、同一タグが異なる時点で異なるイメージを指しうる。digest による固定はビルドの再現性を保証し、ソフトウェアサプライチェーン上のリスクを低減する。
 
+**プラットフォームの固定**: 要件定義書の Out of Scope で amd64 のみを対象とすることが決まっているため、両方の `FROM` 行に `--platform=linux/amd64` を明示する。これを指定しない場合、`docker build` を実行するホストのアーキテクチャ（例: arm64 Mac）に応じて生成イメージのアーキテクチャが変わってしまい、意図しない arm64 イメージが作られうる（Phase 3 の手動検証で arm64 開発機上の実際の挙動として確認済み）。
+
 **マルチステージビルドの目的**: ビルド用ツールチェーン（Go コンパイラ、Alpine のビルド依存）を最終イメージから除外し、イメージサイズと攻撃対象領域を縮小する。
 
 #### 3.2.3 エントリポイントスクリプト（AC-08〜10）
@@ -259,8 +261,9 @@ NF-003 が要求する「選定理由の実装計画書への記載」は、実�
   - `BSKY_APP_PASSWORD`
   - `BSKY_SLACK_WEBHOOK_URL_SUCCESS`
   - `BSKY_SLACK_WEBHOOK_URL_FAILURE`
-- volumes で TOML 設定ファイルのディレクトリを `/config` にマウントする（AC-13）
+- volumes で TOML 設定ファイルのディレクトリを読み取り専用（`:ro`）で `/config` にマウントする（AC-13）。本ツールは設定ファイルへの書き込みを行わないため、読み取り専用にすることで万一のコンテナ内プロセスの侵害時にも設定ファイルの改ざんを防げる（defense in depth）
 - 環境変数 `BSKY_CONFIG_PATH` を `/config/config.toml` に設定し、エントリポイントスクリプトと `supercronic` のジョブ定義から参照可能にする
+- `restart: unless-stopped` を設定する。これは通常運用でのコンテナ再起動（ホスト再起動等）に対応するための設定だが、`schedule` 等の TOML フィールドが不正なまま運用され続けた場合、`print-schedule` が起動のたびに失敗し（fail-closed）、コンテナが無限に再起動を繰り返す（crash-loop）というトレードオフを持つ。この crash-loop は `docker ps`/`docker logs` で観測可能であり、それを監視してアラートを上げる仕組みは本タスクのスコープ外（運用者に委ねる）とする
 
 **`dot.env.example`** は以下の環境変数をダミー値で列挙する（AC-12）:
 - `BSKY_HANDLE=your-handle.bsky.social`

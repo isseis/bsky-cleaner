@@ -1,6 +1,8 @@
 # Build stage: compile bsky-cleaner and fetch supercronic.
-# The digest is pinned for reproducibility (AC-06).
-FROM golang@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 AS build
+# The digest is pinned for reproducibility (AC-06). The platform is pinned to
+# linux/amd64 (requirements doc: multi-arch is out of scope for this task),
+# so the image is reproducible regardless of the host build machine's arch.
+FROM --platform=linux/amd64 golang@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 AS build
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -15,8 +17,9 @@ RUN go install github.com/aptible/supercronic@v0.2.47
 
 # Runtime stage: minimal Alpine image with the binary, supercronic, and
 # entrypoint script. Run as a non-root user (UID 10001) for defence in depth
-# (architecture doc 5.3).
-FROM alpine@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+# (architecture doc 5.3). Platform pinned to linux/amd64 for the same reason
+# as the build stage above.
+FROM --platform=linux/amd64 alpine@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 bsky
 
