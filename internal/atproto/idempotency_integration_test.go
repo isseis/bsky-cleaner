@@ -31,6 +31,7 @@ import (
 // valid success case rather than an error.
 func TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
+	atproto.StubDNSTXTLookup(t)
 
 	const handle = publicIPLiteral
 	const did = "did:web:" + publicIPLiteral
@@ -115,6 +116,7 @@ func TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess(t *testing.T) {
 // 4. A second run with a fresh context successfully deletes all Failed items
 func TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
+	atproto.StubDNSTXTLookup(t)
 
 	const handle = publicIPLiteral
 	const did = "did:web:" + publicIPLiteral

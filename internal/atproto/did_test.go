@@ -28,6 +28,7 @@ const publicIPLiteral = "203.0.113.5"
 // resolves them locally without any network I/O either way.
 func stubSymbolicHostLookup(t *testing.T) {
 	t.Helper()
+	StubDNSTXTLookup(t)
 	prev := lookupIPAddr
 	t.Cleanup(func() { lookupIPAddr = prev })
 	lookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) {
@@ -159,6 +160,52 @@ func TestNewClient_RejectsUntrustedHost_NoFurtherRequest(t *testing.T) {
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, ErrUntrustedPDSEndpoint)
 	assert.Equal(t, 2, mock.CallCount(), "expected exactly handle resolution + DID document requests, no further request after rejection")
+}
+
+// TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline proves
+// that a DID obtained via the DNS TXT method still flows through the
+// unmodified resolveDIDDocument/validatePDSEndpoint pipeline, and that
+// NewClient never falls through to the HTTPS well-known method once DNS
+// TXT resolution succeeds.
+func TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123"}})
+	prev := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = prev })
+	lookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+		if net.ParseIP(host) != nil {
+			return prev(ctx, host)
+		}
+		return []net.IPAddr{{IP: net.ParseIP(publicIPLiteral)}}, nil
+	}
+
+	const handle = "alice.test"
+	const did = "did:plc:test123"
+	pdsEndpoint := "https://" + publicIPLiteral
+
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			switch {
+			case req.URL.Host == handle && req.URL.Path == "/.well-known/atproto-did":
+				t.Fatalf("unexpected HTTPS well-known request; DNS TXT resolution should have succeeded: %s %s", req.Method, req.URL)
+				return nil, nil
+			case req.URL.Host == "plc.directory" && req.URL.Path == "/"+did:
+				return atprototestutil.JSONResponse(http.StatusOK, `{"id":"`+did+`","service":[{"id":"#atproto_pds","type":"AtprotoPersonalDataServer","serviceEndpoint":"`+pdsEndpoint+`"}]}`), nil
+			default:
+				t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+				return nil, nil
+			}
+		},
+	}
+
+	client, err := NewClient(context.Background(), handle, mock)
+
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	assert.Equal(t, handle, client.handle)
+	assert.Equal(t, did, client.did)
+	assert.Equal(t, publicIPLiteral, client.pdsBaseURL.Host)
+	assert.Equal(t, "https", client.pdsBaseURL.Scheme)
+	assert.Equal(t, 1, mock.CallCount(), "expected exactly one request (DID document fetch); HTTPS well-known must not be attempted")
 }
 
 func TestDIDWebDocumentURL(t *testing.T) {

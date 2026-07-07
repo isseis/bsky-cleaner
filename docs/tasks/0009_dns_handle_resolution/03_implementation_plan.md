@@ -137,14 +137,14 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/81）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 4: テストヘルパーの追加
 
 **対象ファイル**: `internal/atproto/test_helpers.go`
 
-- [ ] `StubDNSTXTLookup(t *testing.T)` を追加する。`StubPassthroughPDSDoer`（27-48 行目）と同じパターン（`prev := lookupTXT` → `t.Cleanup` で復元 → `lookupTXT` を「常に空レコードを返すフェイク」に差し替え）で実装する。`atproto_test` などの外部パッケージからも呼べるようエクスポートする。
+- [x] `StubDNSTXTLookup(t *testing.T)` を追加する。`StubPassthroughPDSDoer`（27-48 行目）と同じパターン（`prev := lookupTXT` → `t.Cleanup` で復元 → `lookupTXT` を「常に空レコードを返すフェイク」に差し替え）で実装する。`atproto_test` などの外部パッケージからも呼べるようエクスポートする。
 
 **成功基準**: `make fmt && make test && make lint` が成功する。`test_helpers.go` は `//go:build test` タグ付きファイルであり、通常の `make build`（`go build ./cmd`、`-tags test` なし）ではコンパイル対象に入らないが、`make test`（`go test -tags test ./...`）は `-tags test` を指定するため、コンパイル確認も兼ねる。
 
@@ -152,15 +152,15 @@
 
 **対象ファイル**: `internal/atproto/client.go`、`internal/atproto/did_test.go`、`internal/atproto/client_test.go`、`internal/atproto/runner_integration_test.go`、`internal/atproto/idempotency_integration_test.go`、`cmd/main_test.go`、`cmd/secret_leak_integration_test.go`
 
-- [ ] `client.go` の `NewClient`（65 行目）で `resolveHandleToDID(ctx, didResolutionDoer, handle)` の呼び出しを `resolveHandle(ctx, didResolutionDoer, handle)` に置き換える。
-- [ ] `internal/atproto/did_test.go` の `stubSymbolicHostLookup`（29-39 行目）内に `StubDNSTXTLookup(t)` の呼び出しを追加する（1.3 節の対応方針 1）。
-- [ ] `internal/atproto/runner_integration_test.go` の `TestRunnerRun_WithRealAtprotoClient`（46 行目付近）に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 2）。
-- [ ] `internal/atproto/idempotency_integration_test.go` の `TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`（33 行目付近）に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 3）。
-- [ ] 同ファイルの `TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe`（117 行目付近）に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 4）。
-- [ ] `cmd/main_test.go` の `setEnvCredentials`（63-69 行目）内に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 5）。
-- [ ] `cmd/secret_leak_integration_test.go` の `setupSecretLeakEnv`（38-44 行目）内に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 6）。
-- [ ] `did_test.go` に `TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` を追加する（AC-09 の動的検証）。この 1 件だけは他の `NewClient` テストと異なり `stubSymbolicHostLookup`/`StubDNSTXTLookup` の「レコード 0 件」フェイクを使わず、`lookupTXT` を直接 `did=did:plc:test123` を1件返すフェイクに差し替える。`atprototestutil.MockHTTPDoer` は `.well-known/atproto-did`（HTTPS 側の呼び出し）へのリクエストが来たら `t.Fatalf` で失敗させ、`plc.directory/did:plc:test123` への `resolveDIDDocument` リクエストと、その先の `validatePDSEndpoint` が使う DNS（`stubSymbolicHostLookup` 相当の `lookupIPAddr` スタブ）にのみ応答する。これにより、DNS TXT 方式で得た DID が実際に既存の `resolveDIDDocument`/`validatePDSEndpoint` を経由し、`NewClient` が成功裏に `*Client` を構築することを直接確認する（AC-09 の「迂回経路が生まれない」ことのふるまいレベルでの証明。静的検証だけでは、この経路が実際に最後まで動作することまでは確認できない）。
-- [ ] `make test` を実行し、1.3 節で列挙した 28 件のテストを含む全テストが実ネットワーク I/O なしで成功することを確認する（回帰確認、AC-05 の「既存挙動を壊さない」ことの直接検証）。
+- [x] `client.go` の `NewClient`（65 行目）で `resolveHandleToDID(ctx, didResolutionDoer, handle)` の呼び出しを `resolveHandle(ctx, didResolutionDoer, handle)` に置き換える。
+- [x] `internal/atproto/did_test.go` の `stubSymbolicHostLookup`（29-39 行目）内に `StubDNSTXTLookup(t)` の呼び出しを追加する（1.3 節の対応方針 1）。
+- [x] `internal/atproto/runner_integration_test.go` の `TestRunnerRun_WithRealAtprotoClient`（46 行目付近）に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 2）。
+- [x] `internal/atproto/idempotency_integration_test.go` の `TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess`（33 行目付近）に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 3）。
+- [x] 同ファイルの `TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe`（117 行目付近）に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 4）。
+- [x] `cmd/main_test.go` の `setEnvCredentials`（63-69 行目）内に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 5）。
+- [x] `cmd/secret_leak_integration_test.go` の `setupSecretLeakEnv`（38-44 行目）内に `atproto.StubDNSTXTLookup(t)` の呼び出しを追加する（同 6）。
+- [x] `did_test.go` に `TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` を追加する（AC-09 の動的検証）。この 1 件だけは他の `NewClient` テストと異なり `stubSymbolicHostLookup`/`StubDNSTXTLookup` の「レコード 0 件」フェイクを使わず、`lookupTXT` を直接 `did=did:plc:test123` を1件返すフェイクに差し替える。`atprototestutil.MockHTTPDoer` は `.well-known/atproto-did`（HTTPS 側の呼び出し）へのリクエストが来たら `t.Fatalf` で失敗させ、`plc.directory/did:plc:test123` への `resolveDIDDocument` リクエストと、その先の `validatePDSEndpoint` が使う DNS（`stubSymbolicHostLookup` 相当の `lookupIPAddr` スタブ）にのみ応答する。これにより、DNS TXT 方式で得た DID が実際に既存の `resolveDIDDocument`/`validatePDSEndpoint` を経由し、`NewClient` が成功裏に `*Client` を構築することを直接確認する（AC-09 の「迂回経路が生まれない」ことのふるまいレベルでの証明。静的検証だけでは、この経路が実際に最後まで動作することまでは確認できない）。
+- [x] `make test` を実行し、1.3 節で列挙した 28 件のテストを含む全テストが実ネットワーク I/O なしで成功することを確認する（回帰確認、AC-05 の「既存挙動を壊さない」ことの直接検証）。
 
 **成功基準**: `make fmt && make test && make lint` が成功する。`go test -tags test -run 'TestNewClient|TestRunnerRun|TestRun_' ./... -v` の出力で DNS 関連のネットワークエラー・タイムアウトが発生しないことを確認する。
 
@@ -174,8 +174,8 @@
 
 （注: この PR は本タスクで最大の diff になる。PR 説明では、1.3 節の対応方針1〜6にあたる「機械的な `StubDNSTXTLookup(t)` 呼び出し追加」6箇所と、「実質的な変更」（`client.go` の1行差し替え、および新規追加の `TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline`）を明示的に区別して記載し、レビュアーが後者に注意を集中できるようにする。）
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/82）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 

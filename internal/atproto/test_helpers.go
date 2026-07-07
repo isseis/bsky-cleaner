@@ -3,6 +3,7 @@
 package atproto
 
 import (
+	"context"
 	"net"
 	"net/url"
 	"testing"
@@ -31,7 +32,7 @@ func newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, handle, did string, s
 // HTTPDoer drive Login/ListPosts/DeleteRecord through a real *Client built
 // via NewClient, without requiring genuine network reachability to the
 // resolved PDS endpoint. It does not relax the SSRF checks that already ran
-// by this point (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint)
+// by this point (resolveHandle/resolveDIDDocument/validatePDSEndpoint)
 // -- only the final "which HTTPDoer sends the request" step changes.
 // Exported (unlike newTestClient above) so packages that cannot see
 // atproto's unexported identifiers -- cmd, or a cross-package integration
@@ -45,4 +46,29 @@ func StubPassthroughPDSDoer(t *testing.T) {
 	newPDSDoer = func(original HTTPDoer, _ []net.IP, _ string) HTTPDoer {
 		return original
 	}
+}
+
+// emptyTXTLookuper is a txtLookuper that always reports no TXT records, so
+// resolveHandle's DNS TXT attempt fails fast and falls back to the HTTPS
+// well-known method without performing any real DNS I/O.
+type emptyTXTLookuper struct{}
+
+func (emptyTXTLookuper) LookupTXT(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+// StubDNSTXTLookup overrides the package-level lookupTXT variable (did.go)
+// with a fake that always returns zero records, for the duration of t. This
+// forces resolveHandle's DNS TXT attempt to fail and fall back to the
+// existing HTTPS well-known method, so tests that exercise NewClient via
+// its public API (i.e. cannot reach the unexported lookupTXT variable
+// directly, unlike package-internal tests in did_test.go) don't perform a
+// real DNS query. Exported for the same reason as StubPassthroughPDSDoer
+// above: callers outside package atproto (cmd, internal/atproto's own
+// external *_test.go files) need it too.
+func StubDNSTXTLookup(t *testing.T) {
+	t.Helper()
+	prev := lookupTXT
+	t.Cleanup(func() { lookupTXT = prev })
+	lookupTXT = emptyTXTLookuper{}
 }
