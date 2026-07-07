@@ -93,7 +93,7 @@
 
 - [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
 - [x] PR を作成した
-- [ ] PR がマージされた
+- [x] PR がマージされた
 
 ### Phase 2: Docker 配布基盤（AC-05〜AC-10）
 
