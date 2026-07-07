@@ -94,8 +94,9 @@ func validateSchedule(s string) error {
 	for i, field := range fields {
 		r := cronRanges[i]
 		// Each field is a comma-separated list of items.
+		// strings.Fields already stripped surrounding whitespace from the
+		// whole field, so individual items need no TrimSpace.
 		for item := range strings.SplitSeq(field, ",") {
-			item = strings.TrimSpace(item)
 			if item == "" {
 				return &ScheduleValidationError{
 					Reason: fmt.Sprintf("empty element in %s field", r.name),
