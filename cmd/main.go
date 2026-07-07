@@ -94,7 +94,7 @@ func validateSchedule(s string) error {
 	for i, field := range fields {
 		r := cronRanges[i]
 		// Each field is a comma-separated list of items.
-		for _, item := range strings.Split(field, ",") {
+		for item := range strings.SplitSeq(field, ",") {
 			item = strings.TrimSpace(item)
 			if item == "" {
 				return &ScheduleValidationError{
