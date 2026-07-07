@@ -785,12 +785,11 @@ func TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey(t *testing.
 	code := run(configPath, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
 
 	assert.Equal(t, exitPartialFailure, code)
-	// notify.Sanitize strips every C0 control character -- including the
-	// legitimate line breaks in report.FormatText's own multi-line output,
-	// not only ones smuggled in via failRkey -- so a fully sanitized stdout
-	// contains no raw newline at all. The surrounding content is still
-	// there, just newline-free.
-	assert.NotContains(t, stdout.String(), "\n")
+	// report.FormatText sanitizes failRkey field-by-field, so the newline
+	// smuggled inside it is stripped (no fabricated "FAKE LOG LINE" on its
+	// own raw line) while the report's own structural newlines survive.
+	assert.Contains(t, stdout.String(), "\n")
+	assert.NotContains(t, stdout.String(), "evil\nFAKE LOG LINE")
+	assert.Contains(t, stdout.String(), "evilFAKE LOG LINE")
 	assert.Contains(t, stdout.String(), "1 failure(s)")
-	assert.Contains(t, stdout.String(), "FAKE LOG LINE")
 }

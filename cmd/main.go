@@ -324,7 +324,11 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 	if runErr != nil {
 		_, _ = fmt.Fprintln(stderr, notify.Sanitize(runErr.Error())) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	} else {
-		_, _ = fmt.Fprint(stdout, notify.Sanitize(report.FormatText(*result))) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		// report.FormatText already sanitizes each externally-sourced field
+		// (rkey, error text) individually via internal/sanitize, so its own
+		// structural newlines/spacing are not stripped here the way a
+		// whole-string notify.Sanitize pass would.
+		_, _ = fmt.Fprint(stdout, report.FormatText(*result)) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	}
 
 	// apply-only, and independent of ctx above: ctx's execution-timeout
