@@ -50,7 +50,7 @@ rm -f /tmp/git-commit-msg-YYYYMMDD-HHMMSS.txt
 # 1. Write the PR body to a temp file using write_to_file
 #  (path: /tmp/pr-body-YYYYMMDD-HHMMSS.md)
 # 2. Then execute:
-gh pr create --title "feat: add new feature" -F /tmp/pr-body-YYYYMMDD-HHMMSS.md
+gh pr create --title "feat: add new feature" --body-file /tmp/pr-body-YYYYMMDD-HHMMSS.md
 # 3. Clean up:
 rm -f /tmp/pr-body-YYYYMMDD-HHMMSS.md
 ```
