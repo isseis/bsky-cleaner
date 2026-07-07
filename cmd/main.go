@@ -215,24 +215,70 @@ func parseRange(item, fieldName string) (int, int, error) {
 	return low, high, nil
 }
 
+// printUsage writes the full CLI help message -- a one-line synopsis
+// followed by the registered flag list -- to out. It is used both as
+// fs.Usage (invoked automatically by flag.FlagSet.Parse on a parse error)
+// and explicitly for -h/--help, so the flag list shown always reflects the
+// flags actually registered on fs rather than a hand-maintained duplicate.
+func printUsage(fs *flag.FlagSet, out io.Writer) {
+	_, _ = fmt.Fprintln(out, "Usage: bsky-cleaner --config <path> [--apply]")                            //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(out)                                                                             //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(out, "bsky-cleaner deletes posts older than a configured retention period from") //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(out, "a single Bluesky account. It runs in dry-run mode by default and only")    //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(out, "deletes posts when --apply is given.")                                     //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(out)                                                                             //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(out, "Flags:")                                                                   //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	fs.SetOutput(out)
+	fs.PrintDefaults()
+}
+
 // parseFlags parses args (excluding the program name) into a config path
 // and the apply flag. It returns an error -- never calling os.Exit --
 // whenever flag.FlagSet.Parse fails, --config/-c is missing, or unexpected
 // positional arguments remain, so main's exit-code behavior stays testable
-// without ending the test process.
-func parseFlags(args []string, _ io.Writer) (configPath string, apply bool, err error) {
+// without ending the test process. On -h/--help it returns flag.ErrHelp
+// after writing the full help message (flag list included) to out.
+func parseFlags(args []string, out io.Writer) (configPath string, apply bool, err error) {
 	fs := flag.NewFlagSet("bsky-cleaner", flag.ContinueOnError)
 	// Discard flag's own error+usage output: fs.Parse would otherwise write
 	// the same error message that main prints via the returned err, so this
-	// avoids printing it twice.
+	// avoids printing it twice. fs.Usage below still fires and writes to
+	// out regardless of this setting, since flag.FlagSet.usage bypasses
+	// f.output() and calls fs.Usage directly.
 	fs.SetOutput(io.Discard)
+	fs.Usage = func() { printUsage(fs, out) }
 
+	var help bool
 	fs.StringVar(&configPath, "config", "", "path to the TOML configuration file")
 	fs.StringVar(&configPath, "c", "", "path to the TOML configuration file (shorthand for --config)")
 	fs.BoolVar(&apply, "apply", false, "actually delete posts (default: dry-run)")
+	fs.BoolVar(&help, "help", false, "show this help message and exit")
+	fs.BoolVar(&help, "h", false, "show this help message and exit (shorthand for --help)")
+
+	// Scan for a help token before calling fs.Parse: fs.Parse returns
+	// immediately on the first unknown/invalid flag, so if -h/--help appeared
+	// alongside a malformed flag (e.g. "--help --unknown"), the help check
+	// below would never be reached and the command would exit as a usage
+	// error instead of showing help. Checking args directly here guarantees
+	// -h/--help always succeeds regardless of other flags.
+	for _, arg := range args {
+		if arg == "-h" || arg == "--help" {
+			fs.Usage()
+			return "", false, flag.ErrHelp
+		}
+		if arg == "--" {
+			// Everything after "--" is positional, not a flag.
+			break
+		}
+	}
 
 	if err := fs.Parse(args); err != nil {
 		return "", false, err
+	}
+
+	if help {
+		fs.Usage()
+		return "", false, flag.ErrHelp
 	}
 
 	if fs.NArg() > 0 {
@@ -378,10 +424,13 @@ func main() {
 
 	configPath, apply, err := parseFlags(os.Args[1:], os.Stderr)
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 		if errors.Is(err, flag.ErrHelp) {
+			// The full help message (flag list included) was already
+			// written to os.Stderr by parseFlags/printUsage; avoid
+			// printing the redundant "flag: help requested" error text.
 			os.Exit(exitOK)
 		}
+		_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 		os.Exit(exitUsageError)
 	}
 

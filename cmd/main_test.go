@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -111,6 +112,51 @@ func TestParseFlags_UnexpectedPositionalArgument_ReturnsError(t *testing.T) {
 	_, _, err := parseFlags([]string{"--config", "path/to.toml", "extra-arg"}, &bytes.Buffer{})
 
 	require.Error(t, err)
+}
+
+func TestParseFlags_HelpLongFlag_ReturnsErrHelpAndPrintsFlagList(t *testing.T) {
+	var out bytes.Buffer
+
+	_, _, err := parseFlags([]string{"--help"}, &out)
+
+	require.ErrorIs(t, err, flag.ErrHelp)
+	assert.Contains(t, out.String(), "-config string")
+	assert.Contains(t, out.String(), "-apply")
+}
+
+func TestParseFlags_HelpShortFlag_ReturnsErrHelpAndPrintsFlagList(t *testing.T) {
+	var out bytes.Buffer
+
+	_, _, err := parseFlags([]string{"-h"}, &out)
+
+	require.ErrorIs(t, err, flag.ErrHelp)
+	assert.Contains(t, out.String(), "-config string")
+	assert.Contains(t, out.String(), "-apply")
+}
+
+func TestParseFlags_HelpFlag_DoesNotRequireConfig(t *testing.T) {
+	_, _, err := parseFlags([]string{"--help"}, &bytes.Buffer{})
+
+	require.ErrorIs(t, err, flag.ErrHelp)
+}
+
+func TestParseFlags_UnknownFlag_PrintsFlagListToOut(t *testing.T) {
+	var out bytes.Buffer
+
+	_, _, err := parseFlags([]string{"--unknown"}, &out)
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, flag.ErrHelp)
+	assert.Contains(t, out.String(), "-config string")
+}
+
+func TestParseFlags_MissingConfig_PrintsFlagListToOut(t *testing.T) {
+	var out bytes.Buffer
+
+	_, _, err := parseFlags([]string{}, &out)
+
+	require.Error(t, err)
+	assert.Contains(t, out.String(), "-config string")
 }
 
 func TestRun_ConfigLoadFailure_ReturnsExitCode1(t *testing.T) {
