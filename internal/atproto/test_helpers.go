@@ -32,7 +32,7 @@ func newTestClient(httpDoer HTTPDoer, pdsBaseURL *url.URL, handle, did string, s
 // HTTPDoer drive Login/ListPosts/DeleteRecord through a real *Client built
 // via NewClient, without requiring genuine network reachability to the
 // resolved PDS endpoint. It does not relax the SSRF checks that already ran
-// by this point (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint)
+// by this point (resolveHandle/resolveDIDDocument/validatePDSEndpoint)
 // -- only the final "which HTTPDoer sends the request" step changes.
 // Exported (unlike newTestClient above) so packages that cannot see
 // atproto's unexported identifiers -- cmd, or a cross-package integration

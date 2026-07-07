@@ -48,7 +48,7 @@ type Client struct {
 // httpDoer unchanged so a mock can drive those calls without requiring
 // genuine network reachability to the resolved PDS endpoint. That override
 // does not relax the checks that already ran by this point
-// (resolveHandleToDID/resolveDIDDocument/validatePDSEndpoint) -- only the
+// (resolveHandle/resolveDIDDocument/validatePDSEndpoint) -- only the
 // "which HTTPDoer actually sends the request" step changes.
 var newPDSDoer = func(_ HTTPDoer, verifiedAddrs []net.IP, host string) HTTPDoer {
 	return retry.NewDoer(newRestrictedDoer(verifiedAddrs, host, xrpcRequestTimeout), defaultRetryPolicy, retry.RealClock{})
