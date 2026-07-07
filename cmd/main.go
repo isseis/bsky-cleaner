@@ -13,6 +13,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/isseis/bsky-cleaner/internal/atproto"
@@ -38,10 +40,179 @@ const (
 
 // notifyTimeout bounds internal/notify.Send's own retry loop. It is set to
 // roughly the architecture doc's ~12s worst-case Send duration (3s HTTP
-// timeout x up to 3 attempts + 1s/2s backoff) plus a safety margin, so a
+// timeout x up to 3 attempts plus 1s/2s backoff) plus a safety margin, so a
 // slow-but-not-hung Slack endpoint cannot silently exceed this budget before
 // Send's own bounded retries give up.
 const notifyTimeout = 15 * time.Second
+
+// ScheduleValidationError reports that the schedule field failed
+// cron-syntax validation.
+type ScheduleValidationError struct {
+	Reason string
+}
+
+func (e *ScheduleValidationError) Error() string {
+	return "schedule validation failed: " + e.Reason
+}
+
+// cronField describes the valid range for one cron field.
+type cronField struct {
+	name  string
+	lower int
+	upper int
+}
+
+// cronRanges defines the five standard cron fields and their valid ranges.
+var cronRanges = []cronField{
+	{"minute", 0, 59},
+	{"hour", 0, 23},
+	{"day of month", 1, 31},
+	{"month", 1, 12},
+	{"day of week", 0, 7},
+}
+
+// validateSchedule checks that s is a syntactically valid cron expression:
+// exactly 5 whitespace-separated fields whose values fall within the
+// conventional cron ranges. It also rejects any value containing a newline
+// (crontab injection prevention).
+func validateSchedule(s string) error {
+	// Reject newlines (crontab injection prevention, AC-02).
+	for _, r := range s {
+		if r == '\n' || r == '\r' {
+			return &ScheduleValidationError{Reason: "schedule value contains newline"}
+		}
+	}
+
+	// Split on whitespace. strings.Fields handles multiple spaces/tabs.
+	fields := strings.Fields(s)
+	if len(fields) != 5 {
+		return &ScheduleValidationError{
+			Reason: fmt.Sprintf("expected 5 cron fields, got %d", len(fields)),
+		}
+	}
+
+	for i, field := range fields {
+		r := cronRanges[i]
+		// Each field is a comma-separated list of items.
+		for _, item := range strings.Split(field, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				return &ScheduleValidationError{
+					Reason: fmt.Sprintf("empty element in %s field", r.name),
+				}
+			}
+			if err := validateCronItem(item, r); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateCronItem validates a single cron field item (after splitting on
+// commas) and checks that its bounds fall within the field's valid range.
+func validateCronItem(item string, r cronField) error {
+	low, high, err := parseCronItem(item, r.name)
+	if err != nil {
+		return err
+	}
+	// Wildcard and wildcard-based steps signal -1,-1 to skip bounds check.
+	if low == -1 && high == -1 {
+		return nil
+	}
+	if low < r.lower || high > r.upper || low > high {
+		return &ScheduleValidationError{
+			Reason: fmt.Sprintf("value %s out of range [%d-%d] in %s field", item, r.lower, r.upper, r.name),
+		}
+	}
+	return nil
+}
+
+// parseCronItem parses a single cron field item and returns its numeric
+// bounds. It handles wildcards, step expressions, ranges, and single values.
+// For wildcards and wildcard-based steps, 0,0 is returned as a signal to
+// validateCronItem to skip the bounds check.
+func parseCronItem(item, fieldName string) (int, int, error) {
+	switch {
+	case item == "*":
+		// Wildcard: covers the whole range -- signal caller to skip check.
+		return -1, -1, nil
+	case strings.Contains(item, "/"):
+		// Step form: */n, a-b/n, or n/m.
+		return parseCronStep(item, fieldName)
+	case strings.Contains(item, "-"):
+		// Range form: a-b.
+		return parseRange(item, fieldName)
+	default:
+		// Single value.
+		val, err := strconv.Atoi(item)
+		if err != nil {
+			return 0, 0, &ScheduleValidationError{
+				Reason: fmt.Sprintf("invalid value %q in %s field", item, fieldName),
+			}
+		}
+		return val, val, nil
+	}
+}
+
+// parseCronStep parses a step expression (containing "/") and returns the
+// numeric bounds of the range part.
+func parseCronStep(item, fieldName string) (int, int, error) {
+	parts := strings.SplitN(item, "/", 2)
+	if len(parts) != 2 {
+		return 0, 0, &ScheduleValidationError{
+			Reason: fmt.Sprintf("invalid step expression %q in %s field", item, fieldName),
+		}
+	}
+	rangePart := parts[0]
+	stepStr := parts[1]
+	step, err := strconv.Atoi(stepStr)
+	if err != nil || step <= 0 {
+		return 0, 0, &ScheduleValidationError{
+			Reason: fmt.Sprintf("invalid step value %q in %s field", stepStr, fieldName),
+		}
+	}
+	_ = step // step > 0 is sufficient; value is not range-checked further
+
+	switch {
+	case rangePart == "*":
+		return -1, -1, nil
+	case strings.Contains(rangePart, "-"):
+		return parseRange(rangePart, fieldName)
+	default:
+		val, err := strconv.Atoi(rangePart)
+		if err != nil {
+			return 0, 0, &ScheduleValidationError{
+				Reason: fmt.Sprintf("invalid value %q in %s field", rangePart, fieldName),
+			}
+		}
+		return val, val, nil
+	}
+}
+
+// parseRange parses a "a-b" range string and returns the bounds.
+func parseRange(item, fieldName string) (int, int, error) {
+	parts := strings.SplitN(item, "-", 2)
+	if len(parts) != 2 {
+		return 0, 0, &ScheduleValidationError{
+			Reason: fmt.Sprintf("invalid range %q in %s field", item, fieldName),
+		}
+	}
+	low, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, &ScheduleValidationError{
+			Reason: fmt.Sprintf("invalid range lower bound %q in %s field", parts[0], fieldName),
+		}
+	}
+	high, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, &ScheduleValidationError{
+			Reason: fmt.Sprintf("invalid range upper bound %q in %s field", parts[1], fieldName),
+		}
+	}
+	return low, high, nil
+}
 
 // parseFlags parses args (excluding the program name) into a config path
 // and the apply flag. It returns an error -- never calling os.Exit --
@@ -145,7 +316,65 @@ func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *
 	return notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, notify.Outcome{Result: result, Err: runErr})
 }
 
+// parsePrintScheduleFlags parses args (excluding the "print-schedule"
+// subcommand name) into a config path. It returns an error when
+// --config/-c is missing or unexpected positional arguments remain,
+// consistent with parseFlags's error-return contract.
+func parsePrintScheduleFlags(args []string) (configPath string, err error) {
+	fs := flag.NewFlagSet("print-schedule", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	fs.StringVar(&configPath, "config", "", "path to the TOML configuration file")
+	fs.StringVar(&configPath, "c", "", "path to the TOML configuration file (shorthand for --config)")
+
+	if err := fs.Parse(args); err != nil {
+		return "", err
+	}
+
+	if fs.NArg() > 0 {
+		return "", fmt.Errorf("unexpected positional argument(s): %v", fs.Args())
+	}
+
+	if configPath == "" {
+		return "", fmt.Errorf("--config (or -c) is required")
+	}
+
+	return configPath, nil
+}
+
+// runPrintSchedule loads the TOML file at configPath, validates the
+// schedule field as a cron expression, and writes it to stdout.
+// Errors are written to stderr. config.Load is reused -- no second
+// TOML parse.
+func runPrintSchedule(configPath string, stdout, stderr io.Writer) int {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		return exitSetupOrRunFail
+	}
+
+	if err := validateSchedule(cfg.Schedule); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		return exitSetupOrRunFail
+	}
+
+	_, _ = fmt.Fprintln(stdout, cfg.Schedule) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	return exitOK
+}
+
 func main() {
+	// print-schedule subcommand: hidden, used by entrypoint.sh for cron
+	// integration. Must check len(os.Args) > 1 before indexing os.Args[1]
+	// to avoid index out of range panic on no-argument invocation.
+	if len(os.Args) > 1 && os.Args[1] == "print-schedule" {
+		configPath, err := parsePrintScheduleFlags(os.Args[2:])
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+			os.Exit(exitUsageError)
+		}
+		os.Exit(runPrintSchedule(configPath, os.Stdout, os.Stderr))
+	}
+
 	configPath, apply, err := parseFlags(os.Args[1:], os.Stderr)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
