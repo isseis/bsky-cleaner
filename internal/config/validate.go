@@ -20,10 +20,16 @@ func validateConfig(raw rawConfig) (Config, error) {
 	switch {
 	case raw.RetentionDays == nil:
 		return Config{}, &FieldError{Field: "retention_days", Err: ErrMissingField}
-	case raw.Schedule == nil:
-		return Config{}, &FieldError{Field: "schedule", Err: ErrMissingField}
 	case raw.ExecutionTimeoutSeconds == nil:
 		return Config{}, &FieldError{Field: "execution_timeout_seconds", Err: ErrMissingField}
+	}
+
+	// schedule is optional: only print-schedule (Docker/cron deployments)
+	// needs it. runPrintSchedule's validateSchedule call rejects an empty
+	// value with a clear error when the subcommand is actually used.
+	schedule := ""
+	if raw.Schedule != nil {
+		schedule = *raw.Schedule
 	}
 
 	if *raw.RetentionDays <= 0 {
@@ -45,7 +51,7 @@ func validateConfig(raw rawConfig) (Config, error) {
 
 	return Config{
 		RetentionDays:    *raw.RetentionDays,
-		Schedule:         *raw.Schedule,
+		Schedule:         schedule,
 		ExecutionTimeout: time.Duration(timeoutSeconds) * time.Second,
 		SlackAllowedHost: raw.SlackAllowedHost,
 	}, nil

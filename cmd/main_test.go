@@ -728,8 +728,9 @@ func TestRunPrintSchedule_InvalidTOML_ReturnsExitCode1(t *testing.T) {
 }
 
 func TestRunPrintSchedule_MissingScheduleField_ReturnsExitCode1(t *testing.T) {
-	// TOML missing schedule field -- config.Load will fail with ErrMissingField
-	// because schedule is required.
+	// TOML missing schedule field -- config.Load succeeds (schedule is
+	// optional for run/dry-run), but validateSchedule then rejects the
+	// resulting empty string when the print-schedule subcommand is used.
 	path := t.TempDir() + "/config.toml"
 	body := "retention_days = 30\nexecution_timeout_seconds = 3600\nslack_allowed_host = \"hooks.slack.com\"\n"
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
