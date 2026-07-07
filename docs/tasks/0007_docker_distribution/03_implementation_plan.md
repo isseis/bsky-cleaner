@@ -92,7 +92,7 @@
 **レビュー観点**: `validateSchedule` が改行文字を正しく拒否し（AC-02）、cron 5 フィールドの値域を検証していること（AC-04） / `parsePrintScheduleFlags` が `--config` のみを受け付け、`parseFlags` と一貫したエラー報告パターンを持つこと / `runPrintSchedule` が `config.Load()` を再利用し、TOML パースの二重実装がないこと（AC-03） / `main()` の分岐が既存の `parseFlags` → `run` 経路に影響を与えないこと / テストが正常系・異常系・境界値をカバーしていること
 
 - [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した
 - [ ] PR がマージされた
 
 ### Phase 2: Docker 配布基盤（AC-05〜AC-10）
