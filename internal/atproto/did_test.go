@@ -325,3 +325,70 @@ func TestResolveHandleToDID_RejectsNonDIDResponse(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
 }
+
+// fakeTXTLookuper is a minimal txtLookuper fake for unit tests that avoid
+// real DNS I/O.
+type fakeTXTLookuper struct {
+	records []string
+	err     error
+}
+
+func (f *fakeTXTLookuper) LookupTXT(_ context.Context, _ string) ([]string, error) {
+	return f.records, f.err
+}
+
+func stubTXTLookuper(t *testing.T, fake txtLookuper) {
+	t.Helper()
+	prev := lookupTXT
+	t.Cleanup(func() { lookupTXT = prev })
+	lookupTXT = fake
+}
+
+func TestResolveHandleToDIDViaDNS_SingleDIDRecord_Success(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123"}})
+
+	did, err := resolveHandleToDIDViaDNS(context.Background(), "alice.test")
+
+	require.NoError(t, err)
+	assert.Equal(t, "did:plc:test123", did)
+}
+
+func TestResolveHandleToDIDViaDNS_NoRecords_ReturnsDNSHandleResolutionFailed(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: nil})
+
+	_, err := resolveHandleToDIDViaDNS(context.Background(), "bob.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
+}
+
+func TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"v=spf1 include:_spf.example.com ~all", "unrelated"}})
+
+	_, err := resolveHandleToDIDViaDNS(context.Background(), "carol.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
+}
+
+func TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123", "did=did:plc:test456"}})
+
+	_, err := resolveHandleToDIDViaDNS(context.Background(), "dave.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
+}
+
+func TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError(t *testing.T) {
+	dnsErr := &net.DNSError{Err: "no such host", Name: "_atproto.eve.test", IsNotFound: true}
+	stubTXTLookuper(t, &fakeTXTLookuper{err: dnsErr})
+
+	_, err := resolveHandleToDIDViaDNS(context.Background(), "eve.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
+	extracted, ok := errors.AsType[*net.DNSError](err)
+	require.True(t, ok)
+	assert.Equal(t, dnsErr, extracted)
+}

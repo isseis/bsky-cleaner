@@ -68,7 +68,7 @@
 
 **対象ファイル**: `internal/atproto/errors.go`
 
-- [ ] `ErrDNSHandleResolutionFailed`（センチネルエラー、[02_architecture.md](02_architecture.md) 4.1 節のコード例のとおり）を、既存の `var (...)` ブロック（`ErrDIDResolutionFailed` などが定義されている 11-25 行目）に追加する。
+- [x] `ErrDNSHandleResolutionFailed`（センチネルエラー、[02_architecture.md](02_architecture.md) 4.1 節のコード例のとおり）を、既存の `var (...)` ブロック（`ErrDIDResolutionFailed` などが定義されている 11-25 行目）に追加する。
 
 **成功基準**: `make fmt && make test && make lint` が成功する。
 
@@ -76,21 +76,21 @@
 
 **対象ファイル**: `internal/atproto/did.go`、`internal/atproto/did_test.go`
 
-- [ ] `txtLookuper` インターフェース（`LookupTXT(ctx context.Context, name string) ([]string, error)`）を追加する。
-- [ ] `lookupTXT` パッケージ変数（`net.DefaultResolver` を束縛、既存の `lookupIPAddr` と同じパターン）を追加する。
-- [ ] `dnsTXTLookupTimeout = 3 * time.Second` 定数を追加する（`did.go` に `time` の import 追加が必要）。
-- [ ] `resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error)` を追加する。実装内容（[02_architecture.md](02_architecture.md) 3.1 節）:
+- [x] `txtLookuper` インターフェース（`LookupTXT(ctx context.Context, name string) ([]string, error)`）を追加する。
+- [x] `lookupTXT` パッケージ変数（`net.DefaultResolver` を束縛、既存の `lookupIPAddr` と同じパターン）を追加する。
+- [x] `dnsTXTLookupTimeout = 3 * time.Second` 定数を追加する（`did.go` に `time` の import 追加が必要）。
+- [x] `resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error)` を追加する。実装内容（[02_architecture.md](02_architecture.md) 3.1 節）:
   - `context.WithTimeout(ctx, dnsTXTLookupTimeout)` で親 ctx から派生させたタイムアウト付き ctx を使う。
   - `lookupTXT.LookupTXT(ctx, "_atproto."+handle)` を呼ぶ。
   - 返ってきたレコードのうち `did=` プレフィックスを持つものだけを候補とする（AC-03）。
   - 候補が 0 件・複数件・リゾルバエラーのいずれの場合も `ErrDNSHandleResolutionFailed` でラップして返す（AC-02, AC-07, AC-08）。リゾルバエラーは `%w` で元のエラーを保持する（AC-08、`errors.AsType[*net.DNSError]` 等で判別可能にする）。
   - 候補が一意なら DID を返す（AC-01）。
-- [ ] `did_test.go` に `fakeTXTLookuper`（`records []string`・`err error` を保持し `txtLookuper` を満たすフェイク、`testing` パッケージへの依存を持たない単純な構造体）を追加する。ネットワーク I/O を伴わないテスト容易性のための最小実装とする（NF-003）。
-- [ ] `TestResolveHandleToDIDViaDNS_SingleDIDRecord_Success`: `did=did:plc:xxxx` が 1 件 → 成功（AC-01）。
-- [ ] `TestResolveHandleToDIDViaDNS_NoRecords_ReturnsDNSHandleResolutionFailed`: レコード 0 件 → `ErrDNSHandleResolutionFailed`（AC-02）。
-- [ ] `TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored`: `did=` プレフィックスを持たないレコードのみ → 無視されて解決失敗（AC-03）。
-- [ ] `TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed`: `did=` プレフィックスを持つレコードが複数件 → `ErrDNSHandleResolutionFailed`（AC-07）。
-- [ ] `TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError`: フェイクの `err` フィールドに `&net.DNSError{Err: "no such host", Name: "_atproto.alice.test", IsNotFound: true}` のような具体的な `*net.DNSError` 値を設定し、戻り値エラーに対して `errors.Is(err, ErrDNSHandleResolutionFailed)` が真であることと、`errors.AsType[*net.DNSError](err)` で元の `*net.DNSError` が実際に取り出せることの両方を確認する（AC-08）。単なる `errors.New(...)` を使うと `AsType` による型抽出側の検証にならないため、必ず具体的な型を持つエラーを使う。
+- [x] `did_test.go` に `fakeTXTLookuper`（`records []string`・`err error` を保持し `txtLookuper` を満たすフェイク、`testing` パッケージへの依存を持たない単純な構造体）を追加する。ネットワーク I/O を伴わないテスト容易性のための最小実装とする（NF-003）。
+- [x] `TestResolveHandleToDIDViaDNS_SingleDIDRecord_Success`: `did=did:plc:xxxx` が 1 件 → 成功（AC-01）。
+- [x] `TestResolveHandleToDIDViaDNS_NoRecords_ReturnsDNSHandleResolutionFailed`: レコード 0 件 → `ErrDNSHandleResolutionFailed`（AC-02）。
+- [x] `TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored`: `did=` プレフィックスを持たないレコードのみ → 無視されて解決失敗（AC-03）。
+- [x] `TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed`: `did=` プレフィックスを持つレコードが複数件 → `ErrDNSHandleResolutionFailed`（AC-07）。
+- [x] `TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError`: フェイクの `err` フィールドに `&net.DNSError{Err: "no such host", Name: "_atproto.alice.test", IsNotFound: true}` のような具体的な `*net.DNSError` 値を設定し、戻り値エラーに対して `errors.Is(err, ErrDNSHandleResolutionFailed)` が真であることと、`errors.AsType[*net.DNSError](err)` で元の `*net.DNSError` が実際に取り出せることの両方を確認する（AC-08）。単なる `errors.New(...)` を使うと `AsType` による型抽出側の検証にならないため、必ず具体的な型を持つエラーを使う。
 
 **成功基準**: `make fmt && make test && make lint` が成功し、上記5テストすべてが成功する。
 
