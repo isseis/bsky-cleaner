@@ -29,9 +29,9 @@ For non-git commands that may invoke a pager (e.g., `man`), also set `PAGER=cat`
 
 ## Long Message Handling for git/gh Commands
 
-Long commit or pull request messages may be truncated when passed as inline arguments, causing commands to fail silently. Additionally, heredocs and pipes (`-F -`) still go through Cline's terminal input, which has its own length limitations.
+Long commit or pull request messages may be truncated when passed as inline arguments due to PTY (pseudo-terminal) input limits. To avoid truncation, write the message/body to a temporary file (prefer `write_to_file` in Cline for very long content) and reference that file with the command's file flag (e.g., `git commit -F`, `gh pr create --body-file`).
 
-**The reliable approach is to write the message to a temporary file using `write_to_file`, then reference that file with `-F`.**
+**The reliable approach is to write the message to a temporary file, then reference it with the appropriate file flag.**
 
 ### git commit with long messages
 
