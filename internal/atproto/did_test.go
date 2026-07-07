@@ -450,5 +450,31 @@ func TestResolveHandle_BothFail_ReturnsErrDIDResolutionFailed(t *testing.T) {
 	_, err := resolveHandle(context.Background(), mock, "alice.test")
 
 	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDIDResolutionFailed, "must be classifiable as an overall DID resolution failure")
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed, "the DNS-side failure reason must survive the errors.Join into the returned error")
+}
+
+// fatalTXTLookuper fails the test if LookupTXT is ever called, so tests can
+// prove a code path never reaches DNS resolution.
+type fatalTXTLookuper struct{ t *testing.T }
+
+func (f fatalTXTLookuper) LookupTXT(_ context.Context, name string) ([]string, error) {
+	f.t.Fatalf("unexpected DNS TXT lookup for %q", name)
+	return nil, nil
+}
+
+func TestResolveHandle_RejectsMalformedHandle_NoDNSOrHTTPSAttempt(t *testing.T) {
+	stubTXTLookuper(t, fatalTXTLookuper{t: t})
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected HTTPS request for malformed handle: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	_, err := resolveHandle(context.Background(), mock, "alice.test/evil")
+
+	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+	assert.Equal(t, 0, mock.CallCount(), "must not send an HTTPS request for a malformed handle")
 }
