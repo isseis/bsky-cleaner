@@ -15,10 +15,9 @@ When executing git commands (e.g., `git log`, `git diff`, `git show`), always se
 - `PAGER=cat`
 
 Example:
-```
-GIT_PAGER=cat git log --oneline -5
-PAGER=cat git diff HEAD~1 HEAD
-```
+
+    GIT_PAGER=cat PAGER=cat git log --oneline -5
+    GIT_PAGER=cat PAGER=cat git diff HEAD~1 HEAD
 
 Alternatively, use the `--no-pager` flag:
 ```
