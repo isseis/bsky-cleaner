@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // maxDIDResponseBytes bounds how much of a handle-resolution response body
@@ -69,10 +70,80 @@ func resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (
 	}
 
 	did := strings.TrimSpace(string(body))
-	if !strings.HasPrefix(did, "did:") {
+	if !looksLikeDID(did) {
 		return "", fmt.Errorf("resolve handle to DID: response is not a DID: %w", ErrDIDResolutionFailed)
 	}
 	return did, nil
+}
+
+// looksLikeDID reports whether s has the "did:" prefix common to every DID
+// method AT Protocol uses, so callers can reject an obviously-malformed
+// resolution result before it flows into resolveDIDDocument.
+func looksLikeDID(s string) bool {
+	return strings.HasPrefix(s, "did:")
+}
+
+// txtLookuper is the minimal DNS interface this package needs, so unit
+// tests can supply a fake instead of performing a real DNS query.
+type txtLookuper interface {
+	LookupTXT(ctx context.Context, name string) ([]string, error)
+}
+
+// lookupTXT defaults to net.DefaultResolver, structurally satisfying
+// txtLookuper without an adapter. Tests substitute a fake resolver
+// (stubTXTLookuper in did_test.go for now; a shared exported helper
+// follows in a later phase of this task, see the implementation plan);
+// resolveHandleToDIDViaDNS below references this package variable
+// directly, exactly as checkRequestHostSafety/validatePDSEndpoint
+// reference lookupIPAddr.
+var lookupTXT txtLookuper = net.DefaultResolver
+
+// dnsTXTLookupTimeout bounds a single DNS TXT lookup (NF-004), independent
+// of xrpcRequestTimeout (http.go), which bounds HTTP requests. No retry is
+// applied at this layer: resolveHandle's fallback to the HTTPS well-known
+// method is the retry-equivalent for this method's failure.
+const dnsTXTLookupTimeout = 3 * time.Second
+
+// didTXTRecordPrefix identifies the TXT record value carrying the DID, per
+// the AT Protocol DNS TXT handle-resolution method
+// (_atproto.<handle> TXT "did=...").
+const didTXTRecordPrefix = "did="
+
+// resolveHandleToDIDViaDNS resolves handle to a DID using the DNS TXT
+// record method. It returns ErrDNSHandleResolutionFailed-wrapped errors
+// for "no record", "multiple candidate records", and resolver-level
+// failures alike -- callers that only need to decide "fall back or not"
+// can treat them uniformly via errors.Is. The underlying resolver error,
+// if any, is preserved via %w so it remains available to
+// errors.AsType[*net.DNSError] and similar.
+func resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error) {
+	if strings.ContainsAny(handle, invalidHandleChars) {
+		return "", fmt.Errorf("resolve handle to DID via DNS: invalid handle %q: %w", handle, ErrDNSHandleResolutionFailed)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, dnsTXTLookupTimeout)
+	defer cancel()
+
+	records, err := lookupTXT.LookupTXT(ctx, "_atproto."+handle)
+	if err != nil {
+		return "", fmt.Errorf("resolve handle to DID via DNS: %w: %w", ErrDNSHandleResolutionFailed, err)
+	}
+
+	var candidates []string
+	for _, record := range records {
+		if did, ok := strings.CutPrefix(record, didTXTRecordPrefix); ok && looksLikeDID(did) {
+			candidates = append(candidates, did)
+		}
+	}
+
+	switch len(candidates) {
+	case 0:
+		return "", fmt.Errorf("resolve handle to DID via DNS: no %q TXT record found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
+	case 1:
+		return candidates[0], nil
+	default:
+		return "", fmt.Errorf("resolve handle to DID via DNS: multiple %q TXT records found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
+	}
 }
 
 // didDocument is the subset of a DID document this package needs: the

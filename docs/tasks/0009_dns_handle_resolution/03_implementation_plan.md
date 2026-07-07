@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-07 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-07 |
+| Reviewer | isseis |
 | Comments | - |
 
 ## 1. 実装概要
@@ -68,7 +68,7 @@
 
 **対象ファイル**: `internal/atproto/errors.go`
 
-- [ ] `ErrDNSHandleResolutionFailed`（センチネルエラー、[02_architecture.md](02_architecture.md) 4.1 節のコード例のとおり）を、既存の `var (...)` ブロック（`ErrDIDResolutionFailed` などが定義されている 11-25 行目）に追加する。
+- [x] `ErrDNSHandleResolutionFailed`（センチネルエラー、[02_architecture.md](02_architecture.md) 4.1 節のコード例のとおり）を、既存の `var (...)` ブロック（`ErrDIDResolutionFailed` などが定義されている 11-25 行目）に追加する。
 
 **成功基準**: `make fmt && make test && make lint` が成功する。
 
@@ -76,23 +76,39 @@
 
 **対象ファイル**: `internal/atproto/did.go`、`internal/atproto/did_test.go`
 
-- [ ] `txtLookuper` インターフェース（`LookupTXT(ctx context.Context, name string) ([]string, error)`）を追加する。
-- [ ] `lookupTXT` パッケージ変数（`net.DefaultResolver` を束縛、既存の `lookupIPAddr` と同じパターン）を追加する。
-- [ ] `dnsTXTLookupTimeout = 3 * time.Second` 定数を追加する（`did.go` に `time` の import 追加が必要）。
-- [ ] `resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error)` を追加する。実装内容（[02_architecture.md](02_architecture.md) 3.1 節）:
+- [x] `txtLookuper` インターフェース（`LookupTXT(ctx context.Context, name string) ([]string, error)`）を追加する。
+- [x] `lookupTXT` パッケージ変数（`net.DefaultResolver` を束縛、既存の `lookupIPAddr` と同じパターン）を追加する。
+- [x] `dnsTXTLookupTimeout = 3 * time.Second` 定数を追加する（`did.go` に `time` の import 追加が必要）。
+- [x] `resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error)` を追加する。実装内容（[02_architecture.md](02_architecture.md) 3.1 節）:
   - `context.WithTimeout(ctx, dnsTXTLookupTimeout)` で親 ctx から派生させたタイムアウト付き ctx を使う。
   - `lookupTXT.LookupTXT(ctx, "_atproto."+handle)` を呼ぶ。
-  - 返ってきたレコードのうち `did=` プレフィックスを持つものだけを候補とする（AC-03）。
+  - 返ってきたレコードのうち `did=` プレフィックスを持ち、かつその値が `did:` で始まる（DID として妥当な形式である）ものだけを候補とする（AC-01, AC-03）。この DID 形式チェックは新設のパッケージ関数 `looksLikeDID(s string) bool`（`strings.HasPrefix(s, "did:")`）に切り出し、既存の `resolveHandleToDID`（HTTPS well-known 方式、`did.go:72` 付近）が行っていた同等のインラインチェックもこのヘルパー呼び出しに置き換える（DRY、レビュー指摘対応: `did=` の値そのものを検証せず受理すると HTTPS 側と挙動が非対称になるため）。
   - 候補が 0 件・複数件・リゾルバエラーのいずれの場合も `ErrDNSHandleResolutionFailed` でラップして返す（AC-02, AC-07, AC-08）。リゾルバエラーは `%w` で元のエラーを保持する（AC-08、`errors.AsType[*net.DNSError]` 等で判別可能にする）。
   - 候補が一意なら DID を返す（AC-01）。
-- [ ] `did_test.go` に `fakeTXTLookuper`（`records []string`・`err error` を保持し `txtLookuper` を満たすフェイク、`testing` パッケージへの依存を持たない単純な構造体）を追加する。ネットワーク I/O を伴わないテスト容易性のための最小実装とする（NF-003）。
-- [ ] `TestResolveHandleToDIDViaDNS_SingleDIDRecord_Success`: `did=did:plc:xxxx` が 1 件 → 成功（AC-01）。
-- [ ] `TestResolveHandleToDIDViaDNS_NoRecords_ReturnsDNSHandleResolutionFailed`: レコード 0 件 → `ErrDNSHandleResolutionFailed`（AC-02）。
-- [ ] `TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored`: `did=` プレフィックスを持たないレコードのみ → 無視されて解決失敗（AC-03）。
-- [ ] `TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed`: `did=` プレフィックスを持つレコードが複数件 → `ErrDNSHandleResolutionFailed`（AC-07）。
-- [ ] `TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError`: フェイクの `err` フィールドに `&net.DNSError{Err: "no such host", Name: "_atproto.alice.test", IsNotFound: true}` のような具体的な `*net.DNSError` 値を設定し、戻り値エラーに対して `errors.Is(err, ErrDNSHandleResolutionFailed)` が真であることと、`errors.AsType[*net.DNSError](err)` で元の `*net.DNSError` が実際に取り出せることの両方を確認する（AC-08）。単なる `errors.New(...)` を使うと `AsType` による型抽出側の検証にならないため、必ず具体的な型を持つエラーを使う。
+- [x] `did_test.go` に `fakeTXTLookuper`（`records []string`・`err error` を保持し `txtLookuper` を満たすフェイク、`testing` パッケージへの依存を持たない単純な構造体）を追加する。ネットワーク I/O を伴わないテスト容易性のための最小実装とする（NF-003）。
+- [x] `TestResolveHandleToDIDViaDNS_SingleDIDRecord_Success`: `did=did:plc:xxxx` が 1 件 → 成功（AC-01）。
+- [x] `TestResolveHandleToDIDViaDNS_NoRecords_ReturnsDNSHandleResolutionFailed`: レコード 0 件 → `ErrDNSHandleResolutionFailed`（AC-02）。
+- [x] `TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored`: `did=` プレフィックスを持たないレコードのみ → 無視されて解決失敗（AC-03）。
+- [x] `TestResolveHandleToDIDViaDNS_MalformedDIDValue_Ignored`（レビュー指摘対応で追加）: `did=` プレフィックスは持つが値が `did:` で始まらない（`did=notadid`・`did=` 空値）レコードのみ → 無視されて解決失敗扱い（AC-01 の「`did=did:plc:xxxx` 形式」という定義に対する境界値、AC-03 の趣旨の延長）。
+- [x] `TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed`: `did=` プレフィックスを持つレコードが複数件 → `ErrDNSHandleResolutionFailed`（AC-07）。
+- [x] `TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError`: フェイクの `err` フィールドに `&net.DNSError{Err: "no such host", Name: "_atproto.alice.test", IsNotFound: true}` のような具体的な `*net.DNSError` 値を設定し、戻り値エラーに対して `errors.Is(err, ErrDNSHandleResolutionFailed)` が真であることと、`errors.AsType[*net.DNSError](err)` で元の `*net.DNSError` が実際に取り出せることの両方を確認する（AC-08）。単なる `errors.New(...)` を使うと `AsType` による型抽出側の検証にならないため、必ず具体的な型を持つエラーを使う。
 
 **成功基準**: `make fmt && make test && make lint` が成功し、上記5テストすべてが成功する。
+
+### PR-1 作成ポイント: DNS TXT resolution primitive
+
+**対象ステップ**: Phase 1 / Phase 2
+
+**推奨タイトル**: `feat(0009-dns-handle-resolution): add DNS TXT handle resolution primitive`
+
+**レビュー観点**: `did=` プレフィックス抽出とレコード0件/複数件/リゾルバエラーの fail-closed 判定（AC-02/AC-03/AC-07）が正しいか / `errors.AsType[*net.DNSError]` で元のリゾルバエラーが取り出せるか（AC-08） / この時点で `resolveHandleToDIDViaDNS` は `NewClient` からまだ呼ばれておらず、既存の HTTPS well-known 経路の挙動に影響しないこと
+
+（注: `make deadcode` はこの PR 単体では `resolveHandleToDIDViaDNS`/`ErrDNSHandleResolutionFailed` を「未使用」として検出しうる — `_test.go` からのみ参照され、本番コードから呼ばれるのは PR-3 の Phase 5 でのため。これは意図した一時的な状態であり、この PR で対処すべき不具合ではない。）
+
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/80）
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 3: 優先順位・フォールバック制御の追加
 
@@ -108,6 +124,21 @@
 - [ ] `TestResolveHandle_BothFail_ReturnsErrDIDResolutionFailed`: DNS TXT・HTTPS 双方が失敗する場合、`errors.Is(err, ErrDIDResolutionFailed)` が真になり処理が中断されることを確認する（AC-06）。
 
 **成功基準**: `make fmt && make test && make lint` が成功し、上記3テストすべてが成功する。
+
+### PR-2 作成ポイント: priority and fallback orchestration
+
+**対象ステップ**: Phase 3
+
+**推奨タイトル**: `feat(0009-dns-handle-resolution): add DNS-then-HTTPS handle resolution fallback`
+
+**レビュー観点**: `invalidHandleChars` チェックが DNS・HTTPS 双方を試す前に一度だけ適用されているか（2回目の重複チェックが意図通り無害であることの理解を含む） / DNS 成功時に HTTPS へ一切問い合わせないこと（AC-04、`CallCount()` アサーションの妥当性） / 両方式失敗時に `errors.Join` で双方の失敗理由が保持され `ErrDIDResolutionFailed` として判別可能であること（AC-06） / ログ出力（`slog.Info`/`slog.Warn`）の内容がオンコール調査に十分な情報（`handle`、失敗理由）を含むか
+
+（注: `make deadcode` はこの PR 単体では `resolveHandle` を「未使用」として検出しうる — `_test.go` からのみ参照され、`NewClient` から呼ばれるのは PR-3 の Phase 5 でのため。これは意図した一時的な状態であり、この PR で対処すべき不具合ではない。）
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### Phase 4: テストヘルパーの追加
 
@@ -133,7 +164,24 @@
 
 **成功基準**: `make fmt && make test && make lint` が成功する。`go test -tags test -run 'TestNewClient|TestRunnerRun|TestRun_' ./... -v` の出力で DNS 関連のネットワークエラー・タイムアウトが発生しないことを確認する。
 
+### PR-3 作成ポイント: NewClient cutover and regression coverage
+
+**対象ステップ**: Phase 4 / Phase 5
+
+**推奨タイトル**: `feat(0009-dns-handle-resolution): wire DNS TXT resolution into NewClient`
+
+**レビュー観点**: `StubDNSTXTLookup` を注入した6箇所（1.3 節の対応方針1〜6）が過不足なく全 28 件の `NewClient` 経由テストをカバーしているか / `client.go` の変更が「`resolveHandleToDID` 呼び出しを `resolveHandle` に置き換えるだけ」に留まり、`resolveDIDDocument`/`validatePDSEndpoint` 以降の経路に新しい分岐を持ち込んでいないこと（AC-09、`rg -n "ViaDNS" internal/atproto/client.go` がマッチなしであること） / `TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` が HTTPS well-known 側へのリクエストを `t.Fatalf` で確実に検知する構成になっているか / 全既存テストが実 DNS I/O なしで成功し CI でハングしないこと
+
+（注: この PR は本タスクで最大の diff になる。PR 説明では、1.3 節の対応方針1〜6にあたる「機械的な `StubDNSTXTLookup(t)` 呼び出し追加」6箇所と、「実質的な変更」（`client.go` の1行差し替え、および新規追加の `TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline`）を明示的に区別して記載し、レビュアーが後者に注意を集中できるようにする。）
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ## 3. 実装順序とマイルストーン
+
+### 3.1 マイルストーン
 
 [02_architecture.md](02_architecture.md) 8 章の実装優先順位（Phase 1〜5）をそのまま採用する。各フェーズは前フェーズの成果物に依存するため、次の順序で直列に進める。
 
@@ -144,6 +192,14 @@
 | M3 | Phase 3 完了 | `resolveHandle` が単体で AC-04/05/06 を満たす |
 | M4 | Phase 4 完了 | `StubDNSTXTLookup` が実装される |
 | M5 | Phase 5 完了 | `NewClient` が新経路に切り替わり、既存テスト全件が回帰なく成功する（機能完成） |
+
+### 3.2 PR 構成
+
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | Phase 1 / Phase 2 | `ErrDNSHandleResolutionFailed` センチネルエラー、`txtLookuper`/`lookupTXT`/`dnsTXTLookupTimeout`、`resolveHandleToDIDViaDNS`（DNS TXT 方式単体、ユニットテスト5件） |
+| PR-2 | Phase 3 | `resolveHandle`（DNS→HTTPS 優先順位・フォールバック制御、ログ出力、ユニットテスト3件） |
+| PR-3 | Phase 4 / Phase 5 | `StubDNSTXTLookup` テストヘルパー、`NewClient` の切り替え、既存テスト6箇所への注入、`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline`（AC-09 動的検証）、全テスト回帰確認 |
 
 ## 4. テスト戦略
 
@@ -162,11 +218,9 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] Phase 1: `ErrDNSHandleResolutionFailed` 追加
-- [ ] Phase 2: `txtLookuper`/`lookupTXT`/`dnsTXTLookupTimeout`/`resolveHandleToDIDViaDNS` 追加、ユニットテスト5件追加
-- [ ] Phase 3: `resolveHandle` 追加、ユニットテスト3件追加
-- [ ] Phase 4: `StubDNSTXTLookup` 追加
-- [ ] Phase 5: `NewClient` 切り替え、既存テスト6箇所への `StubDNSTXTLookup` 注入、`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` 追加（AC-09 動的検証）、全テスト回帰確認
+- [ ] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2。`ErrDNSHandleResolutionFailed`、`txtLookuper`/`lookupTXT`/`dnsTXTLookupTimeout`/`resolveHandleToDIDViaDNS` 追加、ユニットテスト5件追加）
+- [ ] PR-2 マージ済み（対象ステップ: Phase 3。`resolveHandle` 追加、ユニットテスト3件追加）
+- [ ] PR-3 マージ済み（対象ステップ: Phase 4 / Phase 5。`StubDNSTXTLookup` 追加、`NewClient` 切り替え、既存テスト6箇所への注入、`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` 追加（AC-09 動的検証）、全テスト回帰確認）
 - [ ] `make fmt && make test && make lint` が最終的に成功する
 - [ ] `make deadcode` で新規追加コードに未使用箇所がないことを確認する
 

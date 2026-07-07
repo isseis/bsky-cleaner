@@ -9,12 +9,19 @@ import (
 // Callers use errors.Is to check for these regardless of which XRPC call
 // produced them.
 var (
-	ErrDIDResolutionFailed  = errors.New("DID resolution failed")
-	ErrUntrustedPDSEndpoint = errors.New("PDS endpoint is not trusted")
-	ErrAuthenticationFailed = errors.New("authentication failed")
-	ErrHTTPStatus           = errors.New("unexpected HTTP status")
-	ErrTransportFailure     = errors.New("HTTP transport failure")            // timeout, DNS failure, connection refused, etc.
-	ErrPaginationStalled    = errors.New("pagination cursor did not advance") // server protocol misbehavior, not a transport failure
+	ErrDIDResolutionFailed = errors.New("DID resolution failed")
+	// ErrDNSHandleResolutionFailed identifies a DNS TXT handle-resolution
+	// failure: no record, multiple ambiguous records, NXDOMAIN, timeout, or
+	// any other resolver-level error. Callers distinguish the specific
+	// cause only if they need to (e.g. via errors.AsType[*net.DNSError]);
+	// the fallback decision in resolveHandle treats all of these
+	// uniformly.
+	ErrDNSHandleResolutionFailed = errors.New("DNS TXT handle resolution failed")
+	ErrUntrustedPDSEndpoint      = errors.New("PDS endpoint is not trusted")
+	ErrAuthenticationFailed      = errors.New("authentication failed")
+	ErrHTTPStatus                = errors.New("unexpected HTTP status")
+	ErrTransportFailure          = errors.New("HTTP transport failure")            // timeout, DNS failure, connection refused, etc.
+	ErrPaginationStalled         = errors.New("pagination cursor did not advance") // server protocol misbehavior, not a transport failure
 	// ErrResponseTooLarge is returned when an XRPC response body exceeds
 	// maxXRPCResponseBytes. It is wrapped in *HTTPError and returned to
 	// the caller.
