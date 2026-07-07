@@ -401,3 +401,54 @@ func TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError(t *testing.T) 
 	require.True(t, ok)
 	assert.Equal(t, dnsErr, extracted)
 }
+
+func TestResolveHandle_DNSSucceeds_DoesNotCallHTTPS(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123"}})
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected HTTPS request when DNS TXT resolution already succeeded: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	did, err := resolveHandle(context.Background(), mock, "alice.test")
+
+	require.NoError(t, err)
+	assert.Equal(t, "did:plc:test123", did)
+	assert.Equal(t, 0, mock.CallCount(), "HTTPS well-known must not be tried when DNS TXT resolution succeeds")
+}
+
+func TestResolveHandle_DNSFails_FallsBackToHTTPS(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: nil})
+	const handle = "alice.test"
+	const did = "did:plc:test123"
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(req *http.Request) (*http.Response, error) {
+			if req.URL.Host == handle && req.URL.Path == "/.well-known/atproto-did" {
+				return atprototestutil.JSONResponse(http.StatusOK, did), nil
+			}
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+			return nil, nil
+		},
+	}
+
+	got, err := resolveHandle(context.Background(), mock, handle)
+
+	require.NoError(t, err)
+	assert.Equal(t, did, got)
+	assert.Equal(t, 1, mock.CallCount(), "expected exactly one HTTPS well-known request after DNS TXT resolution failed")
+}
+
+func TestResolveHandle_BothFail_ReturnsErrDIDResolutionFailed(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: nil})
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(_ *http.Request) (*http.Response, error) {
+			return atprototestutil.JSONResponse(http.StatusNotFound, ""), nil
+		},
+	}
+
+	_, err := resolveHandle(context.Background(), mock, "alice.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDIDResolutionFailed)
+}

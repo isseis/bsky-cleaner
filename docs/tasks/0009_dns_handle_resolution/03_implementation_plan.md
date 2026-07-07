@@ -114,14 +114,14 @@
 
 **対象ファイル**: `internal/atproto/did.go`、`internal/atproto/did_test.go`
 
-- [ ] `resolveHandle(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error)` を追加する。ログ出力に `slog.Default()` を使うため、`did.go` に `"log/slog"` の import 追加が必要（Phase 2 の `time` 追加と同様）。実装内容（[02_architecture.md](02_architecture.md) 3.1/4.3 節、処理フローは同 6 章のシーケンス図参照）:
+- [x] `resolveHandle(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error)` を追加する。ログ出力に `slog.Default()` を使うため、`did.go` に `"log/slog"` の import 追加が必要（Phase 2 の `time` 追加と同様）。実装内容（[02_architecture.md](02_architecture.md) 3.1/4.3 節、処理フローは同 6 章のシーケンス図参照）:
   - 既存の `invalidHandleChars` チェックを一度だけ適用する（DNS・HTTPS いずれの方式を試す前）。なお、フォールバック時に呼び出す `resolveHandleToDID` 自身もこのチェックを内部で再度行う（`did.go:43`）ため、フォールバック経路では同じ検証が2回実行される。ただし検証自体は冪等であり、かつハンドルは1回目のチェックで既に検証済みであるため、2回目の判定結果は常に「不正文字なし（false）」となる。意図した軽微な重複であり、修正不要。
   - `resolveHandleToDIDViaDNS` を試行し、成功すれば `slog.Default().Info("resolved handle via DNS TXT", "handle", handle)` を出力して即座に DID を返す（HTTPS への問い合わせは行わない、AC-04）。
   - `resolveHandleToDIDViaDNS` が失敗すれば `slog.Default().Warn("DNS TXT handle resolution failed, falling back to HTTPS well-known", "handle", handle, "error", <DNS 側のエラー>)` を出力し、`resolveHandleToDID(ctx, httpDoer, handle)` にフォールバックする（AC-05）。
   - HTTPS 側も失敗すれば、DNS 側・HTTPS 側それぞれの失敗理由を `errors.Join` で保持しつつ `ErrDIDResolutionFailed` でラップして返す（AC-06、[02_architecture.md](02_architecture.md) 4.1 節）。
-- [ ] `TestResolveHandle_DNSSucceeds_DoesNotCallHTTPS`: DNS TXT 方式が成功する場合、フェイク `httpDoer`（`atprototestutil.MockHTTPDoer`）への呼び出し回数が 0 であることを `CallCount()` で確認する（AC-04）。
-- [ ] `TestResolveHandle_DNSFails_FallsBackToHTTPS`: DNS TXT 方式が失敗する場合に HTTPS well-known 方式へフォールバックし、成功パス・エラーパス双方で既存の [0002_atproto_client](../0002_atproto_client/01_requirements.md) AC-01〜AC-03 相当の挙動（`did_test.go` の `TestNewClient_ResolvesHandleToDIDAndPDSEndpoint`・`TestNewClient_DIDResolutionFailure` が検証済みの範囲と同じ判断基準）が維持されることを確認する（AC-05）。
-- [ ] `TestResolveHandle_BothFail_ReturnsErrDIDResolutionFailed`: DNS TXT・HTTPS 双方が失敗する場合、`errors.Is(err, ErrDIDResolutionFailed)` が真になり処理が中断されることを確認する（AC-06）。
+- [x] `TestResolveHandle_DNSSucceeds_DoesNotCallHTTPS`: DNS TXT 方式が成功する場合、フェイク `httpDoer`（`atprototestutil.MockHTTPDoer`）への呼び出し回数が 0 であることを `CallCount()` で確認する（AC-04）。
+- [x] `TestResolveHandle_DNSFails_FallsBackToHTTPS`: DNS TXT 方式が失敗する場合に HTTPS well-known 方式へフォールバックし、成功パス・エラーパス双方で既存の [0002_atproto_client](../0002_atproto_client/01_requirements.md) AC-01〜AC-03 相当の挙動（`did_test.go` の `TestNewClient_ResolvesHandleToDIDAndPDSEndpoint`・`TestNewClient_DIDResolutionFailure` が検証済みの範囲と同じ判断基準）が維持されることを確認する（AC-05）。
+- [x] `TestResolveHandle_BothFail_ReturnsErrDIDResolutionFailed`: DNS TXT・HTTPS 双方が失敗する場合、`errors.Is(err, ErrDIDResolutionFailed)` が真になり処理が中断されることを確認する（AC-06）。
 
 **成功基準**: `make fmt && make test && make lint` が成功し、上記3テストすべてが成功する。
 

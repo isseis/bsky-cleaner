@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -144,6 +145,32 @@ func resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error
 	default:
 		return "", fmt.Errorf("resolve handle to DID via DNS: multiple %q TXT records found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
 	}
+}
+
+// resolveHandle resolves handle to a DID, trying the DNS TXT method first
+// and falling back to the HTTPS well-known method if DNS resolution does
+// not yield a unique DID. It is the single entry point NewClient uses for
+// handle resolution: its return type matches resolveHandleToDID's exactly,
+// so the DID document / PDS endpoint pipeline downstream of NewClient is
+// unaffected by which method produced the DID.
+func resolveHandle(ctx context.Context, httpDoer HTTPDoer, handle string) (string, error) {
+	if strings.ContainsAny(handle, invalidHandleChars) {
+		return "", fmt.Errorf("resolve handle: invalid handle %q: %w", handle, ErrDIDResolutionFailed)
+	}
+
+	dnsDID, dnsErr := resolveHandleToDIDViaDNS(ctx, handle)
+	if dnsErr == nil {
+		slog.Default().Info("resolved handle via DNS TXT", "handle", handle)
+		return dnsDID, nil
+	}
+
+	slog.Default().Warn("DNS TXT handle resolution failed, falling back to HTTPS well-known", "handle", handle, "error", dnsErr)
+	httpsDID, httpsErr := resolveHandleToDID(ctx, httpDoer, handle)
+	if httpsErr == nil {
+		return httpsDID, nil
+	}
+
+	return "", fmt.Errorf("resolve handle: %w: %w", ErrDIDResolutionFailed, errors.Join(dnsErr, httpsErr))
 }
 
 // didDocument is the subset of a DID document this package needs: the
