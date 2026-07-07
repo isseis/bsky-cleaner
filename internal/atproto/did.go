@@ -170,6 +170,12 @@ func resolveHandle(ctx context.Context, httpDoer HTTPDoer, handle string) (strin
 		return dnsDID, nil
 	}
 
+	// A canceled/expired caller context means the DNS failure isn't a real
+	// resolution failure; the HTTPS fallback would fail identically, so don't try it.
+	if ctx.Err() != nil || errors.Is(dnsErr, context.Canceled) || errors.Is(dnsErr, context.DeadlineExceeded) {
+		return "", fmt.Errorf("resolve handle: %w: %w", ErrDIDResolutionFailed, dnsErr)
+	}
+
 	slog.Default().Warn("DNS TXT handle resolution failed, falling back to HTTPS well-known", "handle", handle, "error", dnsErr)
 	httpsDID, httpsErr := resolveHandleToDID(ctx, httpDoer, handle)
 	if httpsErr == nil {
