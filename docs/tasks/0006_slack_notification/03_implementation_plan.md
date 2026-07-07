@@ -278,7 +278,7 @@
 
 **背景**: PR-1〜PR-4 マージ後のコードレビューで、`cmd/main.go` が設定読み込み失敗・クライアント初期化失敗・実行時エラーを標準エラー出力へ書き込む3箇所（当初の実装では75〜110行目付近）が `notify.Sanitize()` を経由しておらず、AC-17 が「標準出力」のみを対象にしていたためこのギャップがテストで捕捉されていなかった。`atproto.HTTPError.ErrorName`（サーバー応答由来）・`atproto.SSRFError.Endpoint`（DID解決結果由来）はいずれも外部由来の文字列であり、標準出力と同じログ偽装・ANSIエスケープ注入のリスクを持つため、標準エラー出力にも同じサニタイズを適用する（要件定義書・設計書の2026-07-07付コメント参照）。
 
-- [ ] **対象ファイル**: `cmd/main.go`（既存ファイルの変更）
+- [x] **対象ファイル**: `cmd/main.go`（既存ファイルの変更）
   - **作業内容**: `run` 関数内の3箇所の `fmt.Fprintln(stderr, err.Error())`／`fmt.Fprintln(stderr, runErr.Error())` を、それぞれ `fmt.Fprintln(stderr, notify.Sanitize(err.Error()))` の形に変更する。対象は次の3箇所（1.3節時点の行番号、実装時に前後する可能性がある）:
     1. `config.LoadAppConfig` 失敗時（既存、89行目付近）
     2. `atproto.NewClient` 失敗時（既存、101行目付近）
@@ -286,16 +286,16 @@
     既存の `//nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply` コメントはそのまま維持する（出力先の性質は変わらないため）。`sendNotification` が返す `sendErr.Error()`（118行目付近）は対象外のまま変更しない（設計書 3.7節の通り、`SendError.Error()` は固定形状の分類文字列のみで構成され追加のサニタイズを要しないため）。
   - **完了基準**: `go build ./...` が成功する。
 
-- [ ] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更）
-  - **作業内容**:
-    - [ ] `TestRun_ClientInitFailure_StderrSanitizesMaliciousErrorName`（新規）: DID解決（`/.well-known/atproto-did` あるいは PLC 解決の一方）が返すエラー応答の `"error"` フィールドに改行文字とANSIエスケープシーケンスを含む値（例: `"NotFound\n\x1b[31mFAKE LOG LINE\x1b[0m"`）を設定し、`apply=false` で `run` を実行した際、stderr に生の改行・ESC (0x1B) が含まれないこと（内容自体は含まれてよい）を検証する（既存の `TestRun_ClientInitFailure_ReturnsExitCode1` のフィクスチャを拡張する形）。
-    - [ ] `TestRun_LoginFailure_StderrSanitizesMaliciousErrorName`（新規）: `com.atproto.server.createSession` が返す401応答の `"error"` フィールドに同様の改行・ANSIエスケープを含む値を設定し、`apply=false` で `run` を実行した際、stderr に生の改行・ESC が含まれないことを検証する（既存の `TestRun_LoginFailure_ReturnsExitCode1` のフィクスチャを拡張する形）。
-    - [ ] 設定読み込み失敗（`TestRun_ConfigLoadFailure_ReturnsExitCode1`、既存）は新規のセキュリティテストを追加しない: このエラーはローカルのTOML/環境変数由来であり外部由来の文字列を含まないため、悪意あるペイロードによる回帰テストの対象にならない（3.7節の通り、実装統一のためサニタイズ自体は適用するが、専用テストは不要と判断する）。既存テストが `notify.Sanitize()` 経由後も同じ終了コード・エラーメッセージの実質的内容で成功し続けることをもって回帰確認とする。
+- [x] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更）
+  - **作業内容（実装時の分岐）**: 当初案は client-init 失敗（DID解決）と login 失敗（`createSession`）の両方に、改行・ANSIエスケープを含む悪意あるエラー内容の回帰テストを追加する想定だった。実装時に調査した結果、client-init 失敗経路（`atproto.NewClient` → `resolveHandleToDID`/`resolveDIDDocument`/`validatePDSEndpoint`）は、外部由来の値を運びうる唯一の型が `atproto.SSRFError` であり、その `Error()`（`internal/atproto/errors.go`）は `Endpoint` を `%q`（Goの文字列リテラル形式）で埋め込むため、制御文字は実装済みの `notify.Sanitize()` を適用する以前からすでにエスケープ済みの表現になっている（生の改行・ESCバイトが埋め込まれることがない）。したがってこの経路には「悪意あるペイロードによってstderrが汚染される」という具体的な回帰シナリオが存在せず、専用のセキュリティテストは追加しなかった（`notify.Sanitize()` 自体は3.7節の通り一貫して適用するが、この経路では実質的に無害化のno-opになる）。
+    - 唯一の実質的な脆弱性は login/list/delete 失敗経路が使う `atproto.HTTPError`（`internal/atproto/http.go` の `xrpcErrorName` がサーバー応答の `"error"` フィールドをそのまま格納）で、`HTTPError.Error()`（`internal/atproto/errors.go`）が `ErrorName` を `%s`（エスケープなし）で埋め込むため、`notify.Sanitize()` 適用前は生の改行・ANSIエスケープシーケンスがstderrにそのまま出力されていた。
+    - [x] `TestRun_LoginFailure_StderrSanitizesMaliciousErrorName`（新規）: `com.atproto.server.createSession` が返す401応答の `"error"` フィールドに改行文字とANSIエスケープシーケンスを含む値（`"AuthenticationRequired\nFAKE LOG LINE\x1b[31m"`）を設定し、`apply=false` で `run` を実行した際、stderr（末尾の `fmt.Fprintln` 自身が付与する1個の改行を除く）に生の改行・ESC (0x1B) が含まれないこと、かつ埋め込んだ内容自体は読み取れることを検証する（既存の `TestRun_LoginFailure_ReturnsExitCode1` のフィクスチャを拡張する形）。
+    - [x] 設定読み込み失敗（`TestRun_ConfigLoadFailure_ReturnsExitCode1`、既存）は新規のセキュリティテストを追加しない: このエラーはローカルのTOML/環境変数由来であり外部由来の文字列を含まないため、悪意あるペイロードによる回帰テストの対象にならない（3.7節の通り、実装統一のためサニタイズ自体は適用するが、専用テストは不要と判断する）。既存テストが `notify.Sanitize()` 経由後も同じ終了コード・エラーメッセージの実質的内容で成功し続けることをもって回帰確認とする。
   - **完了基準**: `make test` で `cmd` パッケージの全テストが成功する。
 
-- [ ] **対象コマンド**: `make fmt` / `make test` / `make lint` / `make deadcode`（フェーズ8の再実行）
+- [x] **対象コマンド**: `make fmt` / `make test` / `make lint` / `make deadcode`（フェーズ8の再実行）
   - **作業内容**: フェーズ9の変更を含めて4コマンドを再実行し、いずれもエラーなく完了することを確認する。
-  - **完了基準**: 4コマンドすべてが正常終了する。実行結果をここに記録する。
+  - **完了基準**: 4コマンドすべてが正常終了する。実行結果: 2026-07-07、`make fmt && make test && make lint && make deadcode` すべて成功。
 
 ## 3. 実装順序とマイルストーン
 

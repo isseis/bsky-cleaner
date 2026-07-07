@@ -86,7 +86,7 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 
 	cfg, err := config.LoadAppConfig(configPath)
 	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		_, _ = fmt.Fprintln(stderr, notify.Sanitize(err.Error())) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 		return exitSetupOrRunFail
 	}
 
@@ -98,13 +98,13 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 
 	client, err := atproto.NewClient(ctx, cfg.Handle, httpDoer)
 	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		_, _ = fmt.Fprintln(stderr, notify.Sanitize(err.Error())) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 		return exitSetupOrRunFail
 	}
 
 	result, runErr := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)
 	if runErr != nil {
-		_, _ = fmt.Fprintln(stderr, runErr.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+		_, _ = fmt.Fprintln(stderr, notify.Sanitize(runErr.Error())) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	} else {
 		_, _ = fmt.Fprint(stdout, notify.Sanitize(report.FormatText(*result))) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	}
