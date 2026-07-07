@@ -25,7 +25,7 @@ git --no-pager log --oneline -5
 git --no-pager diff HEAD~1 HEAD
 ```
 
-For non-git commands that may invoke a pager (e.g., `less`, `more`), also set `PAGER=cat` or pipe through `cat` to prevent blocking.
+For non-git commands that may invoke a pager (e.g., `man`), also set `PAGER=cat` or pipe through `cat` to prevent blocking.
 
 ## Long Message Handling for git/gh Commands
 
