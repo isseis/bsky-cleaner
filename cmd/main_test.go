@@ -494,6 +494,221 @@ func TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError(t *testing.T) {
 	assert.Empty(t, stderr.String())
 }
 
+// ── validateSchedule tests ──────────────────────────────────────────────────
+
+func TestValidateSchedule_ValidCronExpression_ReturnsNil(t *testing.T) {
+	err := validateSchedule("0 3 * * *")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_ValidCronWithWildcard_ReturnsNil(t *testing.T) {
+	err := validateSchedule("* * * * *")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_ValidCronWithStep_ReturnsNil(t *testing.T) {
+	err := validateSchedule("*/15 * * * *")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_ValidCronWithRange_ReturnsNil(t *testing.T) {
+	err := validateSchedule("0 9-17 * * *")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_ValidCronWithList_ReturnsNil(t *testing.T) {
+	err := validateSchedule("0 3 * * 1,3,5")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_ValidCronWithRangeAndStep_ReturnsNil(t *testing.T) {
+	err := validateSchedule("0 9-17/2 * * *")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_ValidCronWithListContainingRange_ReturnsNil(t *testing.T) {
+	err := validateSchedule("0 3 * * 1-5,6-7")
+	assert.NoError(t, err)
+}
+
+func TestValidateSchedule_NewlineInValue_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 * * *\n0 4 * * *")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+	assert.Contains(t, err.Error(), "newline")
+}
+
+func TestValidateSchedule_CarriageReturnInValue_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 * * *\r")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+}
+
+func TestValidateSchedule_TooFewFields_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 * *")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+	assert.Contains(t, err.Error(), "expected 5 cron fields")
+}
+
+func TestValidateSchedule_TooManyFields_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 * * * extra")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+	assert.Contains(t, err.Error(), "expected 5 cron fields")
+}
+
+func TestValidateSchedule_MinuteOutOfRange_ReturnsError(t *testing.T) {
+	err := validateSchedule("60 3 * * *")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+	assert.Contains(t, err.Error(), "out of range")
+}
+
+func TestValidateSchedule_HourOutOfRange_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 24 * * *")
+	assert.Error(t, err)
+}
+
+func TestValidateSchedule_DayOfMonthOutOfRange_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 0 * *")
+	assert.Error(t, err)
+}
+
+func TestValidateSchedule_MonthOutOfRange_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 * 13 *")
+	assert.Error(t, err)
+}
+
+func TestValidateSchedule_DayOfWeekOutOfRange_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 3 * * 8")
+	assert.Error(t, err)
+}
+
+func TestValidateSchedule_EmptyString_ReturnsError(t *testing.T) {
+	err := validateSchedule("")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+	assert.Contains(t, err.Error(), "expected 5 cron fields")
+}
+
+func TestValidateSchedule_AtDailyMacro_ReturnsError(t *testing.T) {
+	// @daily is not a 5-field cron expression.
+	err := validateSchedule("@daily")
+	assert.Error(t, err)
+	var sve *ScheduleValidationError
+	assert.ErrorAs(t, err, &sve)
+	assert.Contains(t, err.Error(), "expected 5 cron fields")
+}
+
+func TestValidateSchedule_StepWithInvalidBase_ReturnsError(t *testing.T) {
+	err := validateSchedule("*/abc * * * *")
+	assert.Error(t, err)
+}
+
+func TestValidateSchedule_RangeWithInvertedBounds_ReturnsError(t *testing.T) {
+	err := validateSchedule("0 17-9 * * *")
+	assert.Error(t, err)
+}
+
+// ── parsePrintScheduleFlags tests ───────────────────────────────────────────
+
+func TestParsePrintScheduleFlags_ConfigLongFlag_Accepted(t *testing.T) {
+	configPath, err := parsePrintScheduleFlags([]string{"--config", "path/to.toml"})
+	require.NoError(t, err)
+	assert.Equal(t, "path/to.toml", configPath)
+}
+
+func TestParsePrintScheduleFlags_ConfigShortFlag_Accepted(t *testing.T) {
+	configPath, err := parsePrintScheduleFlags([]string{"-c", "path/to.toml"})
+	require.NoError(t, err)
+	assert.Equal(t, "path/to.toml", configPath)
+}
+
+func TestParsePrintScheduleFlags_MissingConfig_ReturnsError(t *testing.T) {
+	_, err := parsePrintScheduleFlags([]string{})
+	require.Error(t, err)
+}
+
+func TestParsePrintScheduleFlags_UnknownFlag_ReturnsError(t *testing.T) {
+	_, err := parsePrintScheduleFlags([]string{"--unknown"})
+	require.Error(t, err)
+}
+
+func TestParsePrintScheduleFlags_UnexpectedPositionalArgument_ReturnsError(t *testing.T) {
+	_, err := parsePrintScheduleFlags([]string{"--config", "path/to.toml", "extra-arg"})
+	require.Error(t, err)
+}
+
+// ── runPrintSchedule tests ──────────────────────────────────────────────────
+
+func TestRunPrintSchedule_ValidConfig_ReturnsExitCode0AndPrintsSchedule(t *testing.T) {
+	configPath := validConfigPath(t)
+	var stdout, stderr bytes.Buffer
+
+	code := runPrintSchedule(configPath, &stdout, &stderr)
+
+	assert.Equal(t, exitOK, code)
+	assert.Equal(t, "0 3 * * *\n", stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
+func TestRunPrintSchedule_FileNotFound_ReturnsExitCode1(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := runPrintSchedule("/nonexistent/path.toml", &stdout, &stderr)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Empty(t, stdout.String())
+	assert.NotEmpty(t, stderr.String())
+}
+
+func TestRunPrintSchedule_InvalidTOML_ReturnsExitCode1(t *testing.T) {
+	path := t.TempDir() + "/config.toml"
+	require.NoError(t, os.WriteFile(path, []byte("invalid tomldata {{{"), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	code := runPrintSchedule(path, &stdout, &stderr)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Empty(t, stdout.String())
+	assert.NotEmpty(t, stderr.String())
+}
+
+func TestRunPrintSchedule_MissingScheduleField_ReturnsExitCode1(t *testing.T) {
+	// TOML missing schedule field -- config.Load will fail with ErrMissingField
+	// because schedule is required.
+	path := t.TempDir() + "/config.toml"
+	body := "retention_days = 30\nexecution_timeout_seconds = 3600\nslack_allowed_host = \"hooks.slack.com\"\n"
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	code := runPrintSchedule(path, &stdout, &stderr)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Empty(t, stdout.String())
+	assert.NotEmpty(t, stderr.String())
+}
+
+func TestRunPrintSchedule_InvalidScheduleValue_ReturnsExitCode1(t *testing.T) {
+	path := t.TempDir() + "/config.toml"
+	body := "retention_days = 30\nschedule = \"0 3 * *\"\nexecution_timeout_seconds = 3600\nslack_allowed_host = \"hooks.slack.com\"\n"
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	code := runPrintSchedule(path, &stdout, &stderr)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Empty(t, stdout.String())
+	assert.NotEmpty(t, stderr.String())
+}
+
 func TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
 	setEnvCredentials(t)
