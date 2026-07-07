@@ -23,7 +23,7 @@
 - git tag の push を契機に GitHub Actions が Docker イメージをビルドし、GHCR (`ghcr.io`) に公開できる
 - 公開されたイメージにはビルド時のバージョン情報が埋め込まれ、`--version` で確認できる
 - `docker-compose.yml` がローカルビルド（`build: .`）ではなく公開済みイメージ（`image:`）を参照し、利用者はイメージを自分でビルドせずに起動できる
-- 利用者向けのリリース公開・取得手順がドキュメント化されている
+- 開発者向けのリリース公開手順、利用者向けの取得手順がそれぞれドキュメント化されている
 
 ## 2. スコープ
 
@@ -33,6 +33,7 @@
 - **F-002**: ビルド時バージョン埋め込みと `--version` フラグ
 - **F-003**: `docker-compose.yml` のイメージ参照方式への変更
 - **F-004**: リリース公開・取得手順のドキュメント整備
+- **F-005**: `ci.yml` への Docker イメージビルド確認ジョブの追加
 
 ### Out of Scope
 
@@ -40,7 +41,7 @@
 - **Docker Hub 等 GHCR 以外のレジストリへの公開**: 個人プロジェクトの配布に必要十分な GHCR のみを対象とし、複数レジストリ運用によるシークレット管理・CI 設定の複雑化を避ける
 - **イメージ署名・SBOM 生成（cosign 等）**: 現時点では要求されていない付加的なサプライチェーン対策であり、YAGNI に照らして本タスクのスコープ外とする。ベースイメージの digest 固定（0007 で対応済み）を当面の対策とする
 - **バージョンごとの自動 changelog 生成**: リリースノート作成の自動化は本タスクでは扱わない
-- **既存 CI ワークフロー（`ci.yml`）の変更**: リリース公開は別ワークフローファイルとして新設し、PR/push 時に走る既存の test/lint ジョブには手を入れない
+- **リリース公開ワークフロー（GHCR への push）自体の `ci.yml` への統合**: GHCR への公開は F-001 のとおり別ワークフローファイルとして tag push 契機で維持する。`ci.yml` に追加するのは F-005 の「ビルドが成功するかどうかの確認」のみで、push は行わない
 
 ## 3. 機能要件と受け入れ基準
 
@@ -88,10 +89,19 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 - **AC-16**: 利用者向けドキュメント（README または同等の場所）に、`docker-compose.yml`・`.env`・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行するだけで定期実行を開始・更新できる手順が記載されている
 - **AC-17**: [Docker 配布の詳細設計](../../design/docker_deployment.md) に、GHCR パッケージの可視性を public に切り替える一度きりの手動手順（GitHub Package 設定画面での操作）が記載されている（AC-05 関連）
 
+### F-005: `ci.yml` への Docker イメージビルド確認ジョブの追加
+
+タグ push でリリースを公開する前に、Dockerfile の壊れ（依存追加漏れ・COPY 対象の欠落等によるビルド失敗）を PR の時点で検知できるようにする。既存の `ci.yml`（PR/push 契機の test/lint ジョブ）に、Docker イメージのビルドのみを行い GHCR には push しない新規ジョブを追加する。
+
+**Acceptance Criteria**:
+- **AC-18**: `ci.yml` に、PR/push を契機として `docker build .`（GHCR への push なし）を実行するジョブが追加されている
+- **AC-19**: Dockerfile に問題がありビルドが失敗する場合、AC-18 のジョブが失敗し CI 全体が red になる
+- **AC-20**: AC-18 のジョブ追加により、既存の test/lint ジョブのトリガー条件・挙動には変更がない（並行して追加されるのみ）
+
 ## 4. 非機能要件
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する
-- **NF-002**: 新設するワークフローファイルは、既存の `.github/workflows/ci.yml` の内容・トリガー条件を変更しない
+- **NF-002**: `.github/workflows/ci.yml` に追加する Docker ビルド確認ジョブ（F-005）は、既存の test/lint ジョブのトリガー条件・挙動を変更しない。GHCR への公開（F-001）は引き続き別ワークフローファイルとして tag push 契機で行う
 - **NF-003**: GHCR への公開に、リポジトリの `GITHUB_TOKEN` 以外の追加シークレット登録を必要としない
 - **NF-004**: `vX.Y.Z` タグの push に成功する前に失敗したワークフロー実行は、タグの手動削除等の後始末なしに再実行できる（AC-03b の冪等性要件）
 
@@ -101,6 +111,7 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 
 ## 6. 成功基準（要約）
 
-- AC-01〜AC-17（AC-03a・AC-03b・AC-11a を含む）が test/static/manual で緑
+- AC-01〜AC-20（AC-03a・AC-03b・AC-11a を含む）が test/static/manual で緑
 - タグ push（または動作確認用の `workflow_dispatch`）だけで GHCR にイメージが公開され、公開済み `vX.Y.Z` タグは上書きされないこと
 - 利用者は `docker-compose.yml`・`.env`・TOML を用意し、バージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行するだけでコンテナを起動・更新できる状態になっていること
+- PR/push 時の CI で Dockerfile のビルド失敗が検知できる状態になっていること
