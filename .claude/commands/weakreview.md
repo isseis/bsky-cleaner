@@ -58,21 +58,35 @@ needs `git diff <range>` and `git log <range>` to work from.
    fi
 
    # Check 2: draft-status documents with commits already built on top of them
+   NON_APPROVED=""
    for f in 01_requirements.md 02_architecture.md 03_implementation_plan.md; do
      path="docs/tasks/<task-dir>/$f"
      rg -n '^\| Status \|' "$path"
+     if [ -f "$path" ] && ! rg -q '^\| Status \|.*approved' "$path"; then
+       NON_APPROVED="$NON_APPROVED $f"
+     fi
    done
    # Any non-`approved` status for a document whose successor exists (e.g. a
    # 03_implementation_plan.md exists while 02_architecture.md is still draft)
    # means implementation started before its gate — FLAG regardless of what
    # the commit history says about being told to proceed.
+   if [ -n "$NON_APPROVED" ] && [ -f "docs/tasks/<task-dir>/03_implementation_plan.md" ]; then
+     echo "FLAG: non-approved doc(s) with a successor doc present:$NON_APPROVED"
+   else
+     echo "OK: no non-approved doc precedes a successor doc"
+   fi
 
    # Check 3: Dockerfile base images pinned by tag instead of digest
-   rg -n '^FROM .*:[a-zA-Z0-9._-]+\s*$' $(git diff $RANGE --diff-filter=d --name-only | grep -i dockerfile || true) 2>/dev/null \
-     && echo "FLAG: tag-pinned FROM (expect @sha256: digest)" || echo "OK: no tag-only FROM lines"
+   CHANGED_DOCKERFILES=$(git diff $RANGE --diff-filter=d --name-only | grep -i dockerfile || true)
+   if [ -n "$CHANGED_DOCKERFILES" ]; then
+     echo "$CHANGED_DOCKERFILES" | xargs rg -n '^FROM .*:[a-zA-Z0-9._-]+\s*$|^FROM .*:[a-zA-Z0-9._-]+\s+[Aa][Ss]\s+\S+\s*$' 2>/dev/null \
+       && echo "FLAG: tag-pinned FROM (expect @sha256: digest)" || echo "OK: no tag-only FROM lines"
+   else
+     echo "OK: no Dockerfile changes"
+   fi
 
    # Check 4: build-tagged files actually reachable by `make lint`
-   echo "$CHANGED_GO" | xargs rg -l '^//go:build' 2>/dev/null
+   [ -n "$CHANGED_GO" ] && echo "$CHANGED_GO" | xargs rg -l '^//go:build' 2>/dev/null
    # For each hit with a tag other than a bare `test`, confirm the Makefile's
    # lint target actually passes that tag (grep the Makefile / CI config for
    # -tags). A file only ever compiled under a tag no invocation passes is a
