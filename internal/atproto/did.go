@@ -167,6 +167,7 @@ func resolveHandle(ctx context.Context, httpDoer HTTPDoer, handle string) (strin
 	slog.Default().Warn("DNS TXT handle resolution failed, falling back to HTTPS well-known", "handle", handle, "error", dnsErr)
 	httpsDID, httpsErr := resolveHandleToDID(ctx, httpDoer, handle)
 	if httpsErr == nil {
+		slog.Default().Info("resolved handle via HTTPS well-known", "handle", handle)
 		return httpsDID, nil
 	}
 
