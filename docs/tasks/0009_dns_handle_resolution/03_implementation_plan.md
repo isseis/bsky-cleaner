@@ -82,13 +82,14 @@
 - [x] `resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error)` を追加する。実装内容（[02_architecture.md](02_architecture.md) 3.1 節）:
   - `context.WithTimeout(ctx, dnsTXTLookupTimeout)` で親 ctx から派生させたタイムアウト付き ctx を使う。
   - `lookupTXT.LookupTXT(ctx, "_atproto."+handle)` を呼ぶ。
-  - 返ってきたレコードのうち `did=` プレフィックスを持つものだけを候補とする（AC-03）。
+  - 返ってきたレコードのうち `did=` プレフィックスを持ち、かつその値が `did:` で始まる（DID として妥当な形式である）ものだけを候補とする（AC-01, AC-03）。この DID 形式チェックは新設のパッケージ関数 `looksLikeDID(s string) bool`（`strings.HasPrefix(s, "did:")`）に切り出し、既存の `resolveHandleToDID`（HTTPS well-known 方式、`did.go:72` 付近）が行っていた同等のインラインチェックもこのヘルパー呼び出しに置き換える（DRY、レビュー指摘対応: `did=` の値そのものを検証せず受理すると HTTPS 側と挙動が非対称になるため）。
   - 候補が 0 件・複数件・リゾルバエラーのいずれの場合も `ErrDNSHandleResolutionFailed` でラップして返す（AC-02, AC-07, AC-08）。リゾルバエラーは `%w` で元のエラーを保持する（AC-08、`errors.AsType[*net.DNSError]` 等で判別可能にする）。
   - 候補が一意なら DID を返す（AC-01）。
 - [x] `did_test.go` に `fakeTXTLookuper`（`records []string`・`err error` を保持し `txtLookuper` を満たすフェイク、`testing` パッケージへの依存を持たない単純な構造体）を追加する。ネットワーク I/O を伴わないテスト容易性のための最小実装とする（NF-003）。
 - [x] `TestResolveHandleToDIDViaDNS_SingleDIDRecord_Success`: `did=did:plc:xxxx` が 1 件 → 成功（AC-01）。
 - [x] `TestResolveHandleToDIDViaDNS_NoRecords_ReturnsDNSHandleResolutionFailed`: レコード 0 件 → `ErrDNSHandleResolutionFailed`（AC-02）。
 - [x] `TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored`: `did=` プレフィックスを持たないレコードのみ → 無視されて解決失敗（AC-03）。
+- [x] `TestResolveHandleToDIDViaDNS_MalformedDIDValue_Ignored`（レビュー指摘対応で追加）: `did=` プレフィックスは持つが値が `did:` で始まらない（`did=notadid`・`did=` 空値）レコードのみ → 無視されて解決失敗扱い（AC-01 の「`did=did:plc:xxxx` 形式」という定義に対する境界値、AC-03 の趣旨の延長）。
 - [x] `TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed`: `did=` プレフィックスを持つレコードが複数件 → `ErrDNSHandleResolutionFailed`（AC-07）。
 - [x] `TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError`: フェイクの `err` フィールドに `&net.DNSError{Err: "no such host", Name: "_atproto.alice.test", IsNotFound: true}` のような具体的な `*net.DNSError` 値を設定し、戻り値エラーに対して `errors.Is(err, ErrDNSHandleResolutionFailed)` が真であることと、`errors.AsType[*net.DNSError](err)` で元の `*net.DNSError` が実際に取り出せることの両方を確認する（AC-08）。単なる `errors.New(...)` を使うと `AsType` による型抽出側の検証にならないため、必ず具体的な型を持つエラーを使う。
 

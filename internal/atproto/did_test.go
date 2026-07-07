@@ -371,6 +371,15 @@ func TestResolveHandleToDIDViaDNS_RecordsWithoutDIDPrefix_Ignored(t *testing.T) 
 	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
 }
 
+func TestResolveHandleToDIDViaDNS_MalformedDIDValue_Ignored(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=notadid", "did="}})
+
+	_, err := resolveHandleToDIDViaDNS(context.Background(), "frank.test")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
+}
+
 func TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionFailed(t *testing.T) {
 	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123", "did=did:plc:test456"}})
 

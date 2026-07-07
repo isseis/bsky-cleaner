@@ -70,10 +70,17 @@ func resolveHandleToDID(ctx context.Context, httpDoer HTTPDoer, handle string) (
 	}
 
 	did := strings.TrimSpace(string(body))
-	if !strings.HasPrefix(did, "did:") {
+	if !looksLikeDID(did) {
 		return "", fmt.Errorf("resolve handle to DID: response is not a DID: %w", ErrDIDResolutionFailed)
 	}
 	return did, nil
+}
+
+// looksLikeDID reports whether s has the "did:" prefix common to every DID
+// method AT Protocol uses, so callers can reject an obviously-malformed
+// resolution result before it flows into resolveDIDDocument.
+func looksLikeDID(s string) bool {
+	return strings.HasPrefix(s, "did:")
 }
 
 // txtLookuper is the minimal DNS interface this package needs, so unit
@@ -83,8 +90,9 @@ type txtLookuper interface {
 }
 
 // lookupTXT defaults to net.DefaultResolver, structurally satisfying
-// txtLookuper without an adapter. Tests substitute a fake resolver via the
-// exported test-only helper StubDNSTXTLookup (test_helpers.go);
+// txtLookuper without an adapter. Tests substitute a fake resolver
+// (stubTXTLookuper in did_test.go for now; a shared exported helper
+// follows in a later phase of this task, see the implementation plan);
 // resolveHandleToDIDViaDNS below references this package variable
 // directly, exactly as checkRequestHostSafety/validatePDSEndpoint
 // reference lookupIPAddr.
@@ -119,7 +127,7 @@ func resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error
 
 	var candidates []string
 	for _, record := range records {
-		if did, ok := strings.CutPrefix(record, didTXTRecordPrefix); ok {
+		if did, ok := strings.CutPrefix(record, didTXTRecordPrefix); ok && looksLikeDID(did) {
 			candidates = append(candidates, did)
 		}
 	}
