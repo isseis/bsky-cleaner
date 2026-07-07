@@ -17,8 +17,16 @@ func TestFormatText_DryRun_WithTargets(t *testing.T) {
 
 	got := report.FormatText(report.Result{Mode: report.ModeDryRun, Targets: targets})
 
-	assert.Contains(t, got, "first")
-	assert.Contains(t, got, "second")
+	assert.Equal(t, "Posts to delete (2):\n  - first\n  - second\n", got)
+}
+
+func TestFormatText_DryRun_SanitizesControlCharsInRKey(t *testing.T) {
+	targets := []atproto.Post{{RKey: "evil\nFAKE LOG LINE"}}
+
+	got := report.FormatText(report.Result{Mode: report.ModeDryRun, Targets: targets})
+
+	assert.NotContains(t, got, "evil\nFAKE LOG LINE")
+	assert.Contains(t, got, "evilFAKE LOG LINE")
 }
 
 func TestFormatText_DryRun_NoTargets(t *testing.T) {
@@ -49,4 +57,17 @@ func TestFormatText_Apply_WithFailures(t *testing.T) {
 	assert.Contains(t, got, "network error")
 	assert.Contains(t, got, "bad-two")
 	assert.Contains(t, got, "rate limited")
+}
+
+func TestFormatText_Apply_SanitizesControlCharsInFailedRKeyAndError(t *testing.T) {
+	failed := []report.DeleteFailure{
+		{Post: atproto.Post{RKey: "evil\nFAKE LOG LINE"}, Err: errors.New("bad\nerror")},
+	}
+
+	got := report.FormatText(report.Result{Mode: report.ModeApply, Failed: failed})
+
+	assert.NotContains(t, got, "evil\nFAKE LOG LINE")
+	assert.NotContains(t, got, "bad\nerror")
+	assert.Contains(t, got, "evilFAKE LOG LINE")
+	assert.Contains(t, got, "baderror")
 }

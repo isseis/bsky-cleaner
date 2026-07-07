@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/isseis/bsky-cleaner/internal/atproto"
+	"github.com/isseis/bsky-cleaner/internal/sanitize"
 )
 
 // Mode identifies whether a run actually deleted posts or only reported
@@ -50,12 +51,12 @@ func FormatText(r Result) string {
 		}
 		fmt.Fprintf(&b, "Posts to delete (%d):\n", len(r.Targets))
 		for _, post := range r.Targets {
-			fmt.Fprintf(&b, "  %s\n", post.RKey)
+			fmt.Fprintf(&b, "  - %s\n", sanitize.ControlChars(post.RKey))
 		}
 	case ModeApply:
 		fmt.Fprintf(&b, "Deleted %d post(s), %d failure(s).\n", len(r.Deleted), len(r.Failed))
 		for _, failure := range r.Failed {
-			fmt.Fprintf(&b, "  %s: %v\n", failure.Post.RKey, failure.Err)
+			fmt.Fprintf(&b, "  - %s: %s\n", sanitize.ControlChars(failure.Post.RKey), sanitize.ControlChars(failure.Err.Error()))
 		}
 	}
 
