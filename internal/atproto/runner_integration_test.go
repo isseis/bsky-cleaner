@@ -44,6 +44,7 @@ func integrationAppPassword(t *testing.T) config.SecretString {
 // are covered by internal/runner's own tests, not repeated here.
 func TestRunnerRun_WithRealAtprotoClient(t *testing.T) {
 	atproto.StubPassthroughPDSDoer(t)
+	atproto.StubDNSTXTLookup(t)
 
 	const handle = publicIPLiteral
 	const did = "did:web:" + publicIPLiteral

@@ -62,6 +62,7 @@ func hermeticHandler(t *testing.T, next func(req *http.Request) (*http.Response,
 
 func setEnvCredentials(t *testing.T) {
 	t.Helper()
+	atproto.StubDNSTXTLookup(t)
 	t.Setenv("BSKY_HANDLE", publicIPLiteral)
 	t.Setenv("BSKY_APP_PASSWORD", "app-password")
 	t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", "https://hooks.slack.com/services/success")

@@ -37,6 +37,7 @@ const (
 // false-negative-free leak search).
 func setupSecretLeakEnv(t *testing.T) {
 	t.Helper()
+	atproto.StubDNSTXTLookup(t)
 	t.Setenv("BSKY_HANDLE", publicIPLiteral)
 	t.Setenv("BSKY_APP_PASSWORD", secretAppPassword)
 	t.Setenv("BSKY_SLACK_WEBHOOK_URL_SUCCESS", secretWebhookURLSuccess)

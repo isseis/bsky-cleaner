@@ -62,7 +62,7 @@ var newPDSDoer = func(_ HTTPDoer, verifiedAddrs []net.IP, host string) HTTPDoer 
 func NewClient(ctx context.Context, handle string, httpDoer HTTPDoer) (*Client, error) {
 	didResolutionDoer := retry.NewDoer(newHostSafetyCheckedDoer(httpDoer), defaultRetryPolicy, retry.RealClock{})
 
-	did, err := resolveHandleToDID(ctx, didResolutionDoer, handle)
+	did, err := resolveHandle(ctx, didResolutionDoer, handle)
 	if err != nil {
 		return nil, err
 	}
