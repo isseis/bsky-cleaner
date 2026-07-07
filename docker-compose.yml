@@ -1,0 +1,12 @@
+services:
+  bsky-cleaner:
+    build: .
+    restart: unless-stopped
+    environment:
+      BSKY_HANDLE: ${BSKY_HANDLE}
+      BSKY_APP_PASSWORD: ${BSKY_APP_PASSWORD}
+      BSKY_SLACK_WEBHOOK_URL_SUCCESS: ${BSKY_SLACK_WEBHOOK_URL_SUCCESS}
+      BSKY_SLACK_WEBHOOK_URL_FAILURE: ${BSKY_SLACK_WEBHOOK_URL_FAILURE}
+      BSKY_CONFIG_PATH: /config/config.toml
+    volumes:
+      - ./config:/config:ro
