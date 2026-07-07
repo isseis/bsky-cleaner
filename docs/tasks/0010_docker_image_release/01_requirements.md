@@ -46,34 +46,37 @@
 
 ### F-001: GHCR へのイメージ公開ワークフロー
 
-`v*` 形式の git tag が push されたことを契機に、GitHub Actions が Dockerfile からイメージをビルドし、GHCR (`ghcr.io/<owner>/bsky-cleaner`) に公開する。認証は追加のシークレット登録を必要とせず、ワークフロー組み込みの `GITHUB_TOKEN` のみを用いる。
+`v*` 形式の git tag が push されたことを契機に、GitHub Actions が Dockerfile からイメージをビルドし、GHCR (`ghcr.io/isseis/bsky-cleaner`) に公開する。認証は追加のシークレット登録を必要とせず、ワークフロー組み込みの `GITHUB_TOKEN` のみを用いる。動作確認用に、任意のタグ名を指定して同じジョブを手動実行できる `workflow_dispatch` も補助トリガーとして用意する（tag push が引き続き主契機であることは変えない）。
 
 **Acceptance Criteria**:
-- **AC-01**: `v` から始まるタグ（例: `v1.2.3`）の push をトリガーとしてワークフローが起動する。`v` 以外の tag や、ブランチへの push では起動しない
-- **AC-02**: タグが semver 形式（`vX.Y.Z`）に一致しない場合、ワークフローはイメージを公開せず非 0 で終了する（fail-closed。不正なタグから誤ったバージョンのイメージが公開されることを防ぐ）
+- **AC-01**: `v` から始まるタグ（例: `v1.2.3`）の push、または `workflow_dispatch`（対象タグ名を入力として受け取る）をトリガーとしてワークフローが起動する。`v` 以外の tag や、ブランチへの push では起動しない
+- **AC-02**: 対象タグが semver 形式（`vX.Y.Z`）に一致しない場合、ワークフローはイメージを公開せず非 0 で終了する（fail-closed。不正なタグから誤ったバージョンのイメージが公開されることを防ぐ）。`workflow_dispatch` 経由で不正な形式のタグ名を指定した場合も同様に拒否する
 - **AC-03**: ビルドしたイメージに `vX.Y.Z`・`vX.Y`・`vX`・`latest` の4種のタグを付与し、GHCR に push する
+- **AC-03a**: `vX.Y.Z` タグは公開後イミュータブルとして扱う。GHCR 上に同名の `vX.Y.Z` タグが既に存在する場合、ワークフローは上書きせず非 0 で終了する（fail-closed。同一バージョン番号で内容が異なるイメージが黙って公開されることを防ぐ）。再リリースが必要な場合は、運用者が GHCR 側で該当タグを手動削除してから再実行する。`vX.Y`・`vX`・`latest` は「最新パッチへの追従」を目的とした浮動タグであり、この保護の対象外とする（毎回上書きされるのが意図した挙動）
+- **AC-03b**: ワークフローは、上書き保護対象の `vX.Y.Z` タグを最後に push する順序で4タグを公開する。これにより、途中で失敗した場合（例: 浮動タグの push 失敗）でも `vX.Y.Z` はまだ公開されておらず、タグ削除等の手動対応なしにワークフローを再実行できる
 - **AC-04**: 公開されるイメージは `linux/amd64` のみを対象とする（0007 の決定を踏襲）
-- **AC-05**: GHCR パッケージの可視性が public に設定されており、認証なしの匿名 `docker pull` で取得できる
+- **AC-05**: GHCR パッケージの可視性は public とする。ただし可視性設定は `GITHUB_TOKEN` の権限では変更できず、パッケージ初回作成後に運用者が GitHub の Package 設定画面から一度だけ手動で public に切り替える必要がある。この手順は F-004 でドキュメント化する
 - **AC-06**: ワークフローは `GITHUB_TOKEN` 以外の追加シークレットを必要としない
 - **AC-07**: 既存の `ci.yml`（PR/push 契機の test/lint ジョブ）とは独立した別ワークフローファイルとして実装され、既存 CI の挙動に影響を与えない
 
 ### F-002: ビルド時バージョン埋め込みと `--version` フラグ
 
-CLI バイナリに `--version`（または `-v`）フラグを追加し、ビルド時に埋め込まれたバージョン文字列を標準出力に表示して正常終了する。Docker イメージのビルド時には、公開契機となった git tag の値をこのバージョン文字列として埋め込む。
+CLI バイナリに `--version`（または `-v`）フラグを追加し、ビルド時に埋め込まれたバージョン情報を標準出力に表示して正常終了する。Docker イメージのビルド時には、公開契機となった git tag の値と、ビルド元コミットの短縮 SHA をこのバージョン情報として埋め込む。バージョン情報に commit SHA を含めるのは、tag が万一 force-push 等で移動した場合でも、実際にビルドされたコミットを障害調査時に一意に追跡できるようにするため。
 
 **Acceptance Criteria**:
-- **AC-08**: `bsky-cleaner --version` を実行すると、ビルド時に埋め込まれたバージョン文字列が標準出力に1行で出力され、終了コード 0 で終了する
+- **AC-08**: `bsky-cleaner --version` を実行すると、ビルド時に埋め込まれたバージョン情報が `vX.Y.Z (短縮コミットSHA)`（例: `v1.2.3 (a1b2c3d)`）の形式で標準出力に1行で出力され、終了コード 0 で終了する
 - **AC-09**: バージョン文字列を埋め込まずにビルドした場合（通常の `make build` 等のローカル開発ビルド）、`--version` はプレースホルダ値（例: `dev`）を出力する。既存の `make build`／`go build` の呼び出し方に変更は不要
-- **AC-10**: F-001 のワークフローが GHCR に公開するイメージは、契機となった git tag の値（例: `v1.2.3`）をバージョン文字列として埋め込んだバイナリを含む
+- **AC-10**: F-001 のワークフローが GHCR に公開するイメージは、契機となった git tag の値とビルド元コミットの短縮 SHA をバージョン情報として埋め込んだバイナリを含む
 - **AC-11**: `--version` はネットワークアクセス・設定ファイル読み込み・認証情報の参照を一切行わない（バージョン確認のためだけに `.env`/TOML/Bluesky 認証が必要にならない）
+- **AC-11a**: `--config` を指定せずに `bsky-cleaner --version` を実行しても、「必須フラグ不足」のような usage エラーにはならず、バージョン情報を出力して終了コード 0 で終了する（既存の `parseFlags` が `--config` を必須とする経路とは独立して扱われる）
 
 ### F-003: `docker-compose.yml` のイメージ参照方式への変更
 
-`docker-compose.yml` の `build: .` を、GHCR に公開されたイメージへの `image:` 参照に置き換える。
+`docker-compose.yml` の `build: .` を、GHCR に公開されたイメージへの `image:` 参照に置き換える。本ツールは不可逆な削除操作を行うため、`pull` のたびに未レビューのバージョンへ黙って切り替わることを避け、デフォルトは具体的なバージョンタグを指定する方針とする（`latest` は「最新を試す」用途としてコメントで案内するに留める）。
 
 **Acceptance Criteria**:
-- **AC-12**: `docker-compose.yml` に `build:` キーが存在せず、`image: ghcr.io/<owner>/bsky-cleaner:latest` 形式の参照に置き換わっている
-- **AC-13**: `docker-compose.yml` 内、または隣接するドキュメントに、`latest` の代わりに特定バージョンタグ（例: `v1.2.3`）や digest（`@sha256:...`）を指定して固定する方法についてのコメント／説明がある
+- **AC-12**: `docker-compose.yml` に `build:` キーが存在せず、`image: ghcr.io/isseis/bsky-cleaner:vX.Y.Z` のような特定バージョンタグへの参照に置き換わっている（`latest` をデフォルト値にしない）
+- **AC-13**: `docker-compose.yml` 内、または隣接するドキュメントに、(a) バージョンを上げる際は利用者がこの行を明示的に新しいタグへ書き換える必要があること、(b) より厳密に固定したい場合は digest（`@sha256:...`）参照も使えること、(c) `latest` は最新パッチを試す目的でのみ利用を推奨する旨、のコメント／説明がある
 - **AC-14**: ローカルに `bsky-cleaner` のソースコードが存在しない環境でも、`docker-compose.yml`・`.env`・TOML 設定ファイルのみを用意した状態で `docker compose pull && docker compose up -d` によりコンテナが起動する
 
 ### F-004: リリース公開・取得手順のドキュメント整備
@@ -81,14 +84,16 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 開発者向け（リリースの公開手順）・利用者向け（イメージの取得・起動手順）それぞれの手順をドキュメント化する。
 
 **Acceptance Criteria**:
-- **AC-15**: [Docker 配布の詳細設計](../../design/docker_deployment.md) に、開発者がリリースを公開する手順（`git tag vX.Y.Z && git push --tags` 等）が記載されている
-- **AC-16**: 利用者向けドキュメント（README または同等の場所）に、`docker-compose.yml`・`.env`・TOML 設定ファイルを用意し `docker compose pull && docker compose up -d` を実行するだけで定期実行を開始できる手順が記載されている
+- **AC-15**: [Docker 配布の詳細設計](../../design/docker_deployment.md) に、開発者がリリースを公開する手順（`git tag vX.Y.Z && git push --tags` 等、および `workflow_dispatch` による動作確認手順）が記載されている
+- **AC-16**: 利用者向けドキュメント（README または同等の場所）に、`docker-compose.yml`・`.env`・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行するだけで定期実行を開始・更新できる手順が記載されている
+- **AC-17**: [Docker 配布の詳細設計](../../design/docker_deployment.md) に、GHCR パッケージの可視性を public に切り替える一度きりの手動手順（GitHub Package 設定画面での操作）が記載されている（AC-05 関連）
 
 ## 4. 非機能要件
 
 - **NF-001**: `make fmt`・`make test`・`make lint` が成功する
 - **NF-002**: 新設するワークフローファイルは、既存の `.github/workflows/ci.yml` の内容・トリガー条件を変更しない
 - **NF-003**: GHCR への公開に、リポジトリの `GITHUB_TOKEN` 以外の追加シークレット登録を必要としない
+- **NF-004**: `vX.Y.Z` タグの push に成功する前に失敗したワークフロー実行は、タグの手動削除等の後始末なしに再実行できる（AC-03b の冪等性要件）
 
 ## 5. スコープ外の根拠
 
@@ -96,5 +101,6 @@ CLI バイナリに `--version`（または `-v`）フラグを追加し、ビ�
 
 ## 6. 成功基準（要約）
 
-- AC-01〜AC-16 が test/static/manual で緑
-- タグ push だけで GHCR にイメージが公開され、利用者は `docker-compose.yml`・`.env`・TOML を用意して `docker compose pull && docker compose up -d` を実行するだけでコンテナを起動できる状態になっていること
+- AC-01〜AC-17（AC-03a・AC-03b・AC-11a を含む）が test/static/manual で緑
+- タグ push（または動作確認用の `workflow_dispatch`）だけで GHCR にイメージが公開され、公開済み `vX.Y.Z` タグは上書きされないこと
+- 利用者は `docker-compose.yml`・`.env`・TOML を用意し、バージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行するだけでコンテナを起動・更新できる状態になっていること
