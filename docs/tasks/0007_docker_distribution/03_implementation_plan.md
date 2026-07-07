@@ -121,11 +121,11 @@
 
 **対象ファイル**: `docker-compose.yml`（新規）, `dot.env.example`（新規）
 
-- [x] `docker-compose.yml` を作成する。`services.bsky-cleaner` を定義し、`environment:` で `.env` の変数（`BSKY_HANDLE`・`BSKY_APP_PASSWORD`・`BSKY_SLACK_WEBHOOK_URL_SUCCESS`・`BSKY_SLACK_WEBHOOK_URL_FAILURE`）を注入する（AC-11）。TOML 設定ファイルのディレクトリを `/config` に volume mount する（AC-13）。`BSKY_CONFIG_PATH` を `/config/config.toml` に設定する。
-- [x] `dot.env.example` を作成する。4 つの環境変数名をダミー値で列挙する（AC-12）。
+- [x] `docker-compose.yml` を作成した。`services.bsky-cleaner` を定義し、`environment:` で `.env` の変数（`BSKY_HANDLE`・`BSKY_APP_PASSWORD`・`BSKY_SLACK_WEBHOOK_URL_SUCCESS`・`BSKY_SLACK_WEBHOOK_URL_FAILURE`）を注入する（AC-11）。TOML 設定ファイルのディレクトリを `/config` に volume mount する（AC-13）。`BSKY_CONFIG_PATH` を `/config/config.toml` に設定する。
+- [x] `dot.env.example` を作成した。4 つの環境変数名をダミー値で列挙する（AC-12）。
 - [x] `docker compose up` による統合動作確認を手動で実施する（AC-13, AC-14）。TOML 設定ファイルを volume mount した状態でコンテナが起動し、`print-schedule` → `supercronic` → 定期実行の流れが動作することを確認した。検証中、開発機（darwin/arm64）で `docker compose build` すると生成イメージが `arm64` になってしまうことが判明したため、`Dockerfile` の両方の `FROM` 行に `--platform=linux/amd64` を追加し（要件定義書で amd64 のみを対象とする決定に合わせるため）、再ビルド後に `docker image inspect` で `amd64/linux` になることを確認した。また、不正な `schedule` 値（`"invalid cron"`）を volume mount したコンテナが即座に終了コード 1 で異常終了すること（AC-10 の fail-closed）も併せて確認した。
-- [x] `docker-compose.yml` に秘匿情報が直接書かれていないことを静的検証する（AC-11）。`rg -n 'BSKY_APP_PASSWORD|BSKY_HANDLE|BSKY_SLACK_WEBHOOK' docker-compose.yml` で `environment:` 行の `${...}` 参照のみがマッチし、リテラル値が存在しないことを確認する。
-- [x] `dot.env.example` が 4 つの環境変数名を列挙していることを静的検証する（AC-12）。`rg -n 'BSKY_HANDLE|BSKY_APP_PASSWORD|BSKY_SLACK_WEBHOOK_URL_SUCCESS|BSKY_SLACK_WEBHOOK_URL_FAILURE' dot.env.example` で 4 行すべてがマッチすることを確認する。
+- [x] `docker-compose.yml` に秘匿情報が直接書かれていないことを静的検証した（AC-11）。`rg -n 'BSKY_APP_PASSWORD|BSKY_HANDLE|BSKY_SLACK_WEBHOOK' docker-compose.yml` で `environment:` 行の `${...}` 参照のみがマッチし、リテラル値が存在しないことを確認する。
+- [x] `dot.env.example` が 4 つの環境変数名を列挙していることを静的検証した（AC-12）。`rg -n 'BSKY_HANDLE|BSKY_APP_PASSWORD|BSKY_SLACK_WEBHOOK_URL_SUCCESS|BSKY_SLACK_WEBHOOK_URL_FAILURE' dot.env.example` で 4 行すべてがマッチすることを確認する。
 
 **完了基準**: `docker compose up` によりコンテナが起動し、`supercronic` が定期実行を開始する。静的検証がパスする。
 
