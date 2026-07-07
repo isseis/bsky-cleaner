@@ -93,15 +93,15 @@
 
 - [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
 - [x] PR を作成した
-- [ ] PR がマージされた
+- [x] PR がマージされた
 
 ### Phase 2: Docker 配布基盤（AC-05〜AC-10）
 
 **対象ファイル**: `Dockerfile`（新規）, `entrypoint.sh`（新規）
 
-- [ ] `Dockerfile` を作成する。マルチステージビルド構成（ビルドステージ: `golang:alpine` を digest 固定、実行ステージ: `alpine` を digest 固定）。ビルドステージで `go install github.com/aptible/supercronic@<version>`（リリースタグ固定、チェックサムは Go module checksum database で検証）を実行し、実行ステージにビルド済みバイナリ・`supercronic`・`entrypoint.sh` を同梱し、非特権ユーザー（UID 10001）で実行する（AC-05, AC-06, AC-07）。
-- [ ] `entrypoint.sh` を作成する。`bsky-cleaner print-schedule --config "$BSKY_CONFIG_PATH"` を呼び出し、終了コードが非 0 なら `exit 1` で異常終了（AC-10, fail-closed）。終了コード 0 なら、標準出力の cron 式に続けて `bsky-cleaner --apply --config "$BSKY_CONFIG_PATH"` を記述した crontab 行を `/tmp/crontab` に書き込み、`exec supercronic /tmp/crontab` で内蔵 cron を起動する（AC-08, AC-09）。crontab 行の形式は `"$SCHEDULE bsky-cleaner --apply --config \"$BSKY_CONFIG_PATH\""` とする（02_architecture.md 3.2.3 節の仕様に従う）。
-- [ ] `docker build` を実行し、イメージが正常にビルドできることを確認する（AC-07）。手動検証。
+- [x] `Dockerfile` を作成する。マルチステージビルド構成（ビルドステージ: `golang:alpine` を digest 固定、実行ステージ: `alpine` を digest 固定）。ビルドステージで `go install github.com/aptible/supercronic@<version>`（リリースタグ固定、チェックサムは Go module checksum database で検証）を実行し、実行ステージにビルド済みバイナリ・`supercronic`・`entrypoint.sh` を同梱し、非特権ユーザー（UID 10001）で実行する（AC-05, AC-06, AC-07）。
+- [x] `entrypoint.sh` を作成する。`bsky-cleaner print-schedule --config "$BSKY_CONFIG_PATH"` を呼び出し、終了コードが非 0 なら `exit 1` で異常終了（AC-10, fail-closed）。終了コード 0 なら、標準出力の cron 式に続けて `bsky-cleaner --apply --config "$BSKY_CONFIG_PATH"` を記述した crontab 行を `/tmp/crontab` に書き込み、`exec supercronic /tmp/crontab` で内蔵 cron を起動する（AC-08, AC-09）。crontab 行の形式は `"$SCHEDULE bsky-cleaner --apply --config \"$BSKY_CONFIG_PATH\""` とする（02_architecture.md 3.2.3 節の仕様に従う）。
+- [x] `docker build` を実行し、イメージが正常にビルドできることを確認する（AC-07）。手動検証。
 
 **完了基準**: `docker build` が成功し、生成されたイメージが期待通りの構成（バイナリ・`supercronic`・`entrypoint.sh`・非特権ユーザー）を持つこと。
 
@@ -113,8 +113,8 @@
 
 **レビュー観点**: マルチステージビルドによりビルド用イメージと実行用イメージが分離されていること（AC-05） / ベースイメージが digest で固定されていること（AC-06） / `entrypoint.sh` が `print-schedule` の終了コードを正しく判定し、fail-closed を実現していること（AC-10） / `exec supercronic` によりシグナルが正しく伝播すること（AC-09） / 非特権ユーザーで実行されること
 
-- [ ] グリーンゲート（`make test && make lint`）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
+- [x] PR を作成した
 - [ ] PR がマージされた
 
 ### Phase 3: docker-compose 設定と統合テスト（AC-11〜AC-14）
@@ -221,10 +221,10 @@ Docker デーモンを必要とするテストは手動検証手順として記�
 
 ## 6. 実装チェックリスト
 
-- [ ] PR-1 完了（対象ステップ：Phase 1。`cmd/main.go` に `print-schedule` サブコマンドを追加、`cmd/main_test.go` にテストを追加）
-- [ ] PR-2 完了（対象ステップ：Phase 2。`Dockerfile`・`entrypoint.sh` を新規作成、`docker build` 成功確認）
+- [x] PR-1 完了（対象ステップ：Phase 1。`cmd/main.go` に `print-schedule` サブコマンドを追加、`cmd/main_test.go` にテストを追加）
+- [x] PR-2 完了（対象ステップ：Phase 2。`Dockerfile`・`entrypoint.sh` を新規作成、`docker build` 成功確認）
 - [ ] PR-3 完了（対象ステップ：Phase 3。`docker-compose.yml`・`dot.env.example` を新規作成、`docker compose up` 統合動作確認）
-- [ ] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
+- [x] 全体：`make fmt`・`make test`・`make lint` が緑（NF-001）
 
 ## 7. 受け入れ基準の検証
 

@@ -1,0 +1,31 @@
+# See docs/design/docker_deployment.md for the rationale on each entry.
+
+# Go workspace
+vendor/
+
+# Local environment
+.env
+.env.*
+
+# Build and development artifacts
+bin/
+dist/
+tmp/
+
+# Git
+.git/
+.gitattributes
+.gitignore
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation sources (not needed at runtime)
+docs/
