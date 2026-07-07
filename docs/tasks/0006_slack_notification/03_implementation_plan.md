@@ -541,7 +541,7 @@
 - Verification method: test
 
 **AC-17: コンソール出力（標準出力・標準エラー出力の両方）についても、外部由来の文字列にログ偽装が起きないよう制御文字が除去またはエスケープされる。サニタイズ処理は一箇所に集約される**
-- Test location: `cmd/main_test.go::TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey`（標準出力）、`cmd/main_test.go::TestRun_ClientInitFailure_StderrSanitizesMaliciousErrorName`・`TestRun_LoginFailure_StderrSanitizesMaliciousErrorName`（標準エラー出力、フェーズ9で追加）
+- Test location: `cmd/main_test.go::TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey`（標準出力）、`cmd/main_test.go::TestRun_LoginFailure_StderrSanitizesMaliciousErrorName`（標準エラー出力、フェーズ9で追加）。クライアント初期化失敗経路（`atproto.SSRFError`）には専用テストを追加していない: `SSRFError.Error()`（`internal/atproto/errors.go`）が `Endpoint` を `%q` で埋め込むため、`notify.Sanitize()` 適用前から制御文字がエスケープ済みであり、悪意あるペイロードによる回帰シナリオが存在しないため（フェーズ9「実装時の分岐」参照）
 - Implementation: `internal/notify/sanitize.go`（`Sanitize`）、`cmd/main.go`（標準出力は `notify.Sanitize(report.FormatText(*result))`、標準エラー出力は設定読み込み失敗・クライアント初期化失敗・実行時エラーの3箇所で `notify.Sanitize(err.Error())` によるラップ、フェーズ9）
 - Verification method: test（`internal/notify.Sanitize` が `internal/notify` 自身のペイロード構築（AC-16）と `cmd/main.go` の標準出力・標準エラー出力（AC-17）のすべてから呼ばれる同一実装であることは、`internal/notify/sanitize.go` が単一の公開関数であることによって構造的に保証される）
 

@@ -384,6 +384,8 @@ func NewDoer(inner HTTPDoer, policy Policy, clock Clock, opts ...Option) *Doer
 
 Slack 通知の送信失敗（`SendError`）については対象外のままとする: `SendError.Error()`（3.2節・4節）は `StatusCode` と `errorKind()` が返す固定形状の分類文字列のみから組み立てられ、外部由来の生文字列を含まない設計になっているため、追加のサニタイズを要しない（5.1節の脅威モデル図には、この2つの経路の違いを反映している）。
 
+`cmd/main.go` の `parseFlags` 失敗時（`--config` 未指定・未知のフラグ・想定外の位置引数）の標準エラー出力も対象外のままとする: この経路のエラーはコマンドライン引数というローカルな入力のみから構築され、AT Protocol サーバー応答や DID 解決結果のような外部由来の文字列を一切含まないため、上記3箇所と異なりサニタイズすべき対象が存在しない。
+
 ## 4. エラーハンドリング設計
 
 ```go
