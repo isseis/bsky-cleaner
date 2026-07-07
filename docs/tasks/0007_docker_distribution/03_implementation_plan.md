@@ -114,7 +114,7 @@
 **レビュー観点**: マルチステージビルドによりビルド用イメージと実行用イメージが分離されていること（AC-05） / ベースイメージが digest で固定されていること（AC-06） / `entrypoint.sh` が `print-schedule` の終了コードを正しく判定し、fail-closed を実現していること（AC-10） / `exec supercronic` によりシグナルが正しく伝播すること（AC-09） / 非特権ユーザーで実行されること
 
 - [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した
 - [ ] PR がマージされた
 
 ### Phase 3: docker-compose 設定と統合テスト（AC-11〜AC-14）
