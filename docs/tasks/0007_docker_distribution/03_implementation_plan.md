@@ -115,7 +115,7 @@
 
 - [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
 - [x] PR を作成した
-- [ ] PR がマージされた
+- [x] PR がマージされた
 
 ### Phase 3: docker-compose 設定と統合テスト（AC-11〜AC-14）
 
