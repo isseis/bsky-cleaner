@@ -8,7 +8,7 @@
 | Created | 2026-07-05 |
 | Review date | 2026-07-05 |
 | Reviewer | isseis |
-| Comments | 2026-07-05（再オープン）: F-005 のホスト検証方式を、正常系/異常系 URL の相互一致のみから、TOML `slack_allowed_host` による明示的な allowlist 方式に変更（3.1節・9節・付録を改訂）。要件定義書 [01_requirements.md](01_requirements.md) の同日付コメント参照。 |
+| Comments | 2026-07-05（再オープン）: F-005 のホスト検証方式を、正常系/異常系 URL の相互一致のみから、TOML `slack_allowed_host` による明示的な allowlist 方式に変更（3.1節・9節・付録を改訂）。要件定義書 [01_requirements.md](01_requirements.md) の同日付コメント参照。2026-07-07（再オープン）: 実装完了後のコードレビューで見つかった、`cmd/main.go` の設定読み込み失敗・クライアント初期化失敗・実行時エラーの標準エラー出力が `notify.Sanitize()` を経由していなかったギャップに対応するため、3.7節（新設）を追加し、3.5節・5.1節・5.2節を改訂した。要件定義書の同日付コメント参照。 |
 
 関連ドキュメント: [要件定義書](01_requirements.md)
 
@@ -39,14 +39,16 @@ flowchart LR
     OUTCOME --> BUILD["internal/notify<br>buildPayload()"]
     BUILD --> SEND["internal/notify<br>Send()"]
     SEND -->|"HTTPS POST"| SLACK[("Slack Incoming Webhook")]
-    SEND -.->|"送信失敗時"| STDERR["標準エラー出力"]
+    SEND -.->|"送信失敗時（SendError.Error()は固定文言のみで構成、追加のSanitize不要）"| STDERR["標準エラー出力"]
     MAIN --> STDOUT["internal/notify<br>Sanitize()"]
     STDOUT --> CONSOLE["標準出力"]
+    MAIN -.->|"設定読込/クライアント初期化/実行時エラー"| STDERRSAN["internal/notify<br>Sanitize()<br>(3.7節、追加)"]
+    STDERRSAN --> STDERR
 
     class ENV,RESULT,TOML data
     class MAIN process
     class CFG enhanced
-    class OUTCOME,BUILD,SEND,STDOUT newpkg
+    class OUTCOME,BUILD,SEND,STDOUT,STDERRSAN newpkg
 ```
 
 矢印 A → B は「A の処理結果・データが B の入力になる」ことを表す。点線矢印（`-.->`）は「特定の条件下でのみ発生する」処理経路を表す。
@@ -140,7 +142,7 @@ graph TB
 | `internal/config/errors.go` | 変更 | `ErrWebhookHostMismatch`・`ErrSlackAllowedHostMissing` を追加 |
 | `internal/config/credentials_test.go` | 変更 | ホスト不一致・`slack_allowed_host` 未設定のテストケースを追加、既存2ケースのフィクスチャに `slack_allowed_host` を追加（3.1節） |
 | `internal/retry/doer.go` | 変更 | URL 秘匿用の redactor オプションを追加（3.6.1節） |
-| `cmd/main.go` | 変更 | `notify.Send()` 呼び出し・`notify.Sanitize()` によるラップを追加 |
+| `cmd/main.go` | 変更 | `notify.Send()` 呼び出し・`notify.Sanitize()` による標準出力のラップを追加。加えて、設定読み込み失敗・クライアント初期化失敗・実行時エラーの標準エラー出力にも `notify.Sanitize()` のラップを追加（3.7節、追加） |
 | `cmd/main_test.go` | 変更 | `TestRun_ApplyAllSucceed_*`/`TestRun_ApplyPartialFailure_*` のモックに Slack Webhook 向けの応答を追加（7節） |
 
 ### 2.2 設定とデータフロー
@@ -368,6 +370,22 @@ func NewDoer(inner HTTPDoer, policy Policy, clock Clock, opts ...Option) *Doer
 
 `internal/notify` は `WithURLRedactor` に、Webhook のホスト名のみを返す関数（例: `"https://hooks.slack.com/services/[REDACTED]"`）を渡す。`internal/atproto` の既存呼び出しは `opts` を渡さないため、ログ出力の既存挙動は変更されない（後方互換）。
 
+### 3.7 標準エラー出力のサニタイズ（追加、AC-17拡張）
+
+**背景**: 実装完了後のコードレビューで、`cmd/main.go` が次の3箇所で `err.Error()` を標準エラー出力にそのまま書き込んでおり、`notify.Sanitize()` を経由していないことが判明した。
+
+1. `config.LoadAppConfig` 失敗時（設定読み込み失敗）
+2. `atproto.NewClient` 失敗時（クライアント初期化失敗）
+3. `runner.Run` 失敗時（実行時エラー、`runErr != nil`）
+
+このうち (2)・(3) は外部由来の文字列を含みうる。`atproto.HTTPError.ErrorName`（`internal/atproto/http.go` の `xrpcErrorName`）は AT Protocol サーバーのレスポンスボディの `"error"` フィールドをそのまま格納しており、悪意ある、または侵害された PDS が任意の文字列（改行・ANSIエスケープシーケンスを含む）を返しうる。`atproto.SSRFError.Endpoint` は DID 解決結果（DIDドキュメントの `serviceEndpoint`）由来であり、同様に外部起因である。これらは 5.1節の脅威モデルが対象とする「外部由来の識別子・エラー文字列」と同じ性質を持つが、3.5節の標準出力（`report.FormatText` の出力）とは異なりこれまで `Sanitize()` を経由していなかった。(1) の設定読み込み失敗はローカルの TOML/環境変数に由来し外部からの入力を含まないが、実装を一箇所に統一する（3箇所すべてを同じ経路で扱う）ことで、将来 `config.LoadAppConfig` のエラー内容が変わっても個別に判断し直す必要がないようにする。
+
+**対応**: `cmd/main.go` の上記3箇所の `err.Error()` 出力を、いずれも `notify.Sanitize(err.Error())` でラップしてから書き込む。3.5節の標準出力（`notify.Sanitize(report.FormatText(result))`）と同じ関数を再利用し、サニタイズの実装を一箇所に集約するというAC-17の既存方針をそのまま踏襲する。
+
+Slack 通知の送信失敗（`SendError`）については対象外のままとする: `SendError.Error()`（3.2節・4節）は `StatusCode` と `errorKind()` が返す固定形状の分類文字列のみから組み立てられ、外部由来の生文字列を含まない設計になっているため、追加のサニタイズを要しない（5.1節の脅威モデル図には、この2つの経路の違いを反映している）。
+
+`cmd/main.go` の `parseFlags` 失敗時（`--config` 未指定・未知のフラグ・想定外の位置引数）の標準エラー出力も対象外のままとする: この経路のエラーはコマンドライン引数というローカルな入力のみから構築され、AT Protocol サーバー応答や DID 解決結果のような外部由来の文字列を一切含まないため、上記3箇所と異なりサニタイズすべき対象が存在しない。
+
 ## 4. エラーハンドリング設計
 
 ```go
@@ -414,7 +432,7 @@ flowchart TD
 
 ### 5.2 リスクへの対応
 
-- **投稿本文経由の間接的なインジェクション（[security.md](../../design/security.md)）**: 本タスクの通知には投稿本文を一切含めない設計（AC-14）のため、body 経由のインジェクションはそもそも発生しない。ただし識別子・エラーメッセージも外部由来（handle・DID・サーバ応答に由来しうる）であるため、これらに無条件で `Sanitize()` + mrkdwn エスケープを適用する（5.1節参照）。
+- **投稿本文経由の間接的なインジェクション（[security.md](../../design/security.md)）**: 本タスクの通知には投稿本文を一切含めない設計（AC-14）のため、body 経由のインジェクションはそもそも発生しない。ただし識別子・エラーメッセージも外部由来（handle・DID・サーバ応答に由来しうる）であるため、これらに無条件で `Sanitize()` + mrkdwn エスケープを適用する（5.1節参照）。この無条件適用は Slack ペイロード・標準出力に加え、標準エラー出力（設定読み込み失敗・クライアント初期化失敗・実行時エラーの `err.Error()`）にも及ぶ（3.7節、AC-17拡張）。
 - **秘密情報漏洩（Webhook URL、`SendError` 経由）**: Go の `net/http`/`net/url` パッケージのエラーは、しばしばエラー文字列にリクエスト URL をそのまま含む（例: `*url.Error.Error()`）。Webhook URL は「知っていれば投稿できる」秘匿情報（[overview.md](../../overview.md)）であるため、`Send` はこの種の生のエラーを `SendError` でラップし、`SendError.Error()` が `StatusCode` と分類文字列のみから安全な文字列を組み立てる（4節）。`cmd/main.go` は `SendError.Error()` のみを標準エラー出力に書き込み、`Unwrap()` で得られる内部エラーの `Error()` 文字列を直接出力しない。
 - **秘密情報漏洩（Webhook URL、`internal/retry` のリトライログ経由）**: `internal/retry.Doer` の既存のリトライ・打ち切りログは `req.URL.String()` をそのまま出力する設計であり、これをそのまま再利用すると Webhook URL がログに漏洩する（`internal/atproto` での既存利用ではリクエスト URL が秘匿情報でないため問題にならなかった前提が、本タスクでは成り立たない）。3.6.1節の `internal/retry.WithURLRedactor` により、`internal/notify` はこのログにホスト名のみを渡すことでこれを防ぐ。
 - **秘密情報漏洩（app パスワード・セッション JWT・Authorization ヘッダー）**: `internal/notify` は `report.Result`/`DeleteFailure` のうち明示的に選択したフィールド（RKey・エラー種別）のみをペイロードに含め、`atproto.Client` やセッション情報そのものには一切アクセスしない（`internal/atproto` への依存は 2.1節の通り `Post`/`HTTPError`/`SSRFError` 型に限られ、`Client`/セッション状態には触れない）。

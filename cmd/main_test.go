@@ -190,6 +190,48 @@ func TestRun_LoginFailure_ReturnsExitCode1(t *testing.T) {
 	assert.Equal(t, exitSetupOrRunFail, code)
 }
 
+// TestRun_LoginFailure_StderrSanitizesMaliciousErrorName verifies that a
+// login failure's stderr output is sanitized. The createSession XRPC
+// response's "error" field is attacker/server-controlled and flows
+// verbatim into atproto.HTTPError.ErrorName (internal/atproto/errors.go),
+// which HTTPError.Error() interpolates with %s -- unlike SSRFError.Error(),
+// which uses %q and so already escapes control characters on its own, this
+// is a path where a raw newline or ANSI escape sequence would otherwise
+// reach the terminal/log unescaped. Before phase 9's fix, cmd/main.go wrote
+// runErr.Error() to stderr without notify.Sanitize().
+func TestRun_LoginFailure_StderrSanitizesMaliciousErrorName(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+	configPath := validConfigPath(t)
+
+	const maliciousErrorName = "AuthenticationRequired\nFAKE LOG LINE\x1b[31m"
+	errorNameJSON, err := json.Marshal(maliciousErrorName)
+	require.NoError(t, err)
+	body := fmt.Sprintf(`{"error":%s}`, errorNameJSON)
+
+	mock := &atprototestutil.MockHTTPDoer{Handler: hermeticHandler(t, func(req *http.Request) (*http.Response, error) {
+		if strings.HasSuffix(req.URL.Path, "com.atproto.server.createSession") {
+			return atprototestutil.JSONResponse(http.StatusUnauthorized, body), nil
+		}
+		t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+		return nil, nil
+	})}
+
+	var stdout, stderr bytes.Buffer
+	code := run(configPath, false, time.Now(), mock, &stdout, &stderr)
+
+	assert.Equal(t, exitSetupOrRunFail, code)
+	// fmt.Fprintln appends its own trailing newline after the sanitized
+	// text, so trim exactly that one before asserting: notify.Sanitize
+	// strips every C0 control character (including the embedded newline
+	// and ESC byte smuggled in via maliciousErrorName), so nothing but this
+	// single trailing newline should remain.
+	stderrText := strings.TrimSuffix(stderr.String(), "\n")
+	assert.NotContains(t, stderrText, "\n")
+	assert.NotContains(t, stderrText, "\x1b")
+	assert.Contains(t, stderrText, "FAKE LOG LINE")
+}
+
 // postPageResponse builds a single-page com.atproto.repo.listRecords
 // response for the app.bsky.feed.post collection containing one post with
 // the given rkey and createdAt.

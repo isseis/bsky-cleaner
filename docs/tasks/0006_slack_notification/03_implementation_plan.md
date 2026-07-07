@@ -8,7 +8,7 @@
 | Created | 2026-07-05 |
 | Review date | 2026-07-05 |
 | Reviewer | isseis |
-| Comments | - |
+| Comments | 2026-07-07: 実装完了後のコードレビューで見つかった標準エラー出力サニタイズのギャップ（要件定義書・アーキテクチャ設計書の同日付コメント参照）に対応するため、フェーズ9を追加した。 |
 
 関連ドキュメント: [要件定義書](01_requirements.md) / [アーキテクチャ設計書](02_architecture.md)
 
@@ -274,6 +274,29 @@
   - **作業内容**: `internal/notify` 新設・`internal/retry`/`internal/config`/`cmd/main.go` の変更に起因する新規の未使用コードが検出されないことを確認する。
   - **完了基準**: 本タスクに起因する新規の未使用コードが検出されない（既存の未解消項目がある場合はその理由を実行結果として明記する）。
 
+### フェーズ9: 標準エラー出力のサニタイズ拡張（設計書 3.7節、AC-17拡張。コードレビュー起因の追加対応）
+
+**背景**: PR-1〜PR-4 マージ後のコードレビューで、`cmd/main.go` が設定読み込み失敗・クライアント初期化失敗・実行時エラーを標準エラー出力へ書き込む3箇所（当初の実装では75〜110行目付近）が `notify.Sanitize()` を経由しておらず、AC-17 が「標準出力」のみを対象にしていたためこのギャップがテストで捕捉されていなかった。`atproto.HTTPError.ErrorName`（サーバー応答由来）・`atproto.SSRFError.Endpoint`（DID解決結果由来）はいずれも外部由来の文字列であり、標準出力と同じログ偽装・ANSIエスケープ注入のリスクを持つため、標準エラー出力にも同じサニタイズを適用する（要件定義書・設計書の2026-07-07付コメント参照）。
+
+- [x] **対象ファイル**: `cmd/main.go`（既存ファイルの変更）
+  - **作業内容**: `run` 関数内の3箇所の `fmt.Fprintln(stderr, err.Error())`／`fmt.Fprintln(stderr, runErr.Error())` を、それぞれ `fmt.Fprintln(stderr, notify.Sanitize(err.Error()))` の形に変更する。対象は次の3箇所（1.3節時点の行番号、実装時に前後する可能性がある）:
+    1. `config.LoadAppConfig` 失敗時（既存、89行目付近）
+    2. `atproto.NewClient` 失敗時（既存、101行目付近）
+    3. `runner.Run` 失敗時（既存、107行目付近、`runErr != nil` 分岐）
+    既存の `//nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply` コメントはそのまま維持する（出力先の性質は変わらないため）。`sendNotification` が返す `sendErr.Error()`（118行目付近）は対象外のまま変更しない（設計書 3.7節の通り、`SendError.Error()` は固定形状の分類文字列のみで構成され追加のサニタイズを要しないため）。
+  - **完了基準**: `go build ./...` が成功する。
+
+- [x] **対象ファイル**: `cmd/main_test.go`（既存ファイルの変更）
+  - **作業内容（実装時の分岐）**: 当初案は client-init 失敗（DID解決）と login 失敗（`createSession`）の両方に、改行・ANSIエスケープを含む悪意あるエラー内容の回帰テストを追加する想定だった。実装時に調査した結果、client-init 失敗経路（`atproto.NewClient` → `resolveHandleToDID`/`resolveDIDDocument`/`validatePDSEndpoint`）は、外部由来の値を運びうる唯一の型が `atproto.SSRFError` であり、その `Error()`（`internal/atproto/errors.go`）は `Endpoint` を `%q`（Goの文字列リテラル形式）で埋め込むため、制御文字は実装済みの `notify.Sanitize()` を適用する以前からすでにエスケープ済みの表現になっている（生の改行・ESCバイトが埋め込まれることがない）。したがってこの経路には「悪意あるペイロードによってstderrが汚染される」という具体的な回帰シナリオが存在せず、専用のセキュリティテストは追加しなかった（`notify.Sanitize()` 自体は3.7節の通り一貫して適用するが、この経路では実質的に無害化のno-opになる）。
+    - 唯一の実質的な脆弱性は login/list/delete 失敗経路が使う `atproto.HTTPError`（`internal/atproto/http.go` の `xrpcErrorName` がサーバー応答の `"error"` フィールドをそのまま格納）で、`HTTPError.Error()`（`internal/atproto/errors.go`）が `ErrorName` を `%s`（エスケープなし）で埋め込むため、`notify.Sanitize()` 適用前は生の改行・ANSIエスケープシーケンスがstderrにそのまま出力されていた。
+    - [x] `TestRun_LoginFailure_StderrSanitizesMaliciousErrorName`（新規）: `com.atproto.server.createSession` が返す401応答の `"error"` フィールドに改行文字とANSIエスケープシーケンスを含む値（`"AuthenticationRequired\nFAKE LOG LINE\x1b[31m"`）を設定し、`apply=false` で `run` を実行した際、stderr（末尾の `fmt.Fprintln` 自身が付与する1個の改行を除く）に生の改行・ESC (0x1B) が含まれないこと、かつ埋め込んだ内容自体は読み取れることを検証する（既存の `TestRun_LoginFailure_ReturnsExitCode1` のフィクスチャを拡張する形）。
+    - [x] 設定読み込み失敗（`TestRun_ConfigLoadFailure_ReturnsExitCode1`、既存）は新規のセキュリティテストを追加しない: このエラーはローカルのTOML/環境変数由来であり外部由来の文字列を含まないため、悪意あるペイロードによる回帰テストの対象にならない（3.7節の通り、実装統一のためサニタイズ自体は適用するが、専用テストは不要と判断する）。既存テストが `notify.Sanitize()` 経由後も同じ終了コード・エラーメッセージの実質的内容で成功し続けることをもって回帰確認とする。
+  - **完了基準**: `make test` で `cmd` パッケージの全テストが成功する。
+
+- [x] **対象コマンド**: `make fmt` / `make test` / `make lint` / `make deadcode`（フェーズ8の再実行）
+  - **作業内容**: フェーズ9の変更を含めて4コマンドを再実行し、いずれもエラーなく完了することを確認する。
+  - **完了基準**: 4コマンドすべてが正常終了する。実行結果: 2026-07-07、`make fmt && make test && make lint && make deadcode` すべて成功。
+
 ## 3. 実装順序とマイルストーン
 
 ### 3.1 マイルストーン
@@ -286,6 +309,7 @@
 | M4 | `cmd/main.go` への統合が完了し、AC-02〜AC-04・AC-06・AC-07・AC-17 が結合テストで緑になり、既存テストが無退行であることを確認する | `cmd/main.go`・`cmd/main_test.go` |
 | M5 | ドキュメント更新が完了し、フェーズ7の `rg` コマンドがすべて期待通りの結果になる | 更新済み `docs/design/configuration.md`・`package_reference.md` |
 | M6 | `make fmt`/`make test`/`make lint`/`make deadcode` の完走を確認する | 実行結果の記録（実装チェックリスト） |
+| M7 | 標準エラー出力のサニタイズ拡張（フェーズ9、AC-17拡張）が完了し、`make fmt`/`make test`/`make lint`/`make deadcode` の再完走を確認する | `cmd/main.go`・`cmd/main_test.go` |
 
 ### 3.2 PR 構成
 
@@ -296,6 +320,7 @@
 | PR-3 | フェーズ6 | `cmd/main.go` への統合、既存テストの回帰修正 |
 | PR-4 | フェーズ7 | ドキュメント更新 |
 | PR-5 | フェーズ8 | 品質確認完了の記録 |
+| PR-6 | フェーズ9 | 標準エラー出力のサニタイズ拡張（コードレビュー起因の追加対応、AC-17拡張） |
 
 ### PR-1 作成ポイント: internal/retry URL redaction and internal/config allowlist validation
 
@@ -348,6 +373,18 @@
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/52）
 - [x] PR がマージされた
 
+### PR-6 作成ポイント: stderr sanitization gap fix (code review follow-up)
+
+**対象ステップ**: フェーズ9
+
+**推奨タイトル**: `fix(0006-slack-notification): sanitize stderr output for config/init/run errors`
+
+**レビュー観点**: 変更した3箇所（設定読み込み失敗・クライアント初期化失敗・実行時エラー）以外の既存の `//nolint:gosec` コメント付き出力箇所（`sendErr.Error()` 等）が意図せず変更されていないこと / 新規テストが実際にANSIエスケープ・改行を含む悪意あるサーバー応答から誘発された `err.Error()` を経由して検証していること（`errorKind()` 等の中間層を経由しない生の `err.Error()` パスであることに注意）
+
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/72）
+- [ ] PR がマージされた
+
 ## 4. テスト戦略
 
 ### 4.1 単体テスト
@@ -393,6 +430,7 @@
 - [ ] PR-3 マージ済み（対象ステップ: フェーズ6。`cmd/main.go` への統合、AC-02〜AC-04・AC-06・AC-07・AC-17関連のテスト追加、既存テストの回帰修正）
 - [ ] PR-4 マージ済み（対象ステップ: フェーズ7。`docs/design/configuration.md`・`package_reference.md` 更新）
 - [ ] PR-5 マージ済み（対象ステップ: フェーズ8。品質確認完了の記録）
+- [ ] PR-6 マージ済み（対象ステップ: フェーズ9。標準エラー出力のサニタイズ拡張、AC-17拡張関連のテスト追加）
 - [ ] `make fmt` / `make test` / `make lint` がすべて通過
 - [ ] `make deadcode` で本タスクに起因する新規の未使用コードがないことを確認
 
@@ -502,10 +540,10 @@
 - Implementation: `internal/notify/sanitize.go`（`Sanitize`）
 - Verification method: test
 
-**AC-17: コンソール出力についても、外部由来の文字列にログ偽装が起きないよう制御文字が除去またはエスケープされる。サニタイズ処理は一箇所に集約される**
-- Test location: `cmd/main_test.go::TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey`
-- Implementation: `internal/notify/sanitize.go`（`Sanitize`）、`cmd/main.go`（`notify.Sanitize(report.FormatText(*result))` によるラップ）
-- Verification method: test（`internal/notify.Sanitize` が `internal/notify` 自身のペイロード構築（AC-16）と `cmd/main.go` の標準出力（AC-17）の両方から呼ばれる同一実装であることは、`internal/notify/sanitize.go` が単一の公開関数であることによって構造的に保証される）
+**AC-17: コンソール出力（標準出力・標準エラー出力の両方）についても、外部由来の文字列にログ偽装が起きないよう制御文字が除去またはエスケープされる。サニタイズ処理は一箇所に集約される**
+- Test location: `cmd/main_test.go::TestRun_ApplyPartialFailure_ConsoleOutputSanitizesMaliciousRKey`（標準出力）、`cmd/main_test.go::TestRun_LoginFailure_StderrSanitizesMaliciousErrorName`（標準エラー出力、フェーズ9で追加）。クライアント初期化失敗経路（`atproto.SSRFError`）には専用テストを追加していない: `SSRFError.Error()`（`internal/atproto/errors.go`）が `Endpoint` を `%q` で埋め込むため、`notify.Sanitize()` 適用前から制御文字がエスケープ済みであり、悪意あるペイロードによる回帰シナリオが存在しないため（フェーズ9「実装時の分岐」参照）
+- Implementation: `internal/notify/sanitize.go`（`Sanitize`）、`cmd/main.go`（標準出力は `notify.Sanitize(report.FormatText(*result))`、標準エラー出力は設定読み込み失敗・クライアント初期化失敗・実行時エラーの3箇所で `notify.Sanitize(err.Error())` によるラップ、フェーズ9）
+- Verification method: test（`internal/notify.Sanitize` が `internal/notify` 自身のペイロード構築（AC-16）と `cmd/main.go` の標準出力・標準エラー出力（AC-17）のすべてから呼ばれる同一実装であることは、`internal/notify/sanitize.go` が単一の公開関数であることによって構造的に保証される）
 
 **AC-18: 通知ペイロードが上限長を超える場合、末尾を切り詰め、切り詰められたことが分かるマーカーを付与する**
 - Test location: `internal/notify/payload_test.go::TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker`
