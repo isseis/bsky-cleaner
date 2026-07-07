@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -137,13 +138,18 @@ func resolveHandleToDIDViaDNS(ctx context.Context, handle string) (string, error
 		}
 	}
 
+	// Per spec, resolution only fails on multiple *different* DIDs;
+	// duplicate records for the same DID are not an error.
+	slices.Sort(candidates)
+	candidates = slices.Compact(candidates)
+
 	switch len(candidates) {
 	case 0:
 		return "", fmt.Errorf("resolve handle to DID via DNS: no %q TXT record found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
 	case 1:
 		return candidates[0], nil
 	default:
-		return "", fmt.Errorf("resolve handle to DID via DNS: multiple %q TXT records found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
+		return "", fmt.Errorf("resolve handle to DID via DNS: multiple conflicting %q TXT records found: %w", didTXTRecordPrefix, ErrDNSHandleResolutionFailed)
 	}
 }
 

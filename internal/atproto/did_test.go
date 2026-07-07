@@ -389,6 +389,15 @@ func TestResolveHandleToDIDViaDNS_MultipleDIDRecords_ReturnsDNSHandleResolutionF
 	assert.ErrorIs(t, err, ErrDNSHandleResolutionFailed)
 }
 
+func TestResolveHandleToDIDViaDNS_DuplicateIdenticalDIDRecords_Succeeds(t *testing.T) {
+	stubTXTLookuper(t, &fakeTXTLookuper{records: []string{"did=did:plc:test123", "did=did:plc:test123"}})
+
+	did, err := resolveHandleToDIDViaDNS(context.Background(), "dave.test")
+
+	require.NoError(t, err)
+	assert.Equal(t, "did:plc:test123", did)
+}
+
 func TestResolveHandleToDIDViaDNS_ResolverError_ReturnsTypedError(t *testing.T) {
 	dnsErr := &net.DNSError{Err: "no such host", Name: "_atproto.eve.test", IsNotFound: true}
 	stubTXTLookuper(t, &fakeTXTLookuper{err: dnsErr})
