@@ -27,6 +27,18 @@ execution_timeout_seconds = 3600
 	assert.Equal(t, time.Hour, cfg.ExecutionTimeout)
 }
 
+func TestLoad_ScheduleOmitted_DefaultsToEmptyString(t *testing.T) {
+	path := writeTempTOML(t, `
+retention_days = 30
+execution_timeout_seconds = 3600
+`)
+
+	cfg, err := Load(path)
+	require.NoError(t, err)
+
+	assert.Empty(t, cfg.Schedule)
+}
+
 func TestLoad_SyntaxError(t *testing.T) {
 	path := writeTempTOML(t, `retention_days = [30`)
 
@@ -52,14 +64,6 @@ schedule = "0 3 * * *"
 execution_timeout_seconds = 3600
 `,
 			field: "retention_days",
-		},
-		{
-			name: "schedule missing",
-			content: `
-retention_days = 30
-execution_timeout_seconds = 3600
-`,
-			field: "schedule",
 		},
 		{
 			name: "execution_timeout_seconds missing",

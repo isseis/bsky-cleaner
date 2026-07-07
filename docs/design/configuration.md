@@ -10,12 +10,12 @@
 
 ## TOML 設定ファイル
 
-`internal/config.Load(path)` が読み込む。`slack_allowed_host` を除く項目は必須であり、いずれかが欠落している場合は読み込みが失敗する（デフォルト値での黙った補完は行わない）。秘匿情報（app パスワード・Slack Webhook URL）は TOML には書かず、下記「環境変数」の節で扱う。`slack_allowed_host` は Webhook URL 自体とは異なりそれ単体では投稿権限を持たないため秘匿情報として扱わず、TOML 側に置く（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) 参照）。
+`internal/config.Load(path)` が読み込む。`slack_allowed_host` と `schedule` を除く項目は必須であり、いずれかが欠落している場合は読み込みが失敗する（必須項目についてはデフォルト値での黙った補完は行わない）。任意項目のデフォルト値は下記テーブルに明示する。秘匿情報（app パスワード・Slack Webhook URL）は TOML には書かず、下記「環境変数」の節で扱う。`slack_allowed_host` は Webhook URL 自体とは異なりそれ単体では投稿権限を持たないため秘匿情報として扱わず、TOML 側に置く（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) 参照）。
 
 | 項目名 | 型 | 必須/任意 | デフォルト値 | 書式・制約 |
 |---|---|---|---|---|
 | `retention_days` | 整数 | 必須 | なし | 正の整数（`1` 以上）。`0` 以下は起動失敗（全投稿即削除を防ぐ fail-closed 検証） |
-| `schedule` | 文字列 | 必須 | なし | cron 相当のスケジュール文字列。本パッケージはキーの存在確認のみを行い（空文字列 `""` は許容される）、cron 構文としての妥当性検証は行わない（[0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md) の `print-schedule` サブコマンドの責務） |
+| `schedule` | 文字列 | 任意 | `""`（キー省略時） | cron 相当のスケジュール文字列。Docker 配布時の `print-schedule` サブコマンド（[0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md)）でのみ使用するため、Docker を介さず直接実行・crontab 登録する場合は不要。本パッケージ自体は値の有無のみを扱い、cron 構文としての妥当性検証は `print-schedule` 側の責務 |
 | `execution_timeout_seconds` | 整数 | 必須 | なし | 秒単位。`1`〜`86400`（24時間）の範囲の整数。`0` 以下または `86400` を超える値は起動失敗 |
 | `slack_allowed_host` | 文字列 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` のいずれかが設定されている場合は必須 | 未設定 | Slack Webhook URL のホスト部として許可する値（例: `hooks.slack.com`）。設定されている Webhook URL のホスト部（ポート番号を除く、大文字小文字を区別しない）がこの値と一致しない場合、起動失敗（fail-closed）。Webhook URL が両方とも未設定の場合は本項目が未設定でも起動失敗しない（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005） |
 

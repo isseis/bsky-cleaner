@@ -16,7 +16,11 @@ import (
 // Config holds the non-secret configuration values read from the TOML
 // configuration file.
 type Config struct {
-	RetentionDays    int
+	RetentionDays int
+	// Schedule is the cron expression used only by the print-schedule
+	// subcommand (for Docker/cron deployments). It is optional: running
+	// the binary directly or registering it in crontab without Docker
+	// does not need it. An absent TOML key yields "".
 	Schedule         string
 	ExecutionTimeout time.Duration
 	// SlackAllowedHost is the required host for any configured Slack
