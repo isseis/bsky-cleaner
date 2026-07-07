@@ -176,8 +176,7 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/82）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
 
 ## 3. 実装順序とマイルストーン
 
@@ -218,11 +217,11 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2。`ErrDNSHandleResolutionFailed`、`txtLookuper`/`lookupTXT`/`dnsTXTLookupTimeout`/`resolveHandleToDIDViaDNS` 追加、ユニットテスト5件追加）
-- [ ] PR-2 マージ済み（対象ステップ: Phase 3。`resolveHandle` 追加、ユニットテスト3件追加）
-- [ ] PR-3 マージ済み（対象ステップ: Phase 4 / Phase 5。`StubDNSTXTLookup` 追加、`NewClient` 切り替え、既存テスト6箇所への注入、`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` 追加（AC-09 動的検証）、全テスト回帰確認）
-- [ ] `make fmt && make test && make lint` が最終的に成功する
-- [ ] `make deadcode` で新規追加コードに未使用箇所がないことを確認する
+- [x] PR-1 マージ済み（対象ステップ: Phase 1 / Phase 2。`ErrDNSHandleResolutionFailed`、`txtLookuper`/`lookupTXT`/`dnsTXTLookupTimeout`/`resolveHandleToDIDViaDNS` 追加、ユニットテスト5件追加）
+- [x] PR-2 マージ済み（対象ステップ: Phase 3。`resolveHandle` 追加、ユニットテスト3件追加）
+- [x] PR-3 マージ済み（対象ステップ: Phase 4 / Phase 5。`StubDNSTXTLookup` 追加、`NewClient` 切り替え、既存テスト6箇所への注入、`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` 追加（AC-09 動的検証）、全テスト回帰確認）
+- [x] `make fmt && make test && make lint` が最終的に成功する
+- [x] `make deadcode` で新規追加コードに未使用箇所がないことを確認する
 
 ## 7. 受け入れ基準の検証
 
