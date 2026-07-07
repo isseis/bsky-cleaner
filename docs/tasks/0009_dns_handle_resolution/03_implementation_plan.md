@@ -70,7 +70,7 @@
 
 - [ ] `ErrDNSHandleResolutionFailed`（センチネルエラー、[02_architecture.md](02_architecture.md) 4.1 節のコード例のとおり）を、既存の `var (...)` ブロック（`ErrDIDResolutionFailed` などが定義されている 11-25 行目）に追加する。
 
-**成功基準**: `make fmt && make build` が成功する。
+**成功基準**: `make fmt && make test && make lint` が成功する。
 
 ### Phase 2: DNS TXT 方式の解決関数の追加
 
@@ -115,7 +115,7 @@
 
 - [ ] `StubDNSTXTLookup(t *testing.T)` を追加する。`StubPassthroughPDSDoer`（27-48 行目）と同じパターン（`prev := lookupTXT` → `t.Cleanup` で復元 → `lookupTXT` を「常に空レコードを返すフェイク」に差し替え）で実装する。`atproto_test` などの外部パッケージからも呼べるようエクスポートする。
 
-**成功基準**: `go build -tags test ./... && make fmt` が成功する。`test_helpers.go` は `//go:build test` タグ付きファイルであり、通常の `make build`（`go build ./cmd`、`-tags test` なし）ではコンパイル対象に入らないため、このフェーズの完了確認には `-tags test` を明示したビルドを使う。
+**成功基準**: `make fmt && make test && make lint` が成功する。`test_helpers.go` は `//go:build test` タグ付きファイルであり、通常の `make build`（`go build ./cmd`、`-tags test` なし）ではコンパイル対象に入らないが、`make test`（`go test -tags test ./...`）は `-tags test` を指定するため、コンパイル確認も兼ねる。
 
 ### Phase 5: `NewClient` の切り替えと既存テストの回帰対応
 
