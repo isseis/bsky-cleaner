@@ -72,14 +72,14 @@
 
 **対象ファイル**: `cmd/main.go`, `cmd/main_test.go`
 
-- [ ] `cmd/main.go`: `ScheduleValidationError` 型を追加する（[02_architecture.md 3.2.1 節](./02_architecture.md#321-print-schedule-サブコマンドac-01〜04) の定義に従う）。
-- [ ] `cmd/main.go`: `validateSchedule(s string) error` 関数を実装する。cron 5 フィールドの構文検証（改行の不在確認・5 フィールドのパース・各フィールドの値域チェック）を標準ライブラリのみで行う。外部ライブラリに依存しない。
-- [ ] `cmd/main.go`: `parsePrintScheduleFlags(args []string) (configPath string, err error)` 関数を実装する。`--config`（または `-c`）フラグのみを受け付け、不足時・不明な位置引数存在時にエラーを返す。`flag.FlagSet` を使用し、`parseFlags` と同じエラー報告パターンに従う。
-- [ ] `cmd/main.go`: `runPrintSchedule(configPath string, stdout, stderr io.Writer) int` 関数を実装する。`config.Load(configPath)` を呼び出し、成功時に `validateSchedule(cfg.Schedule)` で cron 式を検証し、標準出力に書き出す。エラー時は標準エラー出力にエラーメッセージを書き、`exitSetupOrRunFail`(1) を返す。`runPrintSchedule` はフラグを受け取らないため、フラグエラー（`exitUsageError`(2)）は関与しない — それは `parsePrintScheduleFlags`/`main()` 側で `runPrintSchedule` 呼び出し前に判定・返却する（下記ステップ）。
-- [ ] `cmd/main.go`: `main()` 関数に `len(os.Args) > 1 && os.Args[1] == "print-schedule"` の分岐を追加する（`len(os.Args) > 1` のチェックが無いと、引数なし起動時に `os.Args[1]` の添字アクセスが index out of range で panic する）。`print-schedule` の場合、`parsePrintScheduleFlags(os.Args[2:])` を呼び出し、エラー時は `exitUsageError`(2) を返す。成功時は `runPrintSchedule(configPath, os.Stdout, os.Stderr)` の経路を通る。それ以外は既存の `parseFlags` → `run` 経路をそのまま通る。
-- [ ] `cmd/main_test.go`: `TestValidateSchedule_*` テストを追加する。正常な cron 式・改行混入・不正な値域・フィールド数不足・空文字列の各ケースを検証する（AC-02, AC-04）。
-- [ ] `cmd/main_test.go`: `TestParsePrintScheduleFlags_*` テストを追加する。`--config` 正常・`-c` 正常・`--config` 不足・不明フラグ・余分な位置引数の各ケースを検証する（AC-01 間接的）。
-- [ ] `cmd/main_test.go`: `TestRunPrintSchedule_*` テストを追加する。TOML 正常（`validConfigPath` 再利用）・TOML ファイル不在・TOML パース失敗・`schedule` フィールド不足・`schedule` 値が cron 式として不正の各ケースを検証する（AC-01, AC-03, AC-04）。`config.Load()` のエラーラップ（`ErrFileNotFound`・`ErrParseFailed`・`ErrMissingField`・`ErrInvalidValue`）が標準エラー出力に書き出されることを確認する。
+- [x] `cmd/main.go`: `ScheduleValidationError` 型を追加する（[02_architecture.md 3.2.1 節](./02_architecture.md#321-print-schedule-サブコマンドac-01〜04) の定義に従う）。
+- [x] `cmd/main.go`: `validateSchedule(s string) error` 関数を実装する。cron 5 フィールドの構文検証（改行の不在確認・5 フィールドのパース・各フィールドの値域チェック）を標準ライブラリのみで行う。外部ライブラリに依存しない。
+- [x] `cmd/main.go`: `parsePrintScheduleFlags(args []string) (configPath string, err error)` 関数を実装する。`--config`（または `-c`）フラグのみを受け付け、不足時・不明な位置引数存在時にエラーを返す。`flag.FlagSet` を使用し、`parseFlags` と同じエラー報告パターンに従う。
+- [x] `cmd/main.go`: `runPrintSchedule(configPath string, stdout, stderr io.Writer) int` 関数を実装する。`config.Load(configPath)` を呼び出し、成功時に `validateSchedule(cfg.Schedule)` で cron 式を検証し、標準出力に書き出す。エラー時は標準エラー出力にエラーメッセージを書き、`exitSetupOrRunFail`(1) を返す。`runPrintSchedule` はフラグを受け取らないため、フラグエラー（`exitUsageError`(2)）は関与しない — それは `parsePrintScheduleFlags`/`main()` 側で `runPrintSchedule` 呼び出し前に判定・返却する（下記ステップ）。
+- [x] `cmd/main.go`: `main()` 関数に `len(os.Args) > 1 && os.Args[1] == "print-schedule"` の分岐を追加する（`len(os.Args) > 1` のチェックが無いと、引数なし起動時に `os.Args[1]` の添字アクセスが index out of range で panic する）。`print-schedule` の場合、`parsePrintScheduleFlags(os.Args[2:])` を呼び出し、エラー時は `exitUsageError`(2) を返す。成功時は `runPrintSchedule(configPath, os.Stdout, os.Stderr)` の経路を通る。それ以外は既存の `parseFlags` → `run` 経路をそのまま通る。
+- [x] `cmd/main_test.go`: `TestValidateSchedule_*` テストを追加する。正常な cron 式・改行混入・不正な値域・フィールド数不足・空文字列の各ケースを検証する（AC-02, AC-04）。
+- [x] `cmd/main_test.go`: `TestParsePrintScheduleFlags_*` テストを追加する。`--config` 正常・`-c` 正常・`--config` 不足・不明フラグ・余分な位置引数の各ケースを検証する（AC-01 間接的）。
+- [x] `cmd/main_test.go`: `TestRunPrintSchedule_*` テストを追加する。TOML 正常（`validConfigPath` 再利用）・TOML ファイル不在・TOML パース失敗・`schedule` フィールド不足・`schedule` 値が cron 式として不正の各ケースを検証する（AC-01, AC-03, AC-04）。`config.Load()` のエラーラップ（`ErrFileNotFound`・`ErrParseFailed`・`ErrMissingField`・`ErrInvalidValue`）が標準エラー出力に書き出されることを確認する。
 
 **完了基準**: `make test`・`make lint` が緑。`print-schedule` の全テストケースがパスする。
 
@@ -91,7 +91,7 @@
 
 **レビュー観点**: `validateSchedule` が改行文字を正しく拒否し（AC-02）、cron 5 フィールドの値域を検証していること（AC-04） / `parsePrintScheduleFlags` が `--config` のみを受け付け、`parseFlags` と一貫したエラー報告パターンを持つこと / `runPrintSchedule` が `config.Load()` を再利用し、TOML パースの二重実装がないこと（AC-03） / `main()` の分岐が既存の `parseFlags` → `run` 経路に影響を与えないこと / テストが正常系・異常系・境界値をカバーしていること
 
-- [ ] グリーンゲート（`make test && make lint`）がパスしていることを確認した
+- [x] グリーンゲート（`make test && make lint`）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 
