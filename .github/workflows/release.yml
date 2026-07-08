@@ -10,6 +10,17 @@ on:
         description: 'Git tag to release (e.g. v1.2.3)'
         required: true
         type: string
+      bootstrap_first_release:
+        description: >-
+          Skip the existing-tag check. Only for the very first release, when
+          the ghcr.io/isseis/bsky-cleaner package does not exist yet and
+          `docker manifest inspect` cannot distinguish "no such package" from
+          "denied"/network errors, so the check fails closed. Do not use this
+          for any release after the first — it bypasses the safeguard against
+          overwriting an existing tag.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -67,12 +78,18 @@ jobs:
 
       - name: Check existing vX.Y.Z tag
         id: check-tag
+        if: ${{ github.event.inputs.bootstrap_first_release != 'true' }}
         env:
           TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
           EXIT_CODE=0
           OUTPUT=$(docker manifest inspect "ghcr.io/isseis/bsky-cleaner:${TAG}" 2>&1) || EXIT_CODE=$?
           printf '%s\n' "$OUTPUT" | bash scripts/check-existing-tag.sh "$EXIT_CODE"
+
+      - name: Warn about skipped existing-tag check
+        if: ${{ github.event.inputs.bootstrap_first_release == 'true' }}
+        run: |
+          echo "::warning::Existing-tag check was skipped via bootstrap_first_release. This must only be used for the very first release."
 
       - name: Build image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
