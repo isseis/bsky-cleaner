@@ -71,25 +71,6 @@
 
 ## 2. 実装ステップ
 
-### PR-1 作成ポイント
-- **対象ステップ**: フェーズ1〜3（バイナリビルド・チェックサム・GitHub Release 作成ジョブ）
-
-**推奨タイトル**: feat(0011): add binary build, checksum, and GitHub Release publishing to release workflow
-
-**レビュー観点**:
-- 新規ステップが "Build image" と "Tag and push latest" の間に挿入されており、既存の Docker ビルド・push ステップの内容・順序が変更されていないか（NF-002）
-- `go build` の `-ldflags` が `steps.resolve-tag.outputs.resolved_tag`／`steps.short-sha.outputs.sha` を、Docker イメージビルドの `build-args` と同じ値として参照しているか（AC-02 の構造的保証）
-- `release` ジョブの `permissions` が変更されていないか。`publish-release` ジョブの `permissions` が `contents: write` のみであるか（NF-003）
-- `publish-release` ジョブが `needs: release` を持ち、`release` ジョブ失敗時に実行されないか
-- `gh release create` に `--generate-notes`・`--verify-tag`・`workflow_dispatch` 時のみの `--draft` が正しく組み込まれているか
-
-PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/release.yml` を実行し、YAML構文・式構文のエラーがないことを確認した（`make lint`/`make test` は Go ソースのみを対象とし `.github/workflows/*.yml` の構文は検証しないため、マージ前にワークフロー自体の構文エラーを検出する唯一の手段）
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた
-
 ### フェーズ1: バイナリビルドとアーカイブ生成（AC-01〜02, `release` ジョブ）
 
 **対象ファイル**: `.github/workflows/release.yml`
@@ -203,17 +184,20 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 フェーズ1→フェーズ2→フェーズ3の順に依存する: フェーズ2の "Upload release artifacts" はフェーズ1が生成するアーカイブを対象とし、フェーズ3の `publish-release` ジョブはフェーズ2でアップロードされた成果物と `release` ジョブの `outputs.resolved_tag` を前提とする。フェーズ4はフェーズ1〜3が実装された `release.yml` に対する実機検証であるため、PR-1 のマージ後に着手する。
 
-### PR-2 作成ポイント
-- **対象ステップ**: フェーズ4（検証とドキュメント整備）
+### PR-1 作成ポイント
+- **対象ステップ**: フェーズ1〜3（バイナリビルド・チェックサム・GitHub Release 作成ジョブ）
 
-**推奨タイトル**: docs(0011): verify release workflow and document GitHub Release publishing
+**推奨タイトル**: feat(0011): add binary build, checksum, and GitHub Release publishing to release workflow
 
 **レビュー観点**:
-- 実タグ push による本番実行（比較対象タグがない初回リリース相当）で、`gh release create --generate-notes` がエラーにならないことを実機で確認できているか（AC-09 の未検証リスクの解消）
-- `gh release create` を同一タグに対して2回連続実行し、2回目が非0終了して Release を上書きしないことを直接確認できているか（AC-07）
-- `docs/design/docker_deployment.md` の追記が実際のワークフロー挙動と一致しているか
+- 新規ステップが "Build image" と "Tag and push latest" の間に挿入されており、既存の Docker ビルド・push ステップの内容・順序が変更されていないか（NF-002）
+- `go build` の `-ldflags` が `steps.resolve-tag.outputs.resolved_tag`／`steps.short-sha.outputs.sha` を、Docker イメージビルドの `build-args` と同じ値として参照しているか（AC-02 の構造的保証）
+- `release` ジョブの `permissions` が変更されていないか。`publish-release` ジョブの `permissions` が `contents: write` のみであるか（NF-003）
+- `publish-release` ジョブが `needs: release` を持ち、`release` ジョブ失敗時に実行されないか
+- `gh release create` に `--generate-notes`・`--verify-tag`・`workflow_dispatch` 時のみの `--draft` が正しく組み込まれているか
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/release.yml` を実行し、YAML構文・式構文のエラーがないことを確認した（`make lint`/`make test` は Go ソースのみを対象とし `.github/workflows/*.yml` の構文は検証しないため、マージ前にワークフロー自体の構文エラーを検出する唯一の手段）
 - [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [ ] PR を作成した
 - [ ] PR がマージされた
@@ -245,6 +229,21 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [ ] `docs/design/docker_deployment.md` の「動作確認用の手動実行」節に、`workflow_dispatch` 契機の実行では Release が `--draft` 付きで作成されること、確認後は `gh release delete` で削除するか `gh release edit --draft=false` で明示的に公開する必要があることを追記する。
 
 **完了基準**: 実タグ push による実機検証（AC-02, AC-04, AC-08〜09）と `gh release create` の直接実行による重複防止確認（AC-07）が完了し、検証専用の Release・GHCR タグ・git タグがすべて削除済みである。`docs/design/docker_deployment.md` の追記が完了している。
+
+### PR-2 作成ポイント
+- **対象ステップ**: フェーズ4（検証とドキュメント整備）
+
+**推奨タイトル**: docs(0011): verify release workflow and document GitHub Release publishing
+
+**レビュー観点**:
+- 実タグ push による本番実行（比較対象タグがない初回リリース相当）で、`gh release create --generate-notes` がエラーにならないことを実機で確認できているか（AC-09 の未検証リスクの解消）
+- `gh release create` を同一タグに対して2回連続実行し、2回目が非0終了して Release を上書きしないことを直接確認できているか（AC-07）
+- `docs/design/docker_deployment.md` の追記が実際のワークフロー挙動と一致しているか
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
 
 ## 4. テスト戦略
 
