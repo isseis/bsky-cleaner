@@ -10,14 +10,7 @@
 # and monitoring that is left to the operator (out of scope for this task).
 services:
   bsky-cleaner:
-    # Version: bump this tag when upgrading, then run `docker compose
-    # pull` to fetch the new image. Compose does not switch versions on
-    # its own.
-    # For a stricter pin, use a digest instead of a tag, e.g.
-    # image: ghcr.io/isseis/bsky-cleaner@sha256:<digest>
-    # `latest` tracks the newest patch release; use it only to try the
-    # latest build, not as the default for normal operation.
-    image: ghcr.io/isseis/bsky-cleaner:v1.0.0
+    build: .
     restart: unless-stopped
     environment:
       BSKY_HANDLE: ${BSKY_HANDLE}
