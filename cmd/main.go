@@ -291,7 +291,7 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 			fs.Usage()
 			return "", false, flag.ErrHelp
 		}
-		if arg == "-v" || arg == "--version" {
+		if arg == "-v" || arg == "-version" || arg == "--version" {
 			return "", false, errVersionRequested
 		}
 		if arg == "--" {
