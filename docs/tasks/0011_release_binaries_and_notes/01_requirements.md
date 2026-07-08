@@ -15,10 +15,11 @@
 ### 1.1 背景
 
 [0010_docker_image_release](../0010_docker_image_release/01_requirements.md) により、`v*` 形式の
-git tag を push すると GitHub Actions が Docker イメージをビルドし GHCR に公開できるようになった。
-しかし現状、`v*` タグを push しても GitHub 上の Releases ページ
+git tag を push すると GitHub Actions が Docker イメージをビルドし GHCR（GitHub Container Registry）
+に公開できるようになった。
+しかし現状、`v*` タグを push しても、GitHub 上の Releases ページ
 （`https://github.com/isseis/bsky-cleaner/releases/tag/vX.Y.Z`）には GitHub が
-tag に対して自動生成するソースコードアーカイブ（zip/tar.gz）が表示されるのみで、
+tag に対して自動生成するソースコードアーカイブ（zip/tar.gz）が表示されるだけである。
 実体を持つ GitHub Release（`gh release` で操作できるオブジェクト）は作成されていない。
 そのため、ビルド済み CLI バイナリの配布先が GHCR の Docker イメージに限られており、
 Docker を使わずホスト上で直接 `bsky-cleaner` バイナリを実行したい利用者への配布手段がない。
@@ -104,8 +105,8 @@ Docker を使わずホスト上で直接 `bsky-cleaner` バイナリを実行し
 ### F-004: リリースノートの自動生成
 
 **Acceptance Criteria**:
-- **AC-08**: 作成された Release の本文に、前回の `vX.Y.Z` タグからのコミット/PR一覧を
-  元にした GitHub 標準フォーマットのリリースノートが含まれる
+- **AC-08**: 作成された Release の本文に、前回の `vX.Y.Z` タグからのコミットおよび PR の
+  一覧を元にした GitHub 標準フォーマットのリリースノートが含まれる
 - **AC-09**: 直前のタグが存在しない場合（初回リリース）でも、ワークフローはエラーにならず
   Release を作成する（GitHub 標準の自動生成は比較対象がない場合でも動作する）
 
@@ -122,9 +123,9 @@ Docker を使わずホスト上で直接 `bsky-cleaner` バイナリを実行し
 - **NF-002**: 本タスクの追加により、[0010](../0010_docker_image_release/01_requirements.md) の
   既存の受け入れ基準（Docker イメージの GHCR 公開・タグ保護等）の挙動を変更しない
 - **NF-003**: バイナリビルド・添付・Release 作成は既存の `release.yml` 内で完結し、
-  追加のシークレット登録を必要としない（`GITHUB_TOKEN` の既存権限で完結する。
-  Release 作成には `contents: write` 権限が必要なため、ワークフローの `permissions` を
-  `contents: read` から `contents: write` に変更する）
+  追加のシークレット登録を必要としない（`GITHUB_TOKEN` の既存の権限で完結する）。
+  ただし Release 作成には `contents: write` 権限が必要なため、ワークフローの `permissions` を
+  `contents: read` から `contents: write` に変更する
 
 ## 5. スコープ外の根拠
 
