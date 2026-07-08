@@ -74,6 +74,10 @@ jobs:
               - 'internal/**'
               - 'entrypoint.sh'
 
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.docker == 'true'
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image
         if: steps.filter.outputs.docker == 'true'
         uses: docker/build-push-action@v7
