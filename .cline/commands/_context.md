@@ -28,6 +28,8 @@
   - green-gate (combined): `make fmt && make test && make lint && make deadcode`
 
 - Domain-specific (bsky-cleaner):
+  - translation glossary: `docs/translation_glossary.md`
+  - translation language pair: Japanese (primary) ⇄ English *(reference only — mktrans.md determines direction from file extension)*
   - Invariants for generated values: (none — this project is a consumer of upstream APIs, so ID/name generation rules belong to those upstream APIs)
   - Invariants for `--dry-run`: no external write/delete/unfollow side effects; every external API call must be skipped or use a read-only equivalent (e.g. `app.bsky.feed.getPosts` instead of `com.atproto.repo.deleteRecord`)
   - Invariants for sessions:
