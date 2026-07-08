@@ -102,7 +102,7 @@
 - 既存の `TestParseFlags_*`／`TestRun_*` が非影響であること
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
@@ -111,7 +111,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **対象ファイル**: `cmd/main.go`, `cmd/main_test.go`, `Dockerfile`
 
-- [ ] `cmd/main.go`: パッケージレベルに以下を追加する（[02_architecture.md 3.2.4](./02_architecture.md#324-version-v-フラグcmdmaingoac-08〜09-ac-11〜11a)）。
+- [x] `cmd/main.go`: パッケージレベルに以下を追加する（[02_architecture.md 3.2.4](./02_architecture.md#324-version-v-フラグcmdmaingoac-08〜09-ac-11〜11a)）。
   ```go
   var version = "dev"
   var commit = ""
@@ -125,15 +125,15 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
       return version + " (" + commit + ")"
   }
   ```
-- [ ] `cmd/main.go`: `parseFlags` の早期走査ループ（`cmd/main.go:264-273`）に `--version`/`-v` の判定を追加し、該当時 `errVersionRequested` を返す（`-h`/`--help` と同じ「`fs.Usage()` を呼ばず即座に返す」形。バージョン出力は `out` ではなく `main()` が標準出力へ書くため）。
-- [ ] `cmd/main.go`: `parseFlags` 冒頭のローカル変数宣言群（`cmd/main.go:251` の `var help bool` の並び）に `var showVersion bool` を追加し、`fs.BoolVar` 登録群（`cmd/main.go:252-256`）に `fs.BoolVar(&showVersion, "version", false, "print version information and exit")` / `fs.BoolVar(&showVersion, "v", false, "print version information and exit (shorthand for --version)")` を追加する。
-- [ ] `cmd/main.go`: `fs.Parse(args)` 成功後、既存の `if help { fs.Usage(); return "", false, flag.ErrHelp }`（`cmd/main.go:279-282`）の直後に次のフォールバック分岐を追加する。`help` と同様、早期走査（1つ目の項目）が拾えないフラグ形式（例: `--version=true`）を救済するための2経路目であり、`--config` 必須チェック（`cmd/main.go:289-292`）より前に置く。
+- [x] `cmd/main.go`: `parseFlags` の早期走査ループ（`cmd/main.go:264-273`）に `--version`/`-v` の判定を追加し、該当時 `errVersionRequested` を返す（`-h`/`--help` と同じ「`fs.Usage()` を呼ばず即座に返す」形。バージョン出力は `out` ではなく `main()` が標準出力へ書くため）。
+- [x] `cmd/main.go`: `parseFlags` 冒頭のローカル変数宣言群（`cmd/main.go:251` の `var help bool` の並び）に `var showVersion bool` を追加し、`fs.BoolVar` 登録群（`cmd/main.go:252-256`）に `fs.BoolVar(&showVersion, "version", false, "print version information and exit")` / `fs.BoolVar(&showVersion, "v", false, "print version information and exit (shorthand for --version)")` を追加する。
+- [x] `cmd/main.go`: `fs.Parse(args)` 成功後、既存の `if help { fs.Usage(); return "", false, flag.ErrHelp }`（`cmd/main.go:279-282`）の直後に次のフォールバック分岐を追加する。`help` と同様、早期走査（1つ目の項目）が拾えないフラグ形式（例: `--version=true`）を救済するための2経路目であり、`--config` 必須チェック（`cmd/main.go:289-292`）より前に置く。
   ```go
   if showVersion {
       return "", false, errVersionRequested
   }
   ```
-- [ ] `cmd/main.go`: `main()`（`cmd/main.go:429-439`）に、既存の `errors.Is(err, flag.ErrHelp)` 判定の直後（またはその前）に次を追加する。既存の他の標準出力/標準エラー出力と同じ `_, _ = fmt.Fprintln(...)` + `//nolint:gosec` パターンに合わせる（`cmd/main.go:307, 319, 325, 331, 340, 403, 408, 412, 423, 437` の既存パターンと同一書式。bare な `fmt.Println` は使わない（errcheck/gosec で `make lint` が失敗するため）。
+- [x] `cmd/main.go`: `main()`（`cmd/main.go:429-439`）に、既存の `errors.Is(err, flag.ErrHelp)` 判定の直後（またはその前）に次を追加する。既存の他の標準出力/標準エラー出力と同じ `_, _ = fmt.Fprintln(...)` + `//nolint:gosec` パターンに合わせる（`cmd/main.go:307, 319, 325, 331, 340, 403, 408, 412, 423, 437` の既存パターンと同一書式。bare な `fmt.Println` は使わない（errcheck/gosec で `make lint` が失敗するため）。
   ```go
   if errors.Is(err, errVersionRequested) {
       _, _ = fmt.Fprintln(os.Stdout, formatVersion()) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
@@ -141,7 +141,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
   }
   ```
   この分岐は `configPath, apply, err := parseFlags(...)` の直後、かつ `run(configPath, ...)` 呼び出しより前に位置するため、`config.LoadAppConfig`／`atproto.NewClient` には到達しない（AC-11）。
-- [ ] `Dockerfile`: ビルドステージ（`Dockerfile:5-13`）を次のように変更する。
+- [x] `Dockerfile`: ビルドステージ（`Dockerfile:5-13`）を次のように変更する。
 
   変更前:
   ```dockerfile
@@ -170,13 +170,13 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
   RUN go build -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT}" -o /out/bsky-cleaner ./cmd
   ```
   `--build-arg` 未指定のローカル `docker build .`／`make build`／`go build ./cmd` の挙動は変わらない（AC-09）。
-- [ ] `cmd/main_test.go`: `TestFormatVersion_WithCommit_ReturnsVersionAndCommit` を追加する。テスト内で `version`/`commit` を `"v1.2.3"`/`"a1b2c3d"` に設定し（`t.Cleanup` で元の値 `"dev"`/`""` に復元）、`formatVersion()` が `"v1.2.3 (a1b2c3d)"` を返すことを検証する（AC-08）。このテストと以下2件の `TestFormatVersion_*` は同一パッケージレベル変数を書き換えるため、`t.Parallel()` は付与しない。
-- [ ] `cmd/main_test.go`: `TestFormatVersion_NonDevVersionEmptyCommit_ReturnsVersionOnly` を追加する。`version` を `"v1.2.3"` に、`commit` を `""` に設定し（`t.Cleanup` で復元）、`formatVersion()` が `"v1.2.3"`（commit 部分の括弧なし）を返すことを検証する。`version` が非既定値であっても commit 空文字時に括弧が付与されないことを、既定値どうしのケースと切り分けて確認する（AC-08, AC-09）。
-- [ ] `cmd/main_test.go`: `TestFormatVersion_EmptyCommit_ReturnsVersionOnly` を追加する。`version`/`commit` を既定値 `"dev"`/`""` のまま呼び出し、`formatVersion()` が `"dev"` を返すことを検証する（AC-09。ローカルビルドの既定値がそのまま出力されることのスモークテスト）。
-- [ ] `cmd/main_test.go`: `TestParseFlags_VersionLongFlag_ReturnsErrVersionRequested` を追加する。`parseFlags([]string{"--version"}, &bytes.Buffer{})` が `errVersionRequested` を返すことを `require.ErrorIs` で検証する（AC-08 の早期走査経路）。
-- [ ] `cmd/main_test.go`: `TestParseFlags_VersionShortFlag_ReturnsErrVersionRequested` を追加する。`parseFlags([]string{"-v"}, &bytes.Buffer{})` が `errVersionRequested` を返すことを検証する。
-- [ ] `cmd/main_test.go`: `TestParseFlags_VersionEqualsTrueForm_ReturnsErrVersionRequested` を追加する。`parseFlags([]string{"--version=true"}, &bytes.Buffer{})` が `errVersionRequested` を返すことを検証する。早期走査ループでは検出できない（トークンが `--version` と完全一致しない）フラグ形式が `fs.Parse` 後の `if showVersion { ... }` フォールバック経路で正しく検出されることを確認する。
-- [ ] `cmd/main_test.go`: `TestParseFlags_VersionFlag_DoesNotRequireConfig` を追加する。`TestParseFlags_HelpFlag_DoesNotRequireConfig`（`cmd/main_test.go:138-142`）と同型で、`--config` を指定せずに `parseFlags([]string{"--version"}, &bytes.Buffer{})` を呼び、返る `err` が `errVersionRequested` であって「`--config` が必要」エラーでないことを検証する（AC-11a）。
+- [x] `cmd/main_test.go`: `TestFormatVersion_WithCommit_ReturnsVersionAndCommit` を追加する。テスト内で `version`/`commit` を `"v1.2.3"`/`"a1b2c3d"` に設定し（`t.Cleanup` で元の値 `"dev"`/`""` に復元）、`formatVersion()` が `"v1.2.3 (a1b2c3d)"` を返すことを検証する（AC-08）。このテストと以下2件の `TestFormatVersion_*` は同一パッケージレベル変数を書き換えるため、`t.Parallel()` は付与しない。
+- [x] `cmd/main_test.go`: `TestFormatVersion_NonDevVersionEmptyCommit_ReturnsVersionOnly` を追加する。`version` を `"v1.2.3"` に、`commit` を `""` に設定し（`t.Cleanup` で復元）、`formatVersion()` が `"v1.2.3"`（commit 部分の括弧なし）を返すことを検証する。`version` が非既定値であっても commit 空文字時に括弧が付与されないことを、既定値どうしのケースと切り分けて確認する（AC-08, AC-09）。
+- [x] `cmd/main_test.go`: `TestFormatVersion_EmptyCommit_ReturnsVersionOnly` を追加する。`version`/`commit` を既定値 `"dev"`/`""` のまま呼び出し、`formatVersion()` が `"dev"` を返すことを検証する（AC-09。ローカルビルドの既定値がそのまま出力されることのスモークテスト）。
+- [x] `cmd/main_test.go`: `TestParseFlags_VersionLongFlag_ReturnsErrVersionRequested` を追加する。`parseFlags([]string{"--version"}, &bytes.Buffer{})` が `errVersionRequested` を返すことを `require.ErrorIs` で検証する（AC-08 の早期走査経路）。
+- [x] `cmd/main_test.go`: `TestParseFlags_VersionShortFlag_ReturnsErrVersionRequested` を追加する。`parseFlags([]string{"-v"}, &bytes.Buffer{})` が `errVersionRequested` を返すことを検証する。
+- [x] `cmd/main_test.go`: `TestParseFlags_VersionEqualsTrueForm_ReturnsErrVersionRequested` を追加する。`parseFlags([]string{"--version=true"}, &bytes.Buffer{})` が `errVersionRequested` を返すことを検証する。早期走査ループでは検出できない（トークンが `--version` と完全一致しない）フラグ形式が `fs.Parse` 後の `if showVersion { ... }` フォールバック経路で正しく検出されることを確認する。
+- [x] `cmd/main_test.go`: `TestParseFlags_VersionFlag_DoesNotRequireConfig` を追加する。`TestParseFlags_HelpFlag_DoesNotRequireConfig`（`cmd/main_test.go:138-142`）と同型で、`--config` を指定せずに `parseFlags([]string{"--version"}, &bytes.Buffer{})` を呼び、返る `err` が `errVersionRequested` であって「`--config` が必要」エラーでないことを検証する（AC-11a）。
 
 **完了基準**: `make fmt && make test && make lint` が緑。上記7テストがすべてパスする。
 
@@ -355,7 +355,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 ## 6. 実装チェックリスト
 
-- [ ] フェーズ1完了（`--version`/`-v`、`formatVersion`、`Dockerfile` の `ARG`/`-ldflags`）
+- [x] フェーズ1完了（`--version`/`-v`、`formatVersion`、`Dockerfile` の `ARG`/`-ldflags`）
 - [ ] フェーズ2完了（`release.yml` 作成・`workflow_dispatch` 動作確認）
 - [ ] フェーズ3完了（実タグ初回リリース・可視性切り替え・`docker-compose.yml`・ドキュメント）
 - [ ] フェーズ4完了（`ci.yml` への `docker-build-check` ジョブ追加・red/skip 確認）
