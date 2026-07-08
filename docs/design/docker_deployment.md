@@ -30,6 +30,47 @@
 
 この方式により、設定は TOML に一元化されたまま、ユーザーは Docker イメージを起動するだけで良く、ホスト側の cron 設定は不要になる。
 
+## リリース公開手順（開発者向け）
+
+### 通常のリリース
+
+```sh
+# 1. タグを作成して push する
+git tag vX.Y.Z
+git push --tags
+```
+
+これにより、`.github/workflows/release.yml` が起動し、以下の処理が自動的に行われる。
+
+1. タグが semver 形式（`vX.Y.Z`）であることを検証する
+2. 同じ `vX.Y.Z` タグが GHCR に既に存在しないことを確認する
+3. Docker イメージをビルドし、`VERSION=vX.Y.Z` と短縮コミット SHA を埋め込む
+4. `latest`・`vX`・`vX.Y`・`vX.Y.Z` の4タグを GHCR に push する（`vX.Y.Z` は最後）
+
+### 動作確認用の手動実行
+
+`workflow_dispatch` を使用して、任意のタグ名を指定して同じワークフローを手動実行できる。
+
+1. GitHub リポジトリの Actions タブを開く
+2. 左側のメニューから「Release」ワークフローを選択する
+3. 「Run workflow」ボタンをクリックする
+4. 「Git tag to release」フィールドにタグ名（例: `v1.2.3`）を入力する
+5. 「Run workflow」をクリックする
+
+`workflow_dispatch` で指定したタグが実在しない git tag の場合、チェックアウトステップが失敗し、ワークフローは非0で終了する。
+
+## GHCR パッケージ可視性の切り替え手順
+
+GHCR に初めてイメージを公開した直後は、パッケージの可視性が **private** になっている。`GITHUB_TOKEN` の権限では可視性を変更できないため、以下の手順で一度だけ手動で public に切り替える必要がある。
+
+1. GitHub リポジトリのページを開く
+2. 右側のサイドバーにある「Packages」セクションから `bsky-cleaner` をクリックする
+3. パッケージのトップページで「Package settings」をクリックする
+4. 「Danger Zone」セクションまでスクロールする
+5. 「Change visibility」をクリックし、確認ダイアログで「public」を選択する
+
+この操作はパッケージ初回作成時に一度だけ必要であり、2回目以降のリリースでは不要である。
+
 ## 未確定・今後検討する事項
 
 - 内蔵 cron（`supercronic` 等の具体的な選定）とエントリポイントスクリプトの実装詳細

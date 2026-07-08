@@ -254,8 +254,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - `docker-compose.yml` の `image:` 変更は実タグリリース後にのみ `main` へマージするロールアウト順序の制約が守られているか
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
 
@@ -265,7 +265,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **順序に注意**（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14) のロールアウト順序の制約）: 以下のステップ6（`docker-compose.yml`）は、ステップ8（実タグでの初回リリースと可視性切り替え）の完了後にのみ `main` へマージする。ステップ7（ドキュメント追記）はステップ8を待つ必要はない。
 
-- [ ] `docker-compose.yml`: `services.bsky-cleaner.build: .`（`docker-compose.yml:11`）を削除し、直前に以下のコメントを追加したうえで `image: ghcr.io/isseis/bsky-cleaner:v1.0.0`（フェーズ3ステップ8で実際に公開する初回バージョンタグに置き換える）に置き換える（AC-12, AC-13）。
+- [ ] `docker-compose.yml`: `services.bsky-cleaner.build: .`（`docker-compose.yml:11`）を削除し、直前に以下のコメントを追加したうえで `image: ghcr.io/isseis/bsky-cleaner:v1.0.0`（フェーズ3ステップ8で実際に公開する初回バージョンタグに置き換える）に置き換える（AC-12, AC-13）。**未着手（ロールアウト順序制約により、実タグでの初回リリース・可視性切り替え（ステップ8）が完了するまで意図的に見送っている。PR-3 の最初のレビュー時点で誤って先行コミットされていたため、weakreview で検出し `build: .` に戻した）。**
 
   変更前:
   ```yaml
@@ -289,10 +289,10 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
       image: ghcr.io/isseis/bsky-cleaner:v1.0.0
       restart: unless-stopped
   ```
-- [ ] `docs/design/docker_deployment.md`: 「開発者向けリリース公開手順」節を追加する。`git tag vX.Y.Z && git push --tags` によるタグ push、および `workflow_dispatch` から対象タグ名を入力して動作確認する手順を記載する（フェーズ2で確定した入力名 `tag` を用いる）（AC-15）。
-- [ ] `docs/design/docker_deployment.md`: 「GHCR パッケージ可視性の切り替え手順」節を追加する。`GITHUB_TOKEN` の権限では変更できないため、パッケージ初回作成後に GitHub の Package 設定画面から手動で public に切り替える一度きりの手順を記載する（AC-17, AC-05 関連）。
-- [ ] `README.md`: 「Docker」節（新規）を追加する。`docker-compose.yml`・`.env`（`dot.env.example` からコピー）・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行する手順を記載する（AC-16）。
-- [ ] `README.md`: 既存の「Usage」節（`README.md:60-69` 付近）に `bsky-cleaner --version`（出力例 `v1.2.3 (a1b2c3d)`）の使用例を追加する（AC-16）。
+- [x] `docs/design/docker_deployment.md`: 「開発者向けリリース公開手順」節を追加する。`git tag vX.Y.Z && git push --tags` によるタグ push、および `workflow_dispatch` から対象タグ名を入力して動作確認する手順を記載する（フェーズ2で確定した入力名 `tag` を用いる）（AC-15）。
+- [x] `docs/design/docker_deployment.md`: 「GHCR パッケージ可視性の切り替え手順」節を追加する。`GITHUB_TOKEN` の権限では変更できないため、パッケージ初回作成後に GitHub の Package 設定画面から手動で public に切り替える一度きりの手順を記載する（AC-17, AC-05 関連）。
+- [x] `README.md`: 「Docker」節（新規）を追加する。`docker-compose.yml`・`.env`（`dot.env.example` からコピー）・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行する手順を記載する（AC-16）。
+- [x] `README.md`: 既存の「Usage」節（`README.md:60-69` 付近）に `bsky-cleaner --version`（出力例 `v1.2.3 (a1b2c3d)`）の使用例を追加する（AC-16）。
 - [ ] 実タグでの初回リリースを実施する: `git tag v1.0.0 && git push --tags` を実行し、フェーズ2の `release.yml` が正常終了して4タグが GHCR に公開されることを確認する。GitHub の Package 設定画面から可視性を public に切り替える（AC-05, AC-17 の実施）。
 - [ ] 上記完了後、`docker-compose.yml` の変更（本フェーズ最初のステップ）を `main` にマージする。
 
@@ -302,12 +302,12 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **対象ファイル**: `.github/workflows/ci.yml`
 
-- [ ] `docker-build-check` ジョブを既存の `test`/`lint` ジョブと並行に追加する。既存ジョブの定義・`on:` トリガー条件は変更しない（AC-20, NF-002）。
-- [ ] ジョブの先頭で `dorny/paths-filter@v4` を用いてパス変更を判定するステップを追加する。フィルタ対象は `Dockerfile`・`go.mod`・`go.sum`・`cmd/**`・`internal/**`・`entrypoint.sh` とする（AC-21）。
-- [ ] ジョブ本体を `if: steps.<filter-id>.outputs.docker == 'true'` で条件付けする（AC-21）。
-- [ ] `docker/build-push-action@v7`（タグ参照。`packages: write` を持たないジョブのため SHA 固定は不要）を `push: false` で実行し、`docker build .` 相当のビルドを行う。`--build-arg` は指定しない（AC-18, AC-19）。
-- [ ] `cache-from: type=gha` / `cache-to: type=gha` を設定する（AC-22）。
-- [ ] ジョブに `timeout-minutes: 10` を設定する（NF-005）。
+- [x] `docker-build-check` ジョブを既存の `test`/`lint` ジョブと並行に追加する。既存ジョブの定義・`on:` トリガー条件は変更しない（AC-20, NF-002）。
+- [x] ジョブの先頭で `dorny/paths-filter@v4` を用いてパス変更を判定するステップを追加する。フィルタ対象は `Dockerfile`・`go.mod`・`go.sum`・`cmd/**`・`internal/**`・`entrypoint.sh` とする（AC-21）。
+- [x] ジョブ本体を `if: steps.<filter-id>.outputs.docker == 'true'` で条件付けする（AC-21）。
+- [x] `docker/build-push-action@v7`（タグ参照。`packages: write` を持たないジョブのため SHA 固定は不要）を `push: false` で実行し、`docker build .` 相当のビルドを行う。`--build-arg` は指定しない（AC-18, AC-19）。
+- [x] `cache-from: type=gha` / `cache-to: type=gha` を設定する（AC-22）。
+- [x] ジョブに `timeout-minutes: 10` を設定する（NF-005）。
 
 **完了基準**: `make fmt && make test && make lint` が緑。`Dockerfile` を意図的に壊した状態の PR でこのジョブが red になり、ドキュメントのみの変更 PR ではジョブがスキップされることを手動確認する。
 

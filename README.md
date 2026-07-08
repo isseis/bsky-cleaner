@@ -65,6 +65,10 @@ bsky-cleaner --config config.toml
 # Apply: actually delete the posts
 bsky-cleaner --config config.toml --apply
 
+# Print version information
+bsky-cleaner --version
+# Example output: v1.2.3 (a1b2c3d)
+
 # Print the cron schedule (for Docker/cron deployments)
 bsky-cleaner print-schedule --config config.toml
 ```
@@ -85,6 +89,48 @@ To run periodically, register the binary in your system crontab (without the `sc
 ```cron
 0 3 * * * BSKY_HANDLE=alice.bsky.social BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
+
+## Docker
+
+A pre-built Docker image is available on [GHCR](https://ghcr.io/isseis/bsky-cleaner).
+
+### Prerequisites
+
+- Docker Compose (v2 or later)
+- A `.env` file (copy from `dot.env.example` and fill in real values)
+- A TOML configuration file (e.g. `config/config.toml`)
+
+### Quick start
+
+```sh
+# 1. Prepare the environment file
+cp dot.env.example .env
+# Edit .env with your Bluesky handle and app password
+
+# 2. Create a config directory with your TOML file
+mkdir -p config
+# Create config/config.toml (see Configuration section above)
+
+# 3. Check the version tag in docker-compose.yml and update if needed
+#    (the default points to the latest stable release)
+
+# 4. Pull the image and start the container
+docker compose pull
+docker compose up -d
+```
+
+The container runs on the schedule defined in your TOML file's `schedule` field. To verify it is running:
+
+```sh
+docker compose ps
+docker compose logs
+```
+
+### Upgrading
+
+1. Edit `docker-compose.yml` and bump the version tag in the `image:` line
+2. Run `docker compose pull` to fetch the new image
+3. Run `docker compose up -d` to restart with the new image
 
 ## Directory structure
 
