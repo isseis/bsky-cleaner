@@ -198,19 +198,29 @@ func TestRun_SecretNonLeak_AuthFailure(t *testing.T) {
 // Network error — the HTTPDoer returns a connection-level error.
 // This path fails during DID resolution, before createSession produces any
 // AccessJWT, but the validation should still catch app password / webhook
-// URL leaks in the stderr output.
+// URL leaks in the stderr output. A network error is retryable, so without
+// bounding the run internal/retry's real backoff (1+2+4+8+16s, see
+// defaultRetryPolicy) would make this test take ~31s. execution_timeout_seconds
+// is set to 1 (the minimum config.LoadAppConfig accepts) so the ctx deadline
+// cuts the first backoff sleep short via retry.RealClock.Sleep's ctx check,
+// the same technique TestRun_SecretNonLeak_ExecutionTimeout uses.
 func TestRun_SecretNonLeak_NetworkError(t *testing.T) {
 	setupSecretLeakEnv(t)
-	configPath := validConfigPath(t)
+	path := t.TempDir() + "/config.toml"
+	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 1\nslack_allowed_host = \"hooks.slack.com\"\n"
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 
 	mock := &atprototestutil.MockHTTPDoer{Handler: func(_ *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("simulated network error")
 	}}
 
 	var stdout, stderr bytes.Buffer
-	code := run(configPath, false, time.Now(), mock, &stdout, &stderr)
+	start := time.Now()
+	code := run(path, false, time.Now(), mock, &stdout, &stderr)
+	elapsed := time.Since(start)
 
 	assert.Equal(t, exitSetupOrRunFail, code)
+	assert.Less(t, elapsed, 2*time.Second)
 	assertNoSecrets(t, stdout.String(), stderr.String())
 }
 
