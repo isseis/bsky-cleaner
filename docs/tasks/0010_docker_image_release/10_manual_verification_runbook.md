@@ -149,9 +149,9 @@ gh api /users/isseis/packages/container/bsky-cleaner/versions --paginate --jq '.
 ```bash
 git tag -d v0.0.1
 git push origin :refs/tags/v0.0.1   # リモートのタグを削除
+git checkout main
 git branch -D test/release-dry-run
 git push origin --delete test/release-dry-run
-git checkout main
 ```
 
 ## 実行上の注意
