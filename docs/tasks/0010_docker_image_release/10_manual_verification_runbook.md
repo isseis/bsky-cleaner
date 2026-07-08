@@ -36,8 +36,8 @@ git checkout -b test/release-dry-run
           TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
           MAJOR=$(echo "$TAG" | sed 's/^v\([0-9]*\)\..*$/v\1/')
-          docker tag bsky-cleaner:release "ghcr.io/isseis/bsky-cleaner-nonexistent-test-path:${MAJOR}"
-          docker push "ghcr.io/isseis/bsky-cleaner-nonexistent-test-path:${MAJOR}"
+          docker tag bsky-cleaner:release "ghcr.io/nonexistent-owner/bsky-cleaner:${MAJOR}"
+          docker push "ghcr.io/nonexistent-owner/bsky-cleaner:${MAJOR}"
 ```
 
 コミット・push する。
@@ -73,7 +73,7 @@ gh run watch <RUN_ID>          # 上のコマンドで確認した run ID を指
 GHCR側の確認（`v0.0.1` がまだ無いこと）:
 
 ```bash
-gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags' | grep -F 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
+tags=$(gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags') && echo "$tags" | grep -F 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
 ```
 
 ### 1-4. 壊した箇所を修正し、同じタグ名で再実行する（NF-004の検証）
