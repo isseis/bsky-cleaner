@@ -74,8 +74,8 @@ gh run watch <RUN_ID>          # 上のコマンドで確認した run ID を指
 GHCR側の確認（`v0.0.1` がまだ無いこと）:
 
 ```bash
-tags=$(gh api /users/isseis/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags') || { echo "ERROR: gh api failed (check auth/permissions)"; exit 1; }
-echo "$tags" | grep -qF 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
+tags=$(gh api /users/isseis/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags[]') || { echo "ERROR: gh api failed (check auth/permissions)"; exit 1; }
+echo "$tags" | grep -qx 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
 ```
 
 ### 1-4. 壊した箇所を修正し、同じタグ名で再実行する（NF-004の検証）
