@@ -11,7 +11,7 @@
 ## 事前準備
 
 ```bash
-cd /Users/issei/git/bsky-cleaner
+cd <REPO_DIR>  # e.g., /Users/issei/git/bsky-cleaner
 git status                     # 作業ツリーがクリーンであることを確認
 git fetch origin --tags        # v0.0.1 がまだリポジトリに存在しないことを再確認
 git tag -l 'v0.0.1'            # 何も出力されなければOK
@@ -28,7 +28,7 @@ gh auth status                 # gh CLI がログイン済みであることを�
 git checkout -b test/release-dry-run
 ```
 
-`.github/workflows/release.yml` の「Tag and push major version tag」ステップを一時的に壊す（存在しない/権限のないリポジトリパスへの push にする）。98–99行目を以下のように変更する。
+`.github/workflows/release.yml` の「Tag and push major version tag」ステップを一時的に壊す（存在しない/権限のないリポジトリパスへの push にする）。当該ステップ内の docker tag/push 行を以下のように変更する。
 
 ```yaml
       - name: Tag and push major version tag
@@ -73,7 +73,7 @@ gh run watch <RUN_ID>          # 上のコマンドで確認した run ID を指
 GHCR側の確認（`v0.0.1` がまだ無いこと）:
 
 ```bash
-gh api /user/packages/container/bsky-cleaner/versions --jq '.[].metadata.container.tags' 2>/dev/null | grep -F 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
+gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags' | grep -F 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
 ```
 
 ### 1-4. 壊した箇所を修正し、同じタグ名で再実行する（NF-004の検証）
@@ -103,7 +103,7 @@ gh run watch <新しいRUN_ID>
 ## フェーズ2: 正常系の最終確認（4タグがGHCRに公開されていること）
 
 ```bash
-gh api /user/packages/container/bsky-cleaner/versions --jq '.[] | {id: .id, tags: .metadata.container.tags}'
+gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[] | {id: .id, tags: .metadata.container.tags}'
 ```
 
 `latest` / `v0` / `v0.0` / `v0.0.1` の4タグがいずれかのversionに紐づいていることを確認する。
@@ -134,7 +134,7 @@ gh run list --workflow=release.yml --limit 3
 CLIで確認しながら行いたい場合の参考コマンド（削除自体はUIで行う前提のため、ここではID確認のみ）:
 
 ```bash
-gh api /user/packages/container/bsky-cleaner/versions --jq '.[] | select(.metadata.container.tags | index("v0.0.1")) | {id, tags: .metadata.container.tags}'
+gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[] | select(.metadata.container.tags | index("v0.0.1")) | {id, tags: .metadata.container.tags}'
 ```
 
 ⚠️ `latest` タグは他の正規リリースにも付いている場合があるため、削除対象を誤らないよう、必ずタグ一覧を確認してから実行すること。
