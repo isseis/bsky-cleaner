@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-08 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-08 |
+| Reviewer | isseis |
 | Comments | - |
 
 関連ドキュメント: [要件定義書](01_requirements.md)、[0010 アーキテクチャ設計書](../0010_docker_image_release/02_architecture.md)
