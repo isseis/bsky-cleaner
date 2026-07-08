@@ -104,8 +104,8 @@
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた
 
 ### フェーズ1: バージョン埋め込みと `--version`（AC-08〜09, AC-10 の一部, AC-11〜11a）
 
@@ -196,8 +196,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - `timeout-minutes: 15` が設定されているか
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
 
@@ -205,30 +205,30 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **対象ファイル**: `.github/workflows/release.yml`（新規）, `scripts/check-existing-tag.sh`（新規）, `scripts/check_existing_tag_test.go`（新規）
 
-- [ ] `on:` トリガーを設定する（[02_architecture.md 3.2.1](./02_architecture.md#321-releaseyml-のトリガーとタグ検証ac-01〜02-ac-06〜07)）: `push.tags: ['v*']` と、タグ名を1つ受け取る `workflow_dispatch.inputs.tag`（`required: true`, `type: string`）（AC-01）。
-- [ ] 権限を `permissions: { contents: read, packages: write }` のみに限定する（AC-06）。
-- [ ] ジョブレベルに `timeout-minutes: 15` を設定する（[02_architecture.md 3.2.1](./02_architecture.md#321-releaseyml-のトリガーとタグ検証ac-01〜02-ac-06〜07)、AC-07 に付随する運用要件）。
-- [ ] タグ名解決ステップを追加する: `push` 契機では `github.ref_name`、`workflow_dispatch` 契機では `inputs.tag` を、以降のステップが共通で参照する1つの outputs 変数（例: `resolved_tag`）にまとめる。
-- [ ] `concurrency: { group: release-${{ <resolved_tag> }}, cancel-in-progress: false }` を設定する（AC-03a, NF-004）。
-- [ ] "Validate tag format" ステップを追加する: 解決済みタグが正規表現 `^v[0-9]+\.[0-9]+\.[0-9]+$` に一致しない場合、非0で終了する（AC-02）。
-- [ ] `actions/checkout@v5` で解決済みタグの ref をチェックアウトする（存在しない `workflow_dispatch` 入力タグはここで失敗し、fail-closed として機能する）。
-- [ ] "Resolve short commit SHA" ステップを追加する: `git rev-parse --short HEAD` の結果を outputs に保存する（`github.sha` コンテキストは使わない。理由は 1.2 節参照）。
-- [ ] `docker/setup-buildx-action@v4` で Buildx を有効化する。
-- [ ] `docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0`（`v4.4.0`）で GHCR にログインする。`username: ${{ github.actor }}`, `password: ${{ secrets.GITHUB_TOKEN }}`, `registry: ghcr.io`（AC-06）。
-- [ ] `scripts/check-existing-tag.sh` を新規作成する: AC-03a の fail-closed 判定ロジックを、ワークフロー YAML のインライン shell から切り出した単体の bash スクリプトとして実装する（GitHub Actions のスクリプト化ロジックが複数条件分岐を持つ場合は独立スクリプト化しテストする方針に従う）。
+- [x] `on:` トリガーを設定する（[02_architecture.md 3.2.1](./02_architecture.md#321-releaseyml-のトリガーとタグ検証ac-01〜02-ac-06〜07)）: `push.tags: ['v*']` と、タグ名を1つ受け取る `workflow_dispatch.inputs.tag`（`required: true`, `type: string`）（AC-01）。
+- [x] 権限を `permissions: { contents: read, packages: write }` のみに限定する（AC-06）。
+- [x] ジョブレベルに `timeout-minutes: 15` を設定する（[02_architecture.md 3.2.1](./02_architecture.md#321-releaseyml-のトリガーとタグ検証ac-01〜02-ac-06〜07)、AC-07 に付随する運用要件）。
+- [x] タグ名解決ステップを追加する: `push` 契機では `github.ref_name`、`workflow_dispatch` 契機では `inputs.tag` を、以降のステップが共通で参照する1つの outputs 変数（例: `resolved_tag`）にまとめる。
+- [x] `concurrency: { group: release-${{ <resolved_tag> }}, cancel-in-progress: false }` を設定する（AC-03a, NF-004）。
+- [x] "Validate tag format" ステップを追加する: 解決済みタグが正規表現 `^v[0-9]+\.[0-9]+\.[0-9]+$` に一致しない場合、非0で終了する（AC-02）。
+- [x] `actions/checkout@v5` で解決済みタグの ref をチェックアウトする（存在しない `workflow_dispatch` 入力タグはここで失敗し、fail-closed として機能する）。
+- [x] "Resolve short commit SHA" ステップを追加する: `git rev-parse --short HEAD` の結果を outputs に保存する（`github.sha` コンテキストは使わない。理由は 1.2 節参照）。
+- [x] `docker/setup-buildx-action@v4` で Buildx を有効化する。
+- [x] `docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0`（`v4.4.0`）で GHCR にログインする。`username: ${{ github.actor }}`, `password: ${{ secrets.GITHUB_TOKEN }}`, `registry: ghcr.io`（AC-06）。
+- [x] `scripts/check-existing-tag.sh` を新規作成する: AC-03a の fail-closed 判定ロジックを、ワークフロー YAML のインライン shell から切り出した単体の bash スクリプトとして実装する（GitHub Actions のスクリプト化ロジックが複数条件分岐を持つ場合は独立スクリプト化しテストする方針に従う）。
   - 呼び出し規約: 第1引数に直前の `docker manifest inspect` の終了コード、標準入力にその標準エラー出力を受け取る。
   - 判定: 終了コード `0`（マニフェスト取得成功 = 既存）→ 終了コード `1` で終了（fail-closed、AC-03a）。終了コード非0かつ標準入力に GHCR の「不在」を示すエラー文字列（`docker manifest inspect` が出力する `manifest unknown` 相当。実装時に実際の出力文字列を一度取得し、定数として反映する）が含まれる → 終了コード `0`（「不在が確認できた」ため処理継続）。それ以外（一時的なレジストリ障害・レート制限・認証エラー等、不在と確認できない失敗）→ 終了コード `1`（fail-closed、[02_architecture.md 3.2.2](./02_architecture.md#322-既存タグ確認とタグ-push-の順序制御ac-03-ac-03a-ac-03b-nf-004)）。
-- [ ] `scripts/check_existing_tag_test.go` を新規作成する: `os/exec` で `scripts/check-existing-tag.sh` を起動し、標準入力・第1引数を差し替えて以下3ケースを検証する（AC-03a）。
+- [x] `scripts/check_existing_tag_test.go` を新規作成する: `os/exec` で `scripts/check-existing-tag.sh` を起動し、標準入力・第1引数を差し替えて以下3ケースを検証する（AC-03a）。
   - `TestCheckExistingTag_ManifestFound_ExitsFailClosed`: 第1引数 `"0"`、標準入力空 → スクリプトが終了コード `1` で終了することを検証する。
   - `TestCheckExistingTag_ManifestNotFound_ExitsSuccess`: 第1引数 `"1"`、標準入力に確定済みの「不在」エラー文字列 → スクリプトが終了コード `0` で終了することを検証する。
   - `TestCheckExistingTag_InconclusiveFailure_ExitsFailClosed`: 第1引数 `"1"`、標準入力に無関係なエラー文字列（例: レート制限や5xxを模した文字列）→ スクリプトが終了コード `1` で終了することを検証する。
   - このテストファイルは `scripts/` ディレクトリ（`.` で始まらない）に置くため `go test -tags test ./...`（`make test`）の対象に含まれる。新規のクロスパッケージヘルパ・パッケージ内蔵ヘルパは不要（[test_organization.md](../../dev/developer_guide/test_organization.md) が対象とする Go パッケージ間ヘルパではなく、スクリプト自身の直接テストであるため）。
-- [ ] "Check existing vX.Y.Z tag" ステップを追加する: `docker manifest inspect ghcr.io/isseis/bsky-cleaner:<resolved_tag>` を実行して終了コードと標準エラー出力を捕捉し、`scripts/check-existing-tag.sh` にその終了コードと標準エラー出力を渡す。スクリプトが非0で終了した場合、このステップも非0で終了する。
-- [ ] "Build image" ステップを追加する: `docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a`（`v7.3.0`）を `push: false`, `load: true`, `platforms: linux/amd64`, `build-args: VERSION=<resolved_tag>` / `COMMIT=<short sha>`, `tags: bsky-cleaner:release` で実行する（AC-04, AC-10）。
-- [ ] "Tag and push latest" ステップを追加する: `docker tag bsky-cleaner:release ghcr.io/isseis/bsky-cleaner:latest && docker push ghcr.io/isseis/bsky-cleaner:latest`。
-- [ ] "Tag and push major version tag" ステップを追加する: `vX`（例 `v1`）を `docker tag`/`docker push`。
-- [ ] "Tag and push minor version tag" ステップを追加する: `vX.Y`（例 `v1.2`）を `docker tag`/`docker push`。
-- [ ] "Tag and push patch version tag (vX.Y.Z)" ステップを追加する: 解決済みタグそのものを `docker tag`/`docker push`（最後に実行、AC-03b, NF-004）。
+- [x] "Check existing vX.Y.Z tag" ステップを追加する: `docker manifest inspect ghcr.io/isseis/bsky-cleaner:<resolved_tag>` を実行して終了コードと標準エラー出力を捕捉し、`scripts/check-existing-tag.sh` にその終了コードと標準エラー出力を渡す。スクリプトが非0で終了した場合、このステップも非0で終了する。
+- [x] "Build image" ステップを追加する: `docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a`（`v7.3.0`）を `push: false`, `load: true`, `platforms: linux/amd64`, `build-args: VERSION=<resolved_tag>` / `COMMIT=<short sha>`, `tags: bsky-cleaner:release` で実行する（AC-04, AC-10）。
+- [x] "Tag and push latest" ステップを追加する: `docker tag bsky-cleaner:release ghcr.io/isseis/bsky-cleaner:latest && docker push ghcr.io/isseis/bsky-cleaner:latest`。
+- [x] "Tag and push major version tag" ステップを追加する: `vX`（例 `v1`）を `docker tag`/`docker push`。
+- [x] "Tag and push minor version tag" ステップを追加する: `vX.Y`（例 `v1.2`）を `docker tag`/`docker push`。
+- [x] "Tag and push patch version tag (vX.Y.Z)" ステップを追加する: 解決済みタグそのものを `docker tag`/`docker push`（最後に実行、AC-03b, NF-004）。
 - [ ] `workflow_dispatch` から、まだ GHCR に存在しない実 semver タグ（例 `v0.0.1`。`v0.0.1-plan-check` のような非 semver 値は "Validate tag format" ステップで拒否されるため使えない）を指定して手動実行し、正常系（4タグが GHCR に公開される）を確認する（[02_architecture.md 8章 フェーズ2](./02_architecture.md#8-実装優先順位) の「ドライラン的な動作確認」）。
 - [ ] 上記ドライラン実行中に、いずれか1つの浮動タグ push ステップ（例 "Tag and push major version tag"）を一時的に失敗させ（例: 存在しないレジストリパスを指す一時的な変更）、`vX.Y.Z` タグが push されないまま非0終了することを確認する。修正後、同じタグ名で `workflow_dispatch` を再実行し、タグの手動削除なしに正常終了して4タグすべてが公開されることを確認する（AC-03b, NF-004 の実挙動検証）。
 - [ ] ドライラン検証が完了したら、GitHub の Package 設定画面から `v0.0.1` の4タグ（`latest`/`v0`/`v0.0`/`v0.0.1`）を手動削除する。本番のリリース履歴（フェーズ3ステップ8の `v1.0.0` 初回リリース）に検証専用のタグを残さないためである。
