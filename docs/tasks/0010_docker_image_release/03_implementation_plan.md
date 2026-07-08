@@ -104,8 +104,8 @@
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた
 
 ### フェーズ1: バージョン埋め込みと `--version`（AC-08〜09, AC-10 の一部, AC-11〜11a）
 
