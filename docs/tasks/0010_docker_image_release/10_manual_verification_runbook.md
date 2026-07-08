@@ -100,7 +100,7 @@ gh run list --workflow=release.yml --limit 5
 gh run watch <新しいRUN_ID>
 ```
 
-期待される結果: 4ステップすべて成功し、ワークフロー全体が正常終了する。
+期待される結果: `Tag and push latest` / `Tag and push major version tag` / `Tag and push minor version tag` / `Tag and push patch version tag (vX.Y.Z)` の4ステップがすべて成功し、ワークフロー全体が正常終了する。
 
 ## フェーズ2: 正常系の最終確認（4タグがGHCRに公開されていること）
 
