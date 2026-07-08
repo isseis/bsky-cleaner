@@ -200,8 +200,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/release.yml` を実行し、YAML構文・式構文のエラーがないことを確認した（`make lint`/`make test` は Go ソースのみを対象とし `.github/workflows/*.yml` の構文は検証しないため、マージ前にワークフロー自体の構文エラーを検出する唯一の手段）
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた
 
 ### フェーズ4: 検証とドキュメント整備（AC-02, AC-05〜10）
 
@@ -209,24 +209,19 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **検証手順の前提（重要）**: `workflow_dispatch` の "Checkout code" ステップは、指定したタグが git tag としてリモートに既に存在することを要求する（`docs/design/docker_deployment.md:60`）。したがって、まだ存在しない新規タグを使った動作確認は、`workflow_dispatch` からではなく、実際に `git tag -a <タグ> && git push origin <タグ>` でタグを push することで行う。この push は `on: push: tags: ['v*']` トリガーを発火させ、**`push` 契機（非ドラフト）の本番実行**が自動的に起動する。これは 0010 の [11_manual_verification_log.md](../0010_docker_image_release/11_manual_verification_log.md) が実際に踏んだ手順と同じである（`workflow_dispatch` は、タグが既に存在する状態でのみ意味を持つ再実行・再検証の手段である）。`--draft` は `workflow_dispatch` 契機の実行にのみ付与されるため、新規タグでの最初の動作確認自体をドラフトとして行うことはできない。
 
-- [ ] 未使用の実 semver タグ（例 `v0.0.2`。0010 の検証で使われた `v0.0.1` は削除済みだが、ログとの混同を避けるため別の番号を使う）を用意し、`git tag -a v0.0.2 -m "test: manual verification for release.yml binary/release publishing" && git push origin v0.0.2` を実行する。push 契機で `release.yml` が自動起動することを確認したうえで、次を確認する。
+- [x] 未使用の実 semver タグ（`v0.0.2`）を用意し、`git tag -a v0.0.2 -m "test: manual verification for release.yml binary/release publishing" && git push origin v0.0.2` を実行する。push 契機で `release.yml` が自動起動することを確認したうえで、次を確認する。
   - "Build linux/amd64 binary" 〜 "Upload release artifacts" のステップがすべて成功する。
   - `publish-release` ジョブが起動し、非ドラフトの GitHub Release が作成される（`gh release view v0.0.2` で内容を取得できることを確認。これは 0010 が実施した検証と同じ「本物の初回リリース」であり、AC-09（直前のタグが存在しない場合でもエラーにならない）を自然な形で検証できる。02_architecture.md 3.2.3 の未検証リスクをここで解消する）。
   - 添付ファイル（`bsky-cleaner-v0.0.2-linux-amd64.tar.gz`, `SHA256SUMS`）をダウンロードし、`sha256sum -c SHA256SUMS` が成功することを確認する（AC-04）。
   - ダウンロードしたアーカイブ内のバイナリの `--version` 出力が、同じ実行で GHCR に公開された `ghcr.io/isseis/bsky-cleaner:v0.0.2` の `--version` 出力と一致することを確認する（AC-02）。
   - Release 本文に GitHub 標準形式のコミット/PR 一覧が含まれることを確認する（AC-08）。
-- [ ] 検証完了後、後片付けを行う: `gh release delete v0.0.2 --yes` で Release を削除し、0010 の [11_manual_verification_log.md](../0010_docker_image_release/11_manual_verification_log.md) 3-1節と同じ手順（GHCR Package 設定画面、または `gh api --method DELETE` によるバージョン削除）で GHCR 側の4タグ（`latest`/`v0`/`v0.0`/`v0.0.2`。他のバージョンに影響しないことを確認してから削除する）を削除し、`git push origin :refs/tags/v0.0.2 && git tag -d v0.0.2` でタグを削除する。
-- [ ] AC-07（同名タグの Release が既に存在する場合に fail-closed で非0終了する）は、上記の push 契機の実行を再現せずに、`gh release create` そのものの既存動作を直接 CLI で確認することで検証する。これは、`publish-release` ジョブを実際にもう一度実行して同じ状態を再現しようとした場合の制約による。その場合、`release` ジョブの既存タグ確認（0010 由来、AC-03a）が先に非0終了してしまうため、本タスクが追加する Release 重複防止の経路（`gh release create` 自体のエラー）に到達できない（`bootstrap_first_release` 入力で Docker 側の確認を迂回する手段はあるが、これは「初回リリース専用・以降のリリースでは使用しないこと」と明記された補助フラグであり、検証目的での流用は本来の用途に反するため用いない）。
-  - 上記とは別の未使用タグ（例 `v0.0.3`）を用意し、`git tag -a v0.0.3 -m "test: gh release create duplicate-prevention check" && git push origin v0.0.3` で push する。この push でも `release.yml` が起動し実際に GHCR へ公開されるため、検証後に上記と同様の後片付けが必要になる。GHCR 公開を避けたい場合は、`gh release create v0.0.3 --generate-notes --target main` を直接実行して Release オブジェクトのみを作成してもよい。
-  - 続けて、同じコマンド（`gh release create v0.0.3 --generate-notes --target main`、または実際にワークフローが実行するのと同じ引数）をもう一度実行し、非0終了かつエラーメッセージに Release が既に存在する旨が含まれることを確認する。これにより `publish-release` ジョブが依拠する `gh release create` の重複防止動作そのものを実機で確認する（AC-07）。
-  - 検証完了後、`gh release delete v0.0.3 --yes` で Release を削除し、push した場合は上記と同様に GHCR タグ・git タグも削除する。
-- [ ] `docs/design/docker_deployment.md` の「リリース公開手順（開発者向け）」節（`docs/design/docker_deployment.md:33-60`）の自動処理一覧（現在4項目）に、次の項目を追記する。
-  - `linux/amd64` バイナリのビルドとアーカイブ（`bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz`）の生成
-  - `SHA256SUMS`（チェックサムファイル）の生成
-  - アーカイブと `SHA256SUMS` を添付した GitHub Release オブジェクトの作成
-  - GitHub 標準の自動生成リリースノート（`--generate-notes`）が Release 本文に反映されること
-- [ ] `docs/design/docker_deployment.md` に、ダウンロード後のチェックサム検証手順（`sha256sum -c SHA256SUMS`）についての一文を追記する（README.md の該当手順への参照でよい）。
-- [ ] `docs/design/docker_deployment.md` の「動作確認用の手動実行」節に、`workflow_dispatch` 契機の実行では Release が `--draft` 付きで作成されること、確認後は `gh release delete` で削除するか `gh release edit --draft=false` で明示的に公開する必要があることを追記する。
+- [x] 検証完了後、後片付けを行う: `gh release delete v0.0.2 --yes` で Release を削除し、`gh api --method DELETE` で GHCR 側のバージョン（`v0.0.2` および `v0.0.3`/`latest`/`v0`/`v0.0` が紐づいていたバージョン）を削除し、`latest`/`v0`/`v0.0` タグを `v1.0.0` イメージに再 push して復元した。`git push origin :refs/tags/v0.0.2 v0.0.3 && git tag -d v0.0.2 v0.0.3` でタグを削除した。
+- [x] AC-07（同名タグの Release が既に存在する場合に fail-closed で非0終了する）は、`gh release create v0.0.3 --generate-notes --target main` を直接 CLI で 2 回連続実行し、1回目は成功、2回目は `HTTP 422: Validation Failed (Release.tag_name already exists)` で `EXIT_CODE=1` となることを確認した。
+  - `git tag -a v0.0.3` で push したタグにより `release.yml` が自動起動し、`publish-release` ジョブが `gh release create` に失敗してワークフロー全体が `failure` 終了することを確認した。
+  - 検証完了後、`gh release delete v0.0.3 --yes` で Release を削除し、GHCR タグ・git タグも削除した。
+- [x] `docs/design/docker_deployment.md` の「リリース公開手順（開発者向け）」節の自動処理一覧に、バイナリアーカイブ生成（ステップ4）、SHA256SUMS 生成（ステップ5）、GitHub Release 作成とリリースノート自動生成（ステップ7）を追記した。
+- [x] `docs/design/docker_deployment.md` にダウンロード後のチェックサム検証手順（`sha256sum -c SHA256SUMS`）の節を追記した（`README.md` への参照を含む）。
+- [x] `docs/design/docker_deployment.md` の「動作確認用の手動実行」節に、`workflow_dispatch` 契機では Release が `--draft` 付きで作成されること、確認後は `gh release delete` または `gh release edit --draft=false` での公開が必要であることを追記した。
 
 **完了基準**: 実タグ push による実機検証（AC-02, AC-04, AC-08〜09）と `gh release create` の直接実行による重複防止確認（AC-07）が完了し、検証専用の Release・GHCR タグ・git タグがすべて削除済みである。`docs/design/docker_deployment.md` の追記が完了している。
 
@@ -241,8 +236,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - `docs/design/docker_deployment.md` の追記が実際のワークフロー挙動と一致しているか
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] PR を作成した
 - [ ] PR がマージされた
 
 ## 4. テスト戦略
@@ -278,7 +273,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] フェーズ1完了（Go セットアップ・バイナリビルド・アーカイブ生成ステップ追加）
 - [x] フェーズ2完了（チェックサム生成・ワークフロー成果物アップロード・`release` ジョブの `outputs` 追加）
 - [x] フェーズ3完了（`publish-release` ジョブ新設）
-- [ ] フェーズ4完了（実タグ push による実機検証・`gh release create` の直接実行による重複防止確認・`docs/design/docker_deployment.md` 追記）
+- [x] フェーズ4完了（実タグ push による実機検証・`gh release create` の直接実行による重複防止確認・`docs/design/docker_deployment.md` 追記）
 - [x] `make fmt` / `make test` / `make lint` がすべて通過（NF-001。Go ソース無変更のため実質的に無影響であることの確認）
 - [x] `make deadcode` で未使用コードがないことを確認（Go ソース無変更のため実質的に無影響であることの確認）
 
@@ -347,4 +342,4 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 ## 10. クロス検索チェックリスト
 
 - [x] `publish-release`／`release-assets`／`Build linux/amd64 binary`／`Package binary archive`／`Generate checksum file`／`Create GitHub Release`／`Download release artifacts` は本タスクで新規追加するステップ名・ジョブ名・アーティファクト名であり、`.github/workflows/release.yml`・`.github/workflows/ci.yml` の既存ステップ名と衝突しないことを実装後に `rg -n "Build linux/amd64 binary|Package binary archive|Generate checksum file|Create GitHub Release|Download release artifacts" .github/workflows/*.yml` で確認する（各1箇所のみ一致すること）。
-- [ ] `README.md` の既存の「インストールと実行（ビルド済み実行ファイル）」節（1.3 節で確認済みの先行記述）が、実装後の実際のアーカイブ名・`SHA256SUMS` の形式と一致し続けていることを、フェーズ4完了時に目視で再確認する（`rg -n "bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz|SHA256SUMS" README.md` で該当箇所を再表示して確認する）。
+- [x] `README.md` の既存の「インストールと実行（ビルド済み実行ファイル）」節（1.3 節で確認済みの先行記述）が、実装後の実際のアーカイブ名・`SHA256SUMS` の形式と一致し続けていることを、フェーズ4完了時に目視で再確認する（`rg -n "bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz|SHA256SUMS" README.md` で該当箇所を再表示して確認する）。
