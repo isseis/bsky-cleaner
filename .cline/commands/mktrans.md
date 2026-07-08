@@ -70,7 +70,7 @@ Translate only the sections that changed in the source file since the output fil
 Run the following command to find the last commit that modified the output file:
 
 ```bash
-git log -1 --format=%H -- <output-file>
+git --no-pager log -1 --format=%H -- <output-file>
 ```
 
 Record the commit hash (call it `SYNC_HASH`). If no hash is returned (e.g., the output file is not yet committed), stop and inform the user that differential translation requires the output file to be committed.
@@ -80,7 +80,7 @@ Record the commit hash (call it `SYNC_HASH`). If no hash is returned (e.g., the 
 Run:
 
 ```bash
-git diff SYNC_HASH -- <source-file>
+GIT_PAGER=cat PAGER=cat git diff SYNC_HASH -- <source-file>
 ```
 
 If the diff is empty, the output file is already up to date. Stop and report this to the user.
