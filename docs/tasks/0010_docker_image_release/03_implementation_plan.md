@@ -22,7 +22,7 @@
 
 - **設計の再掲を避ける**: 各コンポーネントの設計詳細・エラー分類・処理フロー・脅威モデルは [02_architecture.md](./02_architecture.md) を参照し、本計画では「どのファイルに何を追加し、どう検証するか」のみを書く。
 - **フェーズは [02_architecture.md 8 章](./02_architecture.md#8-実装優先順位) の定義・順序に一致させる**（フェーズ1: バージョン埋め込みと `--version` → フェーズ2: GHCR 公開ワークフロー → フェーズ3: 配布経路とドキュメント → フェーズ4: CI ビルド確認）。
-- **ロールアウト順序の制約を厳守する**（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14)）: `docker-compose.yml` の `image:` 参照化コミットは、実タグでの初回リリースおよび GHCR パッケージ可視性の public 切り替え（フェーズ3 ステップ8）が完了するまで `main` にマージしない。
+- **ロールアウト順序の制約を厳守する**（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14)）: `docker-compose.yml` の `image:` 参照化コミットは、実タグでの初回リリースおよび GHCR パッケージ可視性の public 切り替え（フェーズ3の「実タグでの初回リリースを実施する」ステップ）が完了するまで `main` にマージしない。
 - **write 権限を持つ GitHub Actions のバージョン固定**（[02_architecture.md 3.2.1](./02_architecture.md#321-releaseyml-のトリガーとタグ検証ac-01〜02-ac-06〜07)）: `docker/login-action` と `docker/build-push-action` はコミット SHA で固定参照する。事前に GitHub API で最新リリースの実コミット SHA を確認済み（2026-07-08 時点）。
   - `docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0`（`v4.4.0` の実コミット）
   - `docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a`（`v7.3.0` の実コミット）
@@ -71,7 +71,7 @@
 
 - 既存: `services.bsky-cleaner.build: .` を指定し、`.env` からの環境変数展開・`./config:/config:ro` のボリュームマウントを持つ（`docker-compose.yml:11-20`）。
 - 不足: `image:` 参照とその隣接コメント（バージョン更新方法・digest 参照・`latest` の位置づけ）。
-- 変更: `build: .` を `image: ghcr.io/isseis/bsky-cleaner:vX.Y.Z`（実タグ、例 `v1.0.0`）に置き換え、直前にコメントを追加する。`environment:`／`volumes:`／`restart:` は変更しない。**このコミットは、フェーズ3ステップ8（実タグでの初回リリースと可視性切り替え）の完了後にのみ `main` へ反映する。**
+- 変更: `build: .` を `image: ghcr.io/isseis/bsky-cleaner:vX.Y.Z`（実タグ、例 `v1.0.0`）に置き換え、直前にコメントを追加する。`environment:`／`volumes:`／`restart:` は変更しない。**このコミットは、フェーズ3の「実タグでの初回リリースを実施する」ステップ（実タグでの初回リリースと可視性切り替え）の完了後にのみ `main` へ反映する。**
 
 **`docs/design/docker_deployment.md`／`README.md`（フェーズ3対象）**
 
@@ -231,7 +231,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] "Tag and push patch version tag (vX.Y.Z)" ステップを追加する: 解決済みタグそのものを `docker tag`/`docker push`（最後に実行、AC-03b, NF-004）。
 - [x] `workflow_dispatch` から、まだ GHCR に存在しない実 semver タグ（例 `v0.0.1`。`v0.0.1-plan-check` のような非 semver 値は "Validate tag format" ステップで拒否されるため使えない）を指定して手動実行し、正常系（4タグが GHCR に公開される）を確認する（[02_architecture.md 8章 フェーズ2](./02_architecture.md#8-実装優先順位) の「ドライラン的な動作確認」）。
 - [x] 上記ドライラン実行中に、いずれか1つの浮動タグ push ステップ（例 "Tag and push major version tag"）を一時的に失敗させ（例: 存在しないレジストリパスを指す一時的な変更）、`vX.Y.Z` タグが push されないまま非0終了することを確認する。修正後、同じタグ名で `workflow_dispatch` を再実行し、タグの手動削除なしに正常終了して4タグすべてが公開されることを確認する（AC-03b, NF-004 の実挙動検証）。
-- [x] ドライラン検証が完了したら、GitHub の Package 設定画面から `v0.0.1` の4タグ（`latest`/`v0`/`v0.0`/`v0.0.1`）を手動削除する。本番のリリース履歴（フェーズ3ステップ8の `v1.0.0` 初回リリース）に検証専用のタグを残さないためである。
+- [x] ドライラン検証が完了したら、GitHub の Package 設定画面から `v0.0.1` の4タグ（`latest`/`v0`/`v0.0`/`v0.0.1`）を手動削除する。本番のリリース履歴（フェーズ3の「実タグでの初回リリースを実施する」ステップで行う `v1.0.0` 初回リリース）に検証専用のタグを残さないためである。
 
 上記ドライラン検証の実施手順は [10_manual_verification_runbook.md](10_manual_verification_runbook.md) に、実行ログは [11_manual_verification_log.md](11_manual_verification_log.md) にまとめてある（実施日 2026-07-08）。AC-03a・AC-03b・NF-004・正常系4タグ公開のいずれも確認済み。副次的な発見として、現行イメージには `--version`/`--help` が未実装で `--config` 必須のまま起動が中断される点をログに記録済み（本タスクのスコープ外、フォローアップ候補）。
 
@@ -263,9 +263,14 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **対象ファイル**: `docker-compose.yml`, `docs/design/docker_deployment.md`, `README.md`
 
-**順序に注意**（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14) のロールアウト順序の制約）: 以下のステップ6（`docker-compose.yml`）は、ステップ8（実タグでの初回リリースと可視性切り替え）の完了後にのみ `main` へマージする。ステップ7（ドキュメント追記）はステップ8を待つ必要はない。
+**順序に注意**（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14) のロールアウト順序の制約）: 以下のステップは実行順に並んでいる。`docker-compose.yml` の `image:` 参照化（下から2番目のステップ）は、実タグでの初回リリースと可視性切り替え（その直前のステップ）が完了するまで着手しない。ドキュメント追記（最初の4ステップ）はこの制約を待つ必要はなく、先に進めてよい。
 
-- [ ] `docker-compose.yml`: `services.bsky-cleaner.build: .`（`docker-compose.yml:11`）を削除し、直前に以下のコメントを追加したうえで `image: ghcr.io/isseis/bsky-cleaner:v1.0.0`（フェーズ3ステップ8で実際に公開する初回バージョンタグに置き換える）に置き換える（AC-12, AC-13）。**未着手（ロールアウト順序制約により、実タグでの初回リリース・可視性切り替え（ステップ8）が完了するまで意図的に見送っている。PR-3 の最初のレビュー時点で誤って先行コミットされていたため、weakreview で検出し `build: .` に戻した）。**
+- [x] `docs/design/docker_deployment.md`: 「開発者向けリリース公開手順」節を追加する。`git tag vX.Y.Z && git push --tags` によるタグ push、および `workflow_dispatch` から対象タグ名を入力して動作確認する手順を記載する（フェーズ2で確定した入力名 `tag` を用いる）（AC-15）。
+- [x] `docs/design/docker_deployment.md`: 「GHCR パッケージ可視性の切り替え手順」節を追加する。`GITHUB_TOKEN` の権限では変更できないため、パッケージ初回作成後に GitHub の Package 設定画面から手動で public に切り替える一度きりの手順を記載する（AC-17, AC-05 関連）。
+- [x] `README.md`: 「Docker」節（新規）を追加する。`docker-compose.yml`・`.env`（`dot.env.example` からコピー）・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行する手順を記載する（AC-16）。
+- [x] `README.md`: 既存の「Usage」節（`README.md:60-69` 付近）に `bsky-cleaner --version`（出力例 `v1.2.3 (a1b2c3d)`）の使用例を追加する（AC-16）。
+- [ ] 実タグでの初回リリースを実施する: `git tag v1.0.0 && git push --tags` を実行し、フェーズ2の `release.yml` が正常終了して4タグが GHCR に公開されることを確認する。GitHub の Package 設定画面から可視性を public に切り替える（AC-05, AC-17 の実施）。
+- [ ] `docker-compose.yml`: 上記の実タグリリースが完了した後に着手する。`services.bsky-cleaner.build: .`（`docker-compose.yml:11`）を削除し、直前に以下のコメントを追加したうえで `image: ghcr.io/isseis/bsky-cleaner:v1.0.0`（上記ステップで実際に公開した初回バージョンタグに置き換える）に置き換える（AC-12, AC-13）。**未着手（PR-3 の最初のレビュー時点でこのステップより前に誤って先行コミットされていたため、weakreview で検出し `build: .` に戻したうえで、実行順を守れるようステップの並びをここに移動した）。**
 
   変更前:
   ```yaml
@@ -289,12 +294,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
       image: ghcr.io/isseis/bsky-cleaner:v1.0.0
       restart: unless-stopped
   ```
-- [x] `docs/design/docker_deployment.md`: 「開発者向けリリース公開手順」節を追加する。`git tag vX.Y.Z && git push --tags` によるタグ push、および `workflow_dispatch` から対象タグ名を入力して動作確認する手順を記載する（フェーズ2で確定した入力名 `tag` を用いる）（AC-15）。
-- [x] `docs/design/docker_deployment.md`: 「GHCR パッケージ可視性の切り替え手順」節を追加する。`GITHUB_TOKEN` の権限では変更できないため、パッケージ初回作成後に GitHub の Package 設定画面から手動で public に切り替える一度きりの手順を記載する（AC-17, AC-05 関連）。
-- [x] `README.md`: 「Docker」節（新規）を追加する。`docker-compose.yml`・`.env`（`dot.env.example` からコピー）・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行する手順を記載する（AC-16）。
-- [x] `README.md`: 既存の「Usage」節（`README.md:60-69` 付近）に `bsky-cleaner --version`（出力例 `v1.2.3 (a1b2c3d)`）の使用例を追加する（AC-16）。
-- [ ] 実タグでの初回リリースを実施する: `git tag v1.0.0 && git push --tags` を実行し、フェーズ2の `release.yml` が正常終了して4タグが GHCR に公開されることを確認する。GitHub の Package 設定画面から可視性を public に切り替える（AC-05, AC-17 の実施）。
-- [ ] 上記完了後、`docker-compose.yml` の変更（本フェーズ最初のステップ）を `main` にマージする。
+- [ ] 上記完了後、`docker-compose.yml` の変更を `main` にマージする。
 
 **完了基準**: `docker compose pull && docker compose up -d` が、`bsky-cleaner` のソースコードを持たない別ディレクトリ（`docker-compose.yml`・`.env`・TOML 設定ファイルのみ配置）で成功する（AC-14）。
 
@@ -352,7 +352,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 |---|---|---|
 | `docker manifest inspect` が返す「不在」エラー文字列が実装時の想定と異なる | AC-03a の fail-closed 判定条件が誤り、既存タグ保護が機能しない、または常に fail-closed になり正常リリースができない | フェーズ2実装時に実際の GHCR レスポンス（`docker manifest inspect` の標準エラー出力）を一度取得し、判定文字列をそれに合わせて確定する。`workflow_dispatch` による動作確認（フェーズ2完了基準）で新規タグ・既存タグ双方のケースを実際に確認する |
 | `workflow_dispatch` によるドライラン実行が実際に GHCR へイメージを公開してしまい、検証専用のバージョン番号が本番のリリース履歴に永続的に残る | 意図しないバージョン番号のイメージが公開され、AC-03a の上書き保護により同名タグの再利用ができなくなる。ドライラン自体が途中失敗した場合、同じ暫定タグでの再実行が AC-03a の保護に阻まれる可能性がある | 未使用の正式 semver（例 `v0.0.1`）を選び、事前に GHCR 側に同名タグが存在しないことを確認してから実行する。ドライラン検証完了後、フェーズ2の実装ステップに明記した通り GHCR 側でこの検証用タグを手動削除する。ドライラン自体が途中失敗した場合は同じタグを使い回さず、新しい未使用タグで再試行する |
-| フェーズ3の `docker-compose.yml` 変更を、実タグリリース前に誤って `main` にマージしてしまう | ソースを持たない利用者が `docker compose pull` で「イメージが見つからない」エラーに遭遇する（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14)） | フェーズ3の実装ステップに明記した順序（`docker-compose.yml` の変更は作成するがマージはステップ8の後）を PR 分割時にも維持する |
+| フェーズ3の `docker-compose.yml` 変更を、実タグリリース前に誤って `main` にマージしてしまう | ソースを持たない利用者が `docker compose pull` で「イメージが見つからない」エラーに遭遇する（[02_architecture.md 3.2.5](./02_architecture.md#325-docker-composeyml-の-image-参照化ac-12〜14)） | フェーズ3の実装ステップに明記した順序（`docker-compose.yml` の変更は実タグでの初回リリース完了後に着手し、マージはその後）を PR 分割時にも維持する |
 | GHCR パッケージ可視性の手動切り替えを忘れる | イメージが private のまま残り、匿名 `docker compose pull` が失敗する | フェーズ3完了基準に「ソースを持たない別ディレクトリでの `docker compose pull` 成功」を含め、可視性切り替え忘れがあれば検出できるようにする |
 
 ## 6. 実装チェックリスト
@@ -376,7 +376,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **AC-03: `vX.Y.Z`・`vX.Y`・`vX`・`latest` の4タグを GHCR に push する**
 - Verification (static): `rg -n "Tag and push" .github/workflows/release.yml` で4ステップの存在を確認する。
-- Verification (manual): フェーズ3ステップ8の実タグ push 後、GHCR の Package ページで4タグすべてが存在することを確認する。
+- Verification (manual): フェーズ3の「実タグでの初回リリースを実施する」ステップでの実タグ push 後、GHCR の Package ページで4タグすべてが存在することを確認する。
 
 **AC-03a: `vX.Y.Z` タグの上書き保護（既存時 fail-closed）**
 - Test location: `scripts/check_existing_tag_test.go::TestCheckExistingTag_ManifestFound_ExitsFailClosed` / `TestCheckExistingTag_ManifestNotFound_ExitsSuccess` / `TestCheckExistingTag_InconclusiveFailure_ExitsFailClosed`（fail-closed 判定ロジック本体の直接テスト。フェーズ2の `scripts/check-existing-tag.sh` 抽出タスク参照）
@@ -392,7 +392,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **AC-05: GHCR パッケージの可視性を public に手動切り替え**
 - Verification (static): `rg -n "可視性" docs/design/docker_deployment.md` で手順の記載を確認する（AC-17 と同一コマンド）。
-- Verification (manual): フェーズ3ステップ8で実際に GitHub Package 設定画面から public に切り替え、匿名 `docker pull ghcr.io/isseis/bsky-cleaner:latest` が成功することを確認する。
+- Verification (manual): フェーズ3の「実タグでの初回リリースを実施する」ステップで実際に GitHub Package 設定画面から public に切り替え、匿名 `docker pull ghcr.io/isseis/bsky-cleaner:latest` が成功することを確認する。
 
 **AC-06: `GITHUB_TOKEN` 以外の追加シークレット不要**
 - Verification (static): `rg -n "permissions:" -A3 .github/workflows/release.yml` で `contents: read`/`packages: write` のみであることを確認する。`rg -n "secrets\." .github/workflows/release.yml` の一致がすべて `secrets.GITHUB_TOKEN` であることを確認する（他の `secrets.*` 参照がないこと）。`rg -n "docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0|docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a" .github/workflows/release.yml` で両 action がコミット SHA 固定されていることを確認する。
@@ -411,7 +411,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **AC-10: 公開イメージにタグ値と短縮コミットSHAが埋め込まれる**
 - Verification (static): `rg -n 'ARG VERSION|ARG COMMIT|-ldflags' Dockerfile` で `ARG`/`-ldflags` の存在を確認する。`rg -n "build-args:" -A2 .github/workflows/release.yml` で `VERSION=`/`COMMIT=` が渡されていることを確認する。
-- Verification (manual): フェーズ3ステップ8の実タグ push 後、`docker run --rm ghcr.io/isseis/bsky-cleaner:v1.0.0 bsky-cleaner --version` が `v1.0.0 (<短縮SHA>)` を出力することを確認する。
+- Verification (manual): フェーズ3の「実タグでの初回リリースを実施する」ステップでの実タグ push 後、`docker run --rm ghcr.io/isseis/bsky-cleaner:v1.0.0 bsky-cleaner --version` が `v1.0.0 (<短縮SHA>)` を出力することを確認する。
 
 **AC-11: `--version` はネットワーク・設定ファイル・認証情報にアクセスしない**
 - Verification (static): 同上 AC-08 の `rg` コマンド（`errVersionRequested` 判定が `run(configPath` 呼び出しより前で完結することの確認）。加えて、`rg -n "func parseFlags" -A15 cmd/main.go` の早期走査ループ内に `config\.|atproto\.` への参照がないことを確認する。この静的検証は、既存の `-h`/`--help`（同じく `main()` レベルの `os.Exit` 分岐は本コードベースでユニットテストされていない）と同じ精度の検証手段であり、本タスクで新たに精度を下げるものではない。
