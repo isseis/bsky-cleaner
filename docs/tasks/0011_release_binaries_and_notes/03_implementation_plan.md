@@ -75,8 +75,8 @@
 
 **対象ファイル**: `.github/workflows/release.yml`
 
-- [ ] "Build image" ステップの直後に "Set up Go" ステップを追加する: `actions/setup-go@v6`、`with: { go-version-file: go.mod, cache: true }`（`ci.yml` の既存ステップと同一の指定方法。`ci.yml:26-29` 参照）。
-- [ ] 続けて "Build linux/amd64 binary" ステップを追加する（[02_architecture.md 3.2.1](./02_architecture.md#321-バイナリビルドとアーカイブ生成ac-01〜02-release-ジョブ)）:
+- [x] "Build image" ステップの直後に "Set up Go" ステップを追加する: `actions/setup-go@v6`、`with: { go-version-file: go.mod, cache: true }`（`ci.yml` の既存ステップと同一の指定方法。`ci.yml:26-29` 参照）。
+- [x] 続けて "Build linux/amd64 binary" ステップを追加する（[02_architecture.md 3.2.1](./02_architecture.md#321-バイナリビルドとアーカイブ生成ac-01〜02-release-ジョブ)）:
   ```yaml
   - name: Build linux/amd64 binary
     env:
@@ -88,7 +88,7 @@
         -ldflags "-X main.version=${TAG} -X main.commit=${COMMIT}" \
         -o dist/bsky-cleaner ./cmd
   ```
-- [ ] 続けて "Package binary archive" ステップを追加する（AC-01）:
+- [x] 続けて "Package binary archive" ステップを追加する（AC-01）:
   ```yaml
   - name: Package binary archive
     env:
@@ -103,7 +103,7 @@
 
 **対象ファイル**: `.github/workflows/release.yml`
 
-- [ ] "Package binary archive" の直後に "Generate checksum file" ステップを追加する（AC-03）:
+- [x] "Package binary archive" の直後に "Generate checksum file" ステップを追加する（AC-03）:
   ```yaml
   - name: Generate checksum file
     env:
@@ -111,7 +111,7 @@
     run: |
       cd dist && sha256sum "bsky-cleaner-${TAG}-linux-amd64.tar.gz" > SHA256SUMS
   ```
-- [ ] 続けて "Upload release artifacts" ステップを追加する（1.2 節「ジョブ間のデータ受け渡し」参照）:
+- [x] 続けて "Upload release artifacts" ステップを追加する（1.2 節「ジョブ間のデータ受け渡し」参照）:
   ```yaml
   - name: Upload release artifacts
     uses: actions/upload-artifact@v4
@@ -124,7 +124,7 @@
       retention-days: 1
   ```
   `retention-days: 1` は、この成果物が同一ワークフロー実行内の `publish-release` ジョブでのみ使われ、実行後に保持する必要がないための最小値。
-- [ ] `release` ジョブに `outputs: { resolved_tag: ${{ steps.resolve-tag.outputs.resolved_tag }} }` を追加する（`publish-release` ジョブが参照するため）。
+- [x] `release` ジョブに `outputs: { resolved_tag: ${{ steps.resolve-tag.outputs.resolved_tag }} }` を追加する（`publish-release` ジョブが参照するため）。
 
 **完了基準**: `release.yml` に "Generate checksum file"／"Upload release artifacts" ステップと `release` ジョブの `outputs.resolved_tag` が追加されている。
 
@@ -132,7 +132,7 @@
 
 **対象ファイル**: `.github/workflows/release.yml`
 
-- [ ] `release` ジョブの後に新規ジョブ `publish-release` を追加する:
+- [x] `release` ジョブの後に新規ジョブ `publish-release` を追加する:
   ```yaml
   publish-release:
     needs: release
@@ -197,8 +197,8 @@
 - `gh release create` に `--generate-notes`・`--verify-tag`・`workflow_dispatch` 時のみの `--draft` が正しく組み込まれているか
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/release.yml` を実行し、YAML構文・式構文のエラーがないことを確認した（`make lint`/`make test` は Go ソースのみを対象とし `.github/workflows/*.yml` の構文は検証しないため、マージ前にワークフロー自体の構文エラーを検出する唯一の手段）
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/release.yml` を実行し、YAML構文・式構文のエラーがないことを確認した（`make lint`/`make test` は Go ソースのみを対象とし `.github/workflows/*.yml` の構文は検証しないため、マージ前にワークフロー自体の構文エラーを検出する唯一の手段）
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
@@ -275,12 +275,12 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 ## 6. 実装チェックリスト
 
-- [ ] フェーズ1完了（Go セットアップ・バイナリビルド・アーカイブ生成ステップ追加）
-- [ ] フェーズ2完了（チェックサム生成・ワークフロー成果物アップロード・`release` ジョブの `outputs` 追加）
-- [ ] フェーズ3完了（`publish-release` ジョブ新設）
+- [x] フェーズ1完了（Go セットアップ・バイナリビルド・アーカイブ生成ステップ追加）
+- [x] フェーズ2完了（チェックサム生成・ワークフロー成果物アップロード・`release` ジョブの `outputs` 追加）
+- [x] フェーズ3完了（`publish-release` ジョブ新設）
 - [ ] フェーズ4完了（実タグ push による実機検証・`gh release create` の直接実行による重複防止確認・`docs/design/docker_deployment.md` 追記）
-- [ ] `make fmt` / `make test` / `make lint` がすべて通過（NF-001。Go ソース無変更のため実質的に無影響であることの確認）
-- [ ] `make deadcode` で未使用コードがないことを確認（Go ソース無変更のため実質的に無影響であることの確認）
+- [x] `make fmt` / `make test` / `make lint` がすべて通過（NF-001。Go ソース無変更のため実質的に無影響であることの確認）
+- [x] `make deadcode` で未使用コードがないことを確認（Go ソース無変更のため実質的に無影響であることの確認）
 
 ## 7. 受け入れ基準の検証（Acceptance Criteria Verification）
 
@@ -346,5 +346,5 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 ## 10. クロス検索チェックリスト
 
-- [ ] `publish-release`／`release-assets`／`Build linux/amd64 binary`／`Package binary archive`／`Generate checksum file`／`Create GitHub Release`／`Download release artifacts` は本タスクで新規追加するステップ名・ジョブ名・アーティファクト名であり、`.github/workflows/release.yml`・`.github/workflows/ci.yml` の既存ステップ名と衝突しないことを実装後に `rg -n "Build linux/amd64 binary|Package binary archive|Generate checksum file|Create GitHub Release|Download release artifacts" .github/workflows/*.yml` で確認する（各1箇所のみ一致すること）。
+- [x] `publish-release`／`release-assets`／`Build linux/amd64 binary`／`Package binary archive`／`Generate checksum file`／`Create GitHub Release`／`Download release artifacts` は本タスクで新規追加するステップ名・ジョブ名・アーティファクト名であり、`.github/workflows/release.yml`・`.github/workflows/ci.yml` の既存ステップ名と衝突しないことを実装後に `rg -n "Build linux/amd64 binary|Package binary archive|Generate checksum file|Create GitHub Release|Download release artifacts" .github/workflows/*.yml` で確認する（各1箇所のみ一致すること）。
 - [ ] `README.md` の既存の「インストールと実行（ビルド済み実行ファイル）」節（1.3 節で確認済みの先行記述）が、実装後の実際のアーカイブ名・`SHA256SUMS` の形式と一致し続けていることを、フェーズ4完了時に目視で再確認する（`rg -n "bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz|SHA256SUMS" README.md` で該当箇所を再表示して確認する）。

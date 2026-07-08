@@ -34,6 +34,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      resolved_tag: ${{ steps.resolve-tag.outputs.resolved_tag }}
     steps:
       - name: Resolve tag name
         id: resolve-tag
@@ -102,6 +104,44 @@ jobs:
             COMMIT=${{ steps.short-sha.outputs.sha }}
           tags: bsky-cleaner:release
 
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build linux/amd64 binary
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
+          COMMIT: ${{ steps.short-sha.outputs.sha }}
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags "-X main.version=${TAG} -X main.commit=${COMMIT}" \
+            -o dist/bsky-cleaner ./cmd
+
+      - name: Package binary archive
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
+        run: |
+          tar czf "dist/bsky-cleaner-${TAG}-linux-amd64.tar.gz" -C dist bsky-cleaner
+
+      - name: Generate checksum file
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
+        run: |
+          cd dist && sha256sum "bsky-cleaner-${TAG}-linux-amd64.tar.gz" > SHA256SUMS
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Tag and push latest
         run: |
           docker tag bsky-cleaner:release ghcr.io/isseis/bsky-cleaner:latest
@@ -129,3 +169,34 @@ jobs:
         run: |
           docker tag bsky-cleaner:release "ghcr.io/isseis/bsky-cleaner:${TAG}"
           docker push "ghcr.io/isseis/bsky-cleaner:${TAG}"
+
+  publish-release:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.resolved_tag }}
+        run: |
+          DRAFT_FLAG=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DRAFT_FLAG="--draft"
+          fi
+          gh release create "$TAG" \
+            "dist/bsky-cleaner-${TAG}-linux-amd64.tar.gz" \
+            dist/SHA256SUMS \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag \
+            $DRAFT_FLAG
