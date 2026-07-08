@@ -294,7 +294,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
       image: ghcr.io/isseis/bsky-cleaner:v1.0.0
       restart: unless-stopped
   ```
-- [ ] 上記完了後、`docker-compose.yml` の変更を `main` にマージする。
+- [x] 上記完了後、`docker-compose.yml` の変更を `main` にマージする。
 
 **完了基準**: `docker compose pull && docker compose up -d` が、`bsky-cleaner` のソースコードを持たない別ディレクトリ（`docker-compose.yml`・`.env`・TOML 設定ファイルのみ配置）で成功する（AC-14）。
 
@@ -359,10 +359,10 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 - [x] フェーズ1完了（`--version`/`-v`、`formatVersion`、`Dockerfile` の `ARG`/`-ldflags`）
 - [x] フェーズ2完了（`release.yml` 作成・`workflow_dispatch` 動作確認。[11_manual_verification_log.md](11_manual_verification_log.md) 参照）
-- [ ] フェーズ3完了（実タグ初回リリース・可視性切り替え・`docker-compose.yml`・ドキュメント）
-- [ ] フェーズ4完了（`ci.yml` への `docker-build-check` ジョブ追加・red/skip 確認）
-- [ ] `make fmt` / `make test` / `make lint` がすべて通過（NF-001）
-- [ ] `make deadcode` で未使用コードがないことを確認
+- [x] フェーズ3完了（実タグ初回リリース・可視性切り替え・`docker-compose.yml`・ドキュメント）
+- [x] フェーズ4完了（`ci.yml` への `docker-build-check` ジョブ追加・red/skip 確認）
+- [x] `make fmt` / `make test` / `make lint` がすべて通過（NF-001）
+- [x] `make deadcode` で未使用コードがないことを確認
 
 ## 7. 受け入れ基準の検証（Acceptance Criteria Verification）
 
