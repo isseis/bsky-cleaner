@@ -16,6 +16,7 @@ git status                     # 作業ツリーがクリーンであること�
 git fetch origin --tags        # v0.0.1 がまだリポジトリに存在しないことを再確認
 git tag -l 'v0.0.1'            # 何も出力されなければOK
 gh auth status                 # gh CLI がログイン済みであることを確認
+git checkout main && git pull origin main  # main ブランチに切り替えて最新化
 ```
 
 ## フェーズ1: 異常系（浮動タグ push 失敗 → 再実行で復旧）を先に検証する
@@ -73,7 +74,7 @@ gh run watch <RUN_ID>          # 上のコマンドで確認した run ID を指
 GHCR側の確認（`v0.0.1` がまだ無いこと）:
 
 ```bash
-tags=$(gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags') && echo "$tags" | grep -F 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
+tags=$(gh api /users/isseis/packages/container/bsky-cleaner/versions --paginate --jq '.[].metadata.container.tags') && echo "$tags" | grep -F 'v0.0.1' || echo "v0.0.1 not published yet (expected)"
 ```
 
 ### 1-4. 壊した箇所を修正し、同じタグ名で再実行する（NF-004の検証）
@@ -103,7 +104,7 @@ gh run watch <新しいRUN_ID>
 ## フェーズ2: 正常系の最終確認（4タグがGHCRに公開されていること）
 
 ```bash
-gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[] | {id: .id, tags: .metadata.container.tags}'
+gh api /users/isseis/packages/container/bsky-cleaner/versions --paginate --jq '.[] | {id: .id, tags: .metadata.container.tags}'
 ```
 
 `latest` / `v0` / `v0.0` / `v0.0.1` の4タグがいずれかのversionに紐づいていることを確認する。
@@ -134,7 +135,7 @@ gh run list --workflow=release.yml --limit 3
 CLIで確認しながら行いたい場合の参考コマンド（削除自体はUIで行う前提のため、ここではID確認のみ）:
 
 ```bash
-gh api /user/packages/container/bsky-cleaner/versions --paginate --jq '.[] | select(.metadata.container.tags | index("v0.0.1")) | {id, tags: .metadata.container.tags}'
+gh api /users/isseis/packages/container/bsky-cleaner/versions --paginate --jq '.[] | select(.metadata.container.tags | index("v0.0.1")) | {id, tags: .metadata.container.tags}'
 ```
 
 ⚠️ `latest` タグは他の正規リリースにも付いている場合があるため、削除対象を誤らないよう、必ずタグ一覧を確認してから実行すること。
