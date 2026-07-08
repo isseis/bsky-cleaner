@@ -56,7 +56,7 @@ git tag v0.0.1
 git push origin v0.0.1
 ```
 
-このpushで自動的に `release.yml` の push トリガーが走る（`test/release-dry-run` ブランチのコミットの内容で実行される）。
+この push で自動的に `release.yml` の push トリガーが走る（実行対象はタグ `v0.0.1` が指すコミット。今回は `test/release-dry-run` の HEAD をタグ付けしている）。
 
 ### 1-3. 失敗を確認する
 
