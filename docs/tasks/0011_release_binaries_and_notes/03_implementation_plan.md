@@ -236,8 +236,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - `docs/design/docker_deployment.md` の追記が実際のワークフロー挙動と一致しているか
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] PR を作成した
 - [ ] PR がマージされた
 
 ## 4. テスト戦略
