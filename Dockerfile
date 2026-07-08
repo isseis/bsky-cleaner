@@ -4,12 +4,15 @@
 # so the image is reproducible regardless of the host build machine's arch.
 FROM --platform=linux/amd64 golang@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 AS build
 
+ARG VERSION=dev
+ARG COMMIT=""
+
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o /out/bsky-cleaner ./cmd
+RUN go build -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT}" -o /out/bsky-cleaner ./cmd
 
 # Fetch supercronic via go install so the Go module checksum database
 # verifies the source (supply-chain protection, see architecture doc 3.2.2).

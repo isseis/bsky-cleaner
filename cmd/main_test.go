@@ -141,6 +141,64 @@ func TestParseFlags_HelpFlag_DoesNotRequireConfig(t *testing.T) {
 	require.ErrorIs(t, err, flag.ErrHelp)
 }
 
+// ── formatVersion tests ──────────────────────────────────────────────────────
+
+func TestFormatVersion_WithCommit_ReturnsVersionAndCommit(t *testing.T) {
+	origVersion, origCommit := version, commit
+	t.Cleanup(func() { version, commit = origVersion, origCommit })
+	version = "v1.2.3"
+	commit = "a1b2c3d"
+
+	got := formatVersion()
+	assert.Equal(t, "v1.2.3 (a1b2c3d)", got)
+}
+
+func TestFormatVersion_NonDevVersionEmptyCommit_ReturnsVersionOnly(t *testing.T) {
+	origVersion, origCommit := version, commit
+	t.Cleanup(func() { version, commit = origVersion, origCommit })
+	version = "v1.2.3"
+	commit = ""
+
+	got := formatVersion()
+	assert.Equal(t, "v1.2.3", got)
+}
+
+func TestFormatVersion_EmptyCommit_ReturnsVersionOnly(t *testing.T) {
+	origVersion, origCommit := version, commit
+	t.Cleanup(func() { version, commit = origVersion, origCommit })
+	version = "dev"
+	commit = ""
+
+	got := formatVersion()
+	assert.Equal(t, "dev", got)
+}
+
+// ── --version/-v parseFlags tests ────────────────────────────────────────────
+
+func TestParseFlags_VersionLongFlag_ReturnsErrVersionRequested(t *testing.T) {
+	_, _, err := parseFlags([]string{"--version"}, &bytes.Buffer{})
+
+	require.ErrorIs(t, err, errVersionRequested)
+}
+
+func TestParseFlags_VersionShortFlag_ReturnsErrVersionRequested(t *testing.T) {
+	_, _, err := parseFlags([]string{"-v"}, &bytes.Buffer{})
+
+	require.ErrorIs(t, err, errVersionRequested)
+}
+
+func TestParseFlags_VersionEqualsTrueForm_ReturnsErrVersionRequested(t *testing.T) {
+	_, _, err := parseFlags([]string{"--version=true"}, &bytes.Buffer{})
+
+	require.ErrorIs(t, err, errVersionRequested)
+}
+
+func TestParseFlags_VersionFlag_DoesNotRequireConfig(t *testing.T) {
+	_, _, err := parseFlags([]string{"--version"}, &bytes.Buffer{})
+
+	require.ErrorIs(t, err, errVersionRequested)
+}
+
 func TestParseFlags_UnknownFlag_PrintsFlagListToOut(t *testing.T) {
 	var out bytes.Buffer
 

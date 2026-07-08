@@ -25,6 +25,28 @@ import (
 	"github.com/isseis/bsky-cleaner/internal/runner"
 )
 
+// version and commit are set at build time via -ldflags -X.
+// When built without -ldflags (local development), version is "dev" and
+// commit is empty.
+var (
+	version = "dev"
+	commit  = ""
+)
+
+// errVersionRequested is a sentinel error returned by parseFlags when
+// --version/-v was given, analogous to flag.ErrHelp.
+var errVersionRequested = errors.New("version requested")
+
+// formatVersion renders the build-time version/commit variables into the
+// single-line string --version prints. When commit is empty (a build with
+// no embedded version information), it returns version alone.
+func formatVersion() string {
+	if commit == "" {
+		return version
+	}
+	return version + " (" + commit + ")"
+}
+
 // Exit codes. Usage/flag errors (2, exitUsageError) are distinguished from
 // other setup-or-run failures such as config/init/login/list (1,
 // exitSetupOrRunFail), which are in turn distinguished from partial-delete
@@ -249,13 +271,16 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 	fs.Usage = func() { printUsage(fs, out) }
 
 	var help bool
+	var showVersion bool
 	fs.StringVar(&configPath, "config", "", "path to the TOML configuration file")
 	fs.StringVar(&configPath, "c", "", "path to the TOML configuration file (shorthand for --config)")
 	fs.BoolVar(&apply, "apply", false, "actually delete posts (default: dry-run)")
 	fs.BoolVar(&help, "help", false, "show this help message and exit")
 	fs.BoolVar(&help, "h", false, "show this help message and exit (shorthand for --help)")
+	fs.BoolVar(&showVersion, "version", false, "print version information and exit")
+	fs.BoolVar(&showVersion, "v", false, "print version information and exit (shorthand for --version)")
 
-	// Scan for a help token before calling fs.Parse: fs.Parse returns
+	// Scan for a help/version token before calling fs.Parse: fs.Parse returns
 	// immediately on the first unknown/invalid flag, so if -h/--help appeared
 	// alongside a malformed flag (e.g. "--help --unknown"), the help check
 	// below would never be reached and the command would exit as a usage
@@ -265,6 +290,9 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 		if arg == "-h" || arg == "--help" {
 			fs.Usage()
 			return "", false, flag.ErrHelp
+		}
+		if arg == "-v" || arg == "-version" || arg == "--version" {
+			return "", false, errVersionRequested
 		}
 		if arg == "--" {
 			// Everything after "--" is positional, not a flag.
@@ -279,6 +307,10 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 	if help {
 		fs.Usage()
 		return "", false, flag.ErrHelp
+	}
+
+	if showVersion {
+		return "", false, errVersionRequested
 	}
 
 	if fs.NArg() > 0 {
@@ -432,6 +464,10 @@ func main() {
 			// The full help message (flag list included) was already
 			// written to os.Stderr by parseFlags/printUsage; avoid
 			// printing the redundant "flag: help requested" error text.
+			os.Exit(exitOK)
+		}
+		if errors.Is(err, errVersionRequested) {
+			_, _ = fmt.Fprintln(os.Stdout, formatVersion()) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 			os.Exit(exitOK)
 		}
 		_, _ = fmt.Fprintln(os.Stderr, err.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
