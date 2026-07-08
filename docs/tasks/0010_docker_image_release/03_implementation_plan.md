@@ -197,7 +197,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
 
