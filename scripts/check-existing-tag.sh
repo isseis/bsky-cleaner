@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # check-existing-tag.sh — fail-closed check for an existing GHCR tag.
 #
-# Usage: docker manifest inspect ghcr.io/isseis/bsky-cleaner:<tag> 2>&1 \
-#          | check-existing-tag.sh "$EXIT_CODE" \
-#   || EXIT_CODE=$?
-# Note: After the pipeline, $? would be the exit code of the last command
-# (check-existing-tag.sh itself), not of docker manifest inspect. Use the
-# || pattern instead to capture docker manifest inspect's exit code.
+# Usage:
+#   EXIT_CODE=0
+#   OUTPUT=$(docker manifest inspect ghcr.io/isseis/bsky-cleaner:<tag> 2>&1) || EXIT_CODE=$?
+#   printf '%s\n' "$OUTPUT" | check-existing-tag.sh "$EXIT_CODE"
 #
 # The script reads the exit code of docker manifest inspect as $1 and its
 # combined stderr+stdout on stdin. It returns:
