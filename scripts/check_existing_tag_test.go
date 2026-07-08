@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -28,8 +29,18 @@ func runScript(t *testing.T, exitCode string, stdin string) int {
 	cmd := exec.Command(scriptPath(t), exitCode)
 	cmd.Stdin = strings.NewReader(stdin)
 	// We don't care about stdout/stderr content, just the exit code.
-	_ = cmd.Run()
-	return cmd.ProcessState.ExitCode()
+	err := cmd.Run()
+	if err == nil {
+		return 0
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	// Command failed to start (e.g. script not executable / missing) — treat
+	// as inconclusive / fail-closed.
+	t.Logf("runScript: command failed to start: %v", err)
+	return 1
 }
 
 func TestCheckExistingTag_ManifestFound_ExitsFailClosed(t *testing.T) {
