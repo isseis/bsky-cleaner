@@ -80,7 +80,7 @@ Record the commit hash (call it `SYNC_HASH`). If no hash is returned (e.g., the 
 Run:
 
 ```bash
-GIT_PAGER=cat PAGER=cat git diff SYNC_HASH -- <source-file>
+GIT_PAGER=cat PAGER=cat git diff $SYNC_HASH -- <source-file>
 ```
 
 If the diff is empty, the output file is already up to date. Stop and report this to the user.
