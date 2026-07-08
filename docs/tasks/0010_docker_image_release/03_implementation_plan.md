@@ -485,6 +485,6 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 ## 10. クロス検索チェックリスト
 
-- [ ] `docker-compose.yml` の `build: .` 削除に伴い、`README.md`・`docs/overview.md`・`docs/design/docker_deployment.md` に「ソースからビルドする」ことを前提にした記述が残っていないか確認する: `rg -n "docker compose build|docker-compose build" README.md docs/overview.md docs/design/docker_deployment.md`（実装時点で0件であることを確認済み。フェーズ3完了時に再確認する）。
-- [ ] `--version`/`-v`・`showVersion`・`errVersionRequested`・`formatVersion` は本タスクで新規追加する識別子であり、既存コードとの衝突がないことを確認済み（`rg -n "\bversion\b|\bcommit\b" cmd/main.go` が本タスクの変更前は0件だったことを1.3節の事前調査で確認済み）。追加実装後にこれらの識別子が意図しない箇所で再定義されていないかを `rg -n "^var version|^var commit|^func formatVersion|errVersionRequested" cmd/*.go` で確認する。
-- [ ] `scripts/` ディレクトリは本タスクで新規追加するものであり、既存コードとの衝突がないことを確認済み（1.3節の事前調査で `scripts/` が未存在であることを確認済み）。追加実装後に `go vet ./...`／`make lint` が `scripts/check_existing_tag_test.go` を正しくパッケージとして認識し、`make test` の対象に含まれていることを `go test -tags test ./... -list '.*' 2>&1 | rg -n "check.*existing.*tag" ` 等で確認する。
+- [x] `docker-compose.yml` の `build: .` 削除に伴い、`README.md`・`docs/overview.md`・`docs/design/docker_deployment.md` に「ソースからビルドする」ことを前提にした記述が残っていないか確認する: `rg -n "docker compose build|docker-compose build" README.md docs/overview.md docs/design/docker_deployment.md`（実装時点で0件であることを確認済み。フェーズ3完了時に再確認する）。
+- [x] `--version`/`-v`・`showVersion`・`errVersionRequested`・`formatVersion` は本タスクで新規追加する識別子であり、既存コードとの衝突がないことを確認済み（`rg -n "\bversion\b|\bcommit\b" cmd/main.go` が本タスクの変更前は0件だったことを1.3節の事前調査で確認済み）。追加実装後にこれらの識別子が意図しない箇所で再定義されていないかを `rg -n "^var version|^var commit|^func formatVersion|errVersionRequested" cmd/*.go` で確認する。
+- [x] `scripts/` ディレクトリは本タスクで新規追加するものであり、既存コードとの衝突がないことを確認済み（1.3節の事前調査で `scripts/` が未存在であることを確認済み）。追加実装後に `go vet ./...`／`make lint` が `scripts/check_existing_tag_test.go` を正しくパッケージとして認識し、`make test` の対象に含まれていることを `go test -tags test ./... -list '.*' 2>&1 | rg -n "check.*existing.*tag" ` 等で確認する。
