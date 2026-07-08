@@ -52,3 +52,32 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11.4
+
+  docker-build-check:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Check for Docker-related changes
+        uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - 'go.mod'
+              - 'go.sum'
+              - 'cmd/**'
+              - 'internal/**'
+              - 'entrypoint.sh'
+
+      - name: Build Docker image
+        if: steps.filter.outputs.docker == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha
