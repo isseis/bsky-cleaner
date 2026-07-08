@@ -270,7 +270,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] `README.md`: 「Docker」節（新規）を追加する。`docker-compose.yml`・`.env`（`dot.env.example` からコピー）・TOML 設定ファイルを用意し、`docker-compose.yml` のバージョンタグを確認・更新したうえで `docker compose pull && docker compose up -d` を実行する手順を記載する（AC-16）。
 - [x] `README.md`: 既存の「Usage」節（`README.md:60-69` 付近）に `bsky-cleaner --version`（出力例 `v1.2.3 (a1b2c3d)`）の使用例を追加する（AC-16）。
 - [x] 実タグでの初回リリースを実施する: `git tag v1.0.0 && git push --tags` を実行し、フェーズ2の `release.yml` が正常終了して4タグが GHCR に公開されることを確認する。GitHub の Package 設定画面から可視性を public に切り替える（AC-05, AC-17 の実施）。
-- [x] `docker-compose.yml`: 上記の実タグリリースが完了した後に着手する。`services.bsky-cleaner.build: .`（`docker-compose.yml:11`）を削除し、直前に以下のコメントを追加したうえで `image: ghcr.io/isseis/bsky-cleaner:v1.0.0`（上記ステップで実際に公開した初回バージョンタグに置き換える）に置き換える（AC-12, AC-13）。**未着手（PR-3 の最初のレビュー時点でこのステップより前に誤って先行コミットされていたため、weakreview で検出し `build: .` に戻したうえで、実行順を守れるようステップの並びをここに移動した）。**
+- [x] `docker-compose.yml`: 上記の実タグリリースが完了した後に着手する。`services.bsky-cleaner.build: .`（`docker-compose.yml:11`）を削除し、直前に以下のコメントを追加したうえで `image: ghcr.io/isseis/bsky-cleaner:v1.0.0`（上記ステップで実際に公開した初回バージョンタグに置き換える）に置き換える（AC-12, AC-13）。**実施済み（PR-3 の最初のレビュー時点でこのステップより前に誤って先行コミットされていたため、weakreview で検出し `build: .` に戻し、実行順を守れるようステップの並びをここに移動したうえで、実タグリリース完了後に本コミットで反映した）。**
 
   変更前:
   ```yaml
