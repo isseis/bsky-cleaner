@@ -190,6 +190,7 @@ sequenceDiagram
 既存の「Build image」ステップ（Docker イメージのローカルビルド。`push: false, load: true`）の**直後、Docker イメージの4タグ push（`latest`/`vX`/`vX.Y`/`vX.Y.Z`）より前**に、以下を行う新規ステップを追加する。
 
 - `actions/setup-go@v6` を用いて Go ツールチェーンをセットアップする。バージョン解決には `go-version-file: go.mod` を指定し、Docker イメージ側のビルドステージ（digest 固定のベースイメージに同梱された Go バージョン）とは独立に、リポジトリの `go.mod` を単一の情報源とする。両者の Go バージョンが完全に一致することまでは保証しないが、少なくともバイナリ側は `go.mod` の宣言と常に整合する。
+- `mkdir -p dist` で出力先ディレクトリを事前に作成する（`go build -o` は親ディレクトリを自動生成しないため）。
 - `GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT}" -o dist/bsky-cleaner ./cmd`
   - `${VERSION}`/`${COMMIT}` は既存の `steps.resolve-tag.outputs.resolved_tag`／`steps.short-sha.outputs.sha`（Docker イメージビルドの `--build-arg` に渡しているのと同じ値）をそのまま参照する。これにより AC-02（アーカイブ内バイナリと GHCR 上の Docker イメージ内バイナリが同一の `vX.Y.Z (短縮コミットSHA)` を `--version` で出力すること）を、値の一元管理によって保証する。
   - 出力先を `dist/` とし、`make build`/`Makefile` が使うローカル開発用の `build/`（`.gitignore` 対象）とは別のディレクトリにする。CI 専用の一時的なビルド成果物を開発者のローカルビルド出力と混同しないための区別であり、両者に機能的な違いはない。
@@ -219,8 +220,8 @@ cd dist && sha256sum bsky-cleaner-${TAG}-linux-amd64.tar.gz > SHA256SUMS
 
 処理内容:
 
-1. `actions/download-artifact` で 3.2.2 のアーカイブと `SHA256SUMS` を取得する。
-2. 次を実行する。
+1. `actions/download-artifact` で 3.2.2 のアーカイブと `SHA256SUMS` を取得する。`upload-artifact` 時の `dist/` 配下のディレクトリ構造がそのまま復元されるため、アセットは `dist/bsky-cleaner-${TAG}-linux-amd64.tar.gz` および `dist/SHA256SUMS` として配置される。
+2. `${TAG}` は `github.ref_name`（タグ push 契機）または `workflow_dispatch` 入力のタグ値（手動実行契機）を指す。`release` ジョブ内で `resolve-tag` により決定された値と同一であり、`publish-release` ジョブでも同じ決定方法（`github.ref_name`／`workflow_dispatch` 入力）を用いる。これを前提として次を実行する。
 
 ```sh
 gh release create "${TAG}" \
