@@ -69,7 +69,7 @@ gh run watch <RUN_ID>          # 上のコマンドで確認した run ID を指
 - `Validate tag format` / `Check existing vX.Y.Z tag` は成功
 - `Tag and push latest` は成功
 - `Tag and push major version tag` が失敗し、ワークフローが非0終了
-- `Tag and push patch version tag (vX.Y.Z)` は**実行されない**（＝`v0.0.1` タグはまだ GHCR に push されていない）
+- `Tag and push minor version tag` / `Tag and push patch version tag (vX.Y.Z)` は**実行されない**（＝`v0`/`v0.0`/`v0.0.1` はまだ GHCR に push されていない）
 
 GHCR側の確認（`v0.0.1` がまだ無いこと）:
 
