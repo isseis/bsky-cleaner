@@ -26,16 +26,21 @@ jobs:
     steps:
       - name: Resolve tag name
         id: resolve-tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_TAG: ${{ github.ref_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "resolved_tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "push" ]; then
+            echo "resolved_tag=$PUSH_TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "resolved_tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "resolved_tag=$DISPATCH_TAG" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Validate tag format
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
-          TAG="${{ steps.resolve-tag.outputs.resolved_tag }}"
           if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "ERROR: tag '$TAG' does not match semver format vX.Y.Z"
             exit 1
@@ -62,8 +67,9 @@ jobs:
 
       - name: Check existing vX.Y.Z tag
         id: check-tag
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
-          TAG="${{ steps.resolve-tag.outputs.resolved_tag }}"
           EXIT_CODE=0
           OUTPUT=$(docker manifest inspect "ghcr.io/isseis/bsky-cleaner:${TAG}" 2>&1) || EXIT_CODE=$?
           echo "$OUTPUT" | scripts/check-existing-tag.sh "$EXIT_CODE"
@@ -85,21 +91,24 @@ jobs:
           docker push ghcr.io/isseis/bsky-cleaner:latest
 
       - name: Tag and push major version tag
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
-          TAG="${{ steps.resolve-tag.outputs.resolved_tag }}"
           MAJOR=$(echo "$TAG" | sed 's/^v\([0-9]*\)\..*$/v\1/')
           docker tag bsky-cleaner:release "ghcr.io/isseis/bsky-cleaner:${MAJOR}"
           docker push "ghcr.io/isseis/bsky-cleaner:${MAJOR}"
 
       - name: Tag and push minor version tag
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
-          TAG="${{ steps.resolve-tag.outputs.resolved_tag }}"
           MINOR=$(echo "$TAG" | sed 's/^v\([0-9]*\.[0-9]*\)\..*$/v\1/')
           docker tag bsky-cleaner:release "ghcr.io/isseis/bsky-cleaner:${MINOR}"
           docker push "ghcr.io/isseis/bsky-cleaner:${MINOR}"
 
       - name: Tag and push patch version tag (vX.Y.Z)
+        env:
+          TAG: ${{ steps.resolve-tag.outputs.resolved_tag }}
         run: |
-          TAG="${{ steps.resolve-tag.outputs.resolved_tag }}"
           docker tag bsky-cleaner:release "ghcr.io/isseis/bsky-cleaner:${TAG}"
           docker push "ghcr.io/isseis/bsky-cleaner:${TAG}"

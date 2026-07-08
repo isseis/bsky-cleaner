@@ -12,7 +12,12 @@
 # The "not found" string is GHCR's equivalent of "manifest unknown".
 # It was determined experimentally by running
 #   docker manifest inspect ghcr.io/isseis/bsky-cleaner:nonexistent-tag
-# and capturing the error output.
+# and capturing the error output. That experiment used an existing package
+# with a missing tag; it has NOT been verified against the "package does not
+# exist at all yet" case (e.g. the very first release), which some registries
+# report with a different error class. Until confirmed, treat that scenario
+# as covered by the fail-closed default (this script exits 1) rather than by
+# this specific string match.
 
 set -o errexit
 set -o nounset
