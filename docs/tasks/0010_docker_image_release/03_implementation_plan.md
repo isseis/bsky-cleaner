@@ -198,8 +198,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた
 
 ### フェーズ2: GHCR 公開ワークフロー（AC-01〜07, AC-10 の残り, NF-003, NF-004）
 
@@ -229,11 +229,13 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] "Tag and push major version tag" ステップを追加する: `vX`（例 `v1`）を `docker tag`/`docker push`。
 - [x] "Tag and push minor version tag" ステップを追加する: `vX.Y`（例 `v1.2`）を `docker tag`/`docker push`。
 - [x] "Tag and push patch version tag (vX.Y.Z)" ステップを追加する: 解決済みタグそのものを `docker tag`/`docker push`（最後に実行、AC-03b, NF-004）。
-- [ ] `workflow_dispatch` から、まだ GHCR に存在しない実 semver タグ（例 `v0.0.1`。`v0.0.1-plan-check` のような非 semver 値は "Validate tag format" ステップで拒否されるため使えない）を指定して手動実行し、正常系（4タグが GHCR に公開される）を確認する（[02_architecture.md 8章 フェーズ2](./02_architecture.md#8-実装優先順位) の「ドライラン的な動作確認」）。
-- [ ] 上記ドライラン実行中に、いずれか1つの浮動タグ push ステップ（例 "Tag and push major version tag"）を一時的に失敗させ（例: 存在しないレジストリパスを指す一時的な変更）、`vX.Y.Z` タグが push されないまま非0終了することを確認する。修正後、同じタグ名で `workflow_dispatch` を再実行し、タグの手動削除なしに正常終了して4タグすべてが公開されることを確認する（AC-03b, NF-004 の実挙動検証）。
-- [ ] ドライラン検証が完了したら、GitHub の Package 設定画面から `v0.0.1` の4タグ（`latest`/`v0`/`v0.0`/`v0.0.1`）を手動削除する。本番のリリース履歴（フェーズ3ステップ8の `v1.0.0` 初回リリース）に検証専用のタグを残さないためである。
+- [x] `workflow_dispatch` から、まだ GHCR に存在しない実 semver タグ（例 `v0.0.1`。`v0.0.1-plan-check` のような非 semver 値は "Validate tag format" ステップで拒否されるため使えない）を指定して手動実行し、正常系（4タグが GHCR に公開される）を確認する（[02_architecture.md 8章 フェーズ2](./02_architecture.md#8-実装優先順位) の「ドライラン的な動作確認」）。
+- [x] 上記ドライラン実行中に、いずれか1つの浮動タグ push ステップ（例 "Tag and push major version tag"）を一時的に失敗させ（例: 存在しないレジストリパスを指す一時的な変更）、`vX.Y.Z` タグが push されないまま非0終了することを確認する。修正後、同じタグ名で `workflow_dispatch` を再実行し、タグの手動削除なしに正常終了して4タグすべてが公開されることを確認する（AC-03b, NF-004 の実挙動検証）。
+- [x] ドライラン検証が完了したら、GitHub の Package 設定画面から `v0.0.1` の4タグ（`latest`/`v0`/`v0.0`/`v0.0.1`）を手動削除する。本番のリリース履歴（フェーズ3ステップ8の `v1.0.0` 初回リリース）に検証専用のタグを残さないためである。
 
-**完了基準**: `.github/workflows/release.yml`・`scripts/check-existing-tag.sh`・`scripts/check_existing_tag_test.go` が上記すべての要素を含む。`make test` で `scripts/check_existing_tag_test.go` の3ケースが緑。ドライラン実行（正常系・浮動タグ push 失敗からの再実行・GHCR タグ削除）が完了している。実際に GHCR へ公開される点に留意する。
+上記ドライラン検証の実施手順は [10_manual_verification_runbook.md](10_manual_verification_runbook.md) に、実行ログは [11_manual_verification_log.md](11_manual_verification_log.md) にまとめてある（実施日 2026-07-08）。AC-03a・AC-03b・NF-004・正常系4タグ公開のいずれも確認済み。副次的な発見として、現行イメージには `--version`/`--help` が未実装で `--config` 必須のまま起動が中断される点をログに記録済み（本タスクのスコープ外、フォローアップ候補）。
+
+**完了基準**: `.github/workflows/release.yml`・`scripts/check-existing-tag.sh`・`scripts/check_existing_tag_test.go` が上記すべての要素を含む。`make test` で `scripts/check_existing_tag_test.go` の3ケースが緑。ドライラン実行（正常系・浮動タグ push 失敗からの再実行・GHCR タグ削除）が完了している（[11_manual_verification_log.md](11_manual_verification_log.md) 参照）。実際に GHCR へ公開される点に留意する。
 
 ### PR-3 作成ポイント
 - **対象ステップ**: フェーズ3: 配布経路とドキュメント, フェーズ4: CI ビルド確認
@@ -356,7 +358,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 ## 6. 実装チェックリスト
 
 - [x] フェーズ1完了（`--version`/`-v`、`formatVersion`、`Dockerfile` の `ARG`/`-ldflags`）
-- [ ] フェーズ2完了（`release.yml` 作成・`workflow_dispatch` 動作確認）
+- [x] フェーズ2完了（`release.yml` 作成・`workflow_dispatch` 動作確認。[11_manual_verification_log.md](11_manual_verification_log.md) 参照）
 - [ ] フェーズ3完了（実タグ初回リリース・可視性切り替え・`docker-compose.yml`・ドキュメント）
 - [ ] フェーズ4完了（`ci.yml` への `docker-build-check` ジョブ追加・red/skip 確認）
 - [ ] `make fmt` / `make test` / `make lint` がすべて通過（NF-001）
