@@ -45,7 +45,10 @@ git push --tags
 1. タグが semver 形式（`vX.Y.Z`）であることを検証する
 2. 同じ `vX.Y.Z` タグが GHCR に既に存在しないことを確認する
 3. Docker イメージをビルドし、`VERSION=vX.Y.Z` と短縮コミット SHA を埋め込む
-4. `latest`・`vX`・`vX.Y`・`vX.Y.Z` の4タグを GHCR に push する（`vX.Y.Z` は最後）
+4. `linux/amd64` バイナリをビルドし、`bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` アーカイブを生成する
+5. 上記アーカイブの SHA256 チェックサムファイル（`SHA256SUMS`）を生成する
+6. `latest`・`vX`・`vX.Y`・`vX.Y.Z` の4タグを GHCR に push する（`vX.Y.Z` は最後）
+7. `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` と `SHA256SUMS` を添付した GitHub Release を作成し、GitHub 標準の自動生成リリースノート（`--generate-notes`）を Release 本文に反映する
 
 ### 動作確認用の手動実行
 
@@ -58,6 +61,17 @@ git push --tags
 5. 「Run workflow」をクリックする
 
 `workflow_dispatch` で指定したタグが実在しない git tag の場合、チェックアウトステップが失敗し、ワークフローは非0で終了する。
+
+`workflow_dispatch` 契機の実行では、GitHub Release が **ドラフト** 状態（`--draft`）で作成される。これは動作確認用の Release が本番の Release 一覧に表示されるのを防ぐための設計である。確認後は `gh release delete <tag>` で削除するか、`gh release edit <tag> --draft=false` で明示的に公開する必要がある。
+
+### ダウンロード後のチェックサム検証
+
+1. GitHub Release ページから `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` と `SHA256SUMS` をダウンロードする
+2. 同じディレクトリに両ファイルを配置し、以下を実行する:
+   ```sh
+   sha256sum -c SHA256SUMS
+   ```
+3. `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz: OK` と出力されれば改ざんされていないことが確認できる（詳細は `README.md` の「インストールと実行（ビルド済み実行ファイル）」節も参照）
 
 ## GHCR パッケージ可視性の切り替え手順
 
