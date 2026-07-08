@@ -3,10 +3,10 @@
 #
 # Usage: docker manifest inspect ghcr.io/isseis/bsky-cleaner:<tag> 2>&1 \
 #          | check-existing-tag.sh "$EXIT_CODE" \
-#   EXIT_CODE=$?
-# Note: After the pipeline, $? is the exit code of the last command in the
-# pipeline (check-existing-tag.sh itself), not of docker manifest inspect.
-# Use the || pattern instead: capture EXIT_CODE separately.
+#   || EXIT_CODE=$?
+# Note: After the pipeline, $? would be the exit code of the last command
+# (check-existing-tag.sh itself), not of docker manifest inspect. Use the
+# || pattern instead to capture docker manifest inspect's exit code.
 #
 # The script reads the exit code of docker manifest inspect as $1 and its
 # combined stderr+stdout on stdin. It returns:

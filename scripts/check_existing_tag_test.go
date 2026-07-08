@@ -26,15 +26,14 @@ func scriptPath(t *testing.T) string {
 // and the given stdin content, and returns the exit code.
 func runScript(t *testing.T, exitCode string, stdin string) int {
 	t.Helper()
-	cmd := exec.Command(scriptPath(t), exitCode)
+	cmd := exec.Command("bash", scriptPath(t), exitCode)
 	cmd.Stdin = strings.NewReader(stdin)
 	// We don't care about stdout/stderr content, just the exit code.
 	err := cmd.Run()
 	if err == nil {
 		return 0
 	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		return exitErr.ExitCode()
 	}
 	// Command failed to start (e.g. script not executable / missing) — treat
