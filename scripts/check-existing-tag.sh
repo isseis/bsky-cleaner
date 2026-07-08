@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# check-existing-tag.sh — fail-closed check for an existing GHCR tag.
+#
+# Usage: docker manifest inspect ghcr.io/isseis/bsky-cleaner:<tag> 2>&1 \
+#          | check-existing-tag.sh $?
+#
+# The script reads the exit code of docker manifest inspect as $1 and its
+# combined stderr+stdout on stdin. It returns:
+#   0 — tag does NOT exist (safe to proceed)
+#   1 — tag exists, or the check was inconclusive (fail-closed)
+#
+# The "not found" string is GHCR's equivalent of "manifest unknown".
+# It was determined experimentally by running
+#   docker manifest inspect ghcr.io/isseis/bsky-cleaner:nonexistent-tag
+# and capturing the error output.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+exit_code="${1:-}"
+input="$(cat)"
+
+# Tag exists — fail-closed.
+if [ "$exit_code" = "0" ]; then
+    exit 1
+fi
+
+# Check whether the error message confirms the tag does not exist.
+# GHCR returns "manifest unknown" when the tag is not found.
+if echo "$input" | grep -q "manifest unknown"; then
+    exit 0
+fi
+
+# Any other failure (rate limit, registry 5xx, network error, etc.) is
+# inconclusive — fail-closed.
+exit 1
