@@ -199,7 +199,7 @@
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/release.yml` を実行し、YAML構文・式構文のエラーがないことを確認した（`make lint`/`make test` は Go ソースのみを対象とし `.github/workflows/*.yml` の構文は検証しないため、マージ前にワークフロー自体の構文エラーを検出する唯一の手段）
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
 
