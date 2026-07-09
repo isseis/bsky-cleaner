@@ -1,5 +1,3 @@
-//go:build test
-
 // Package atproto_test contains integration tests for idempotency and
 // cancellation behavior across the runner and atproto packages.
 package atproto_test
