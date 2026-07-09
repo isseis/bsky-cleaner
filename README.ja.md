@@ -177,15 +177,25 @@ Docker を使わずホスト上で定期実行したい場合は、システム�
 
 秘匿情報を crontab に直接書き込むと、cron がジョブ実行時にコマンドライン全体（環境変数の値を含む）を
 syslog に記録することがあり、意図せず秘匿情報がログに残ってしまう。これを避けるため、秘匿情報は
-`.env` ファイル（Docker Compose 版と同じ形式・ファイル名。[環境変数](#環境変数)を参照）に
-書き込み、パーミッションを `600` に制限した上で、cron エントリからは読み込むだけにする。
+`export VAR=VALUE` 形式のファイル（`cron.env` など。Docker Compose 版の `.env` とは形式が異なるため
+別名にする）に書き込み、パーミッションを `600` に制限した上で、cron エントリからは読み込むだけにする。
+
+`cron.env`（例）:
 
 ```sh
-chmod 600 /path/to/.env
+export BSKY_HANDLE=alice.bsky.social
+export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+# 以下は Slack 通知を使う場合のみ設定する（省略可）
+export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
+export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
+```
+
+```sh
+chmod 600 /path/to/cron.env
 ```
 
 ```cron
-0 3 * * * . /path/to/.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
+0 3 * * * . /path/to/cron.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
 
 ## 安全性
