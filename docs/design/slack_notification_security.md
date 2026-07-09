@@ -1,3 +1,5 @@
+English | [Japanese](slack_notification_security.ja.md)
+
 # Slack Notification Security Design
 
 - Created: 2026-07-09
