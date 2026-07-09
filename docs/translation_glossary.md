@@ -203,6 +203,7 @@
 | セットアップ | setup | |
 | シリアライズ | serialize / serialization | |
 | シェル | shell | |
+| 暗黙の | silently | |
 | サイズ | size | |
 | 仕様 | specification | |
 | 標準 | standard | |

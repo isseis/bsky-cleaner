@@ -17,63 +17,52 @@
 - `.env` に実際の app パスワード等を記載する
 - `.env` の扱いは、運用に応じて以下のいずれかを選択できるようにする
   - **`git-crypt` で `.env` のみを暗号化対象にする**: `.gitattributes` に `.env filter=git-crypt diff=git-crypt` を設定する。`docker-compose.yml` や TOML 設定など秘匿情報を含まないファイルは平文のまま差分管理・レビューでき、秘匿情報だけをリポジトリ内で安全に共有できる。複数人・複数環境で `.env` 自体をバージョン管理・共有したい場合に向く
-  - **`.env` を `.gitignore` に追加してバージョン管理から外す**: 最もシンプルで事故りにくいが、`.env` 自体の共有は git 管理外の手段（パスワードマネージャ等）に委ねる必要がある
-- `.env.example`（値は空/ダミー）はいずれの方式でも通常通りコミットし、初期セットアップの手引きとする
+  - **`.env` を `.gitignore` に追加してバージョン管理から外す**: 最もシンプルで事故を起こしにくいが、`.env` 自体の共有は git 管理外の手段（パスワードマネージャ等）に委ねる必要がある
+- `dot.env.example`（値は空/ダミー）はいずれの方式でも通常通りコミットし、初期セットアップの手引きとする
 
 ## スケジュール設定と内蔵 cron の連携
 
-実行スケジュールも他の設定と同様に TOML に一元化する（`docker-compose.yml` の環境変数には出さない）。TOML はコンテナ起動時にしか読めない内蔵 cron 定義ファイルとは別物のため、以下の手順で橋渡しする。
+実行スケジュールも他の設定と同様に TOML に一元化する（`docker-compose.yml` の環境変数には出さない）。TOML はコンテナ起動時にしか読めない設定ファイルであり、内蔵 cron（supercronic）が読み取る crontab 定義ファイルとは別物である。そのため、以下の手順で TOML の設定値を crontab に橋渡しする。
 
-1. バイナリに `print-schedule` のような隠しサブコマンドを用意し、TOML から schedule フィールド（例: `schedule = "0 3 * * *"`）だけを取り出して標準出力する。TOML のパース処理をこのサブコマンドに集約し、二重実装を避ける。出力前に「改行を含まない1行の cron 式」であることを検証し、不正な値の場合は非0で終了する（改行を含む値をそのまま crontab に書き込むと、crontab の追加行として任意コマンドを注入できるため）
+1. バイナリに隠しサブコマンド `print-schedule` を用意し、TOML から schedule フィールド（例: `schedule = "0 3 * * *"`）だけを取り出して標準出力する。TOML のパース処理をこのサブコマンドに集約し、二重実装を避ける。出力前に「改行を含まない1行の cron 式」であることを検証し、不正な値の場合は非0で終了する（改行を含む値をそのまま crontab に書き込むと、crontab の追加行として任意コマンドを注入できるため）
 2. イメージ同梱のエントリポイントスクリプトが、コンテナ起動時にこのサブコマンドを呼び出し、結果を使って `supercronic` 用の crontab ファイルを動的生成する
 3. `exec supercronic <生成した crontab>` で内蔵 cron を起動し、以降はそのスケジュールに従って本体（`bsky-cleaner --apply --config ...`）を定期実行する
 
 この方式により、設定は TOML に一元化されたまま、ユーザーは Docker イメージを起動するだけで良く、ホスト側の cron 設定は不要になる。
 
-## リリース公開手順（開発者向け）
+## リリース
+
+リリースは CI（`.github/workflows/release.yml`）が自動化しており、開発者が行う操作は以下の通り。
 
 ### 通常のリリース
 
 ```sh
-# 1. タグを作成して push する
 git tag vX.Y.Z
 git push --tags
 ```
 
-これにより、`.github/workflows/release.yml` が起動し、以下の処理が自動的に行われる。
+タグの push をトリガーに CI が以下を自動実行する。
 
-1. タグが semver 形式（`vX.Y.Z`）であることを検証する
-2. 同じ `vX.Y.Z` タグが GHCR に既に存在しないことを確認する
-3. Docker イメージをビルドし、`VERSION=vX.Y.Z` と短縮コミット SHA を埋め込む
-4. `linux/amd64` バイナリをビルドし、`bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` アーカイブを生成する
-5. 上記アーカイブの SHA256 チェックサムファイル（`SHA256SUMS`）を生成する
-6. `latest`・`vX`・`vX.Y`・`vX.Y.Z` の4タグを GHCR に push する（`vX.Y.Z` は最後）
-7. `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` と `SHA256SUMS` を添付した GitHub Release を作成し、GitHub 標準の自動生成リリースノート（`--generate-notes`）を Release 本文に反映する
+- semver 形式の検証、既存タグの重複チェック
+- Docker イメージのビルドと GHCR への push（`latest`・`vX`・`vX.Y`・`vX.Y.Z` の4タグ）
+- バイナリアーカイブ（`bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz`）と SHA256 チェックサムの生成
+- GitHub Release の作成とアーカイブの添付
 
 ### 動作確認用の手動実行
 
-`workflow_dispatch` を使用して、任意のタグ名を指定して同じワークフローを手動実行できる。
-
-1. GitHub リポジトリの Actions タブを開く
-2. 左側のメニューから「Release」ワークフローを選択する
-3. 「Run workflow」ボタンをクリックする
-4. 「Git tag to release」フィールドにタグ名（例: `v1.2.3`）を入力する
-5. 「Run workflow」をクリックする
-
-`workflow_dispatch` で指定したタグが実在しない git tag の場合、チェックアウトステップが失敗し、ワークフローは非0で終了する。
-
-`workflow_dispatch` 契機の実行では、GitHub Release が **ドラフト** 状態（`--draft`）で作成される。これは動作確認用の Release が本番の Release 一覧に表示されるのを防ぐための設計である。確認後は `gh release delete <tag>` で削除するか、`gh release edit <tag> --draft=false` で明示的に公開する必要がある。
+`workflow_dispatch` で任意のタグを指定して同じワークフローを実行できる。指定したタグが実在しない場合はチェックアウトに失敗する。`workflow_dispatch` 契機では GitHub Release が **ドラフト** 状態で作成されるため、確認後は `gh release delete <tag>` で削除するか、`gh release edit <tag> --draft=false` で公開する。
 
 ### ダウンロード後のチェックサム検証
 
-1. GitHub Release ページから `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` と `SHA256SUMS` をダウンロードする
-2. 同じディレクトリに両ファイルを配置し、以下を実行する:
-   ```sh
-   sha256sum -c SHA256SUMS
-   ```
-3. `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz: OK` と出力されれば改ざんされていないことが確認できる（詳細は `README.md` の「インストールと実行（ビルド済み実行ファイル）」節も参照）
+```sh
+# ダウンロードした bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz と SHA256SUMS を同じディレクトリに配置し、以下を実行
+sha256sum -c SHA256SUMS
+# → bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz: OK と出力されれば改ざんされていない
+```
 
-## GHCR パッケージ可視性の切り替え手順
+詳細は `README.md` の「インストールと実行（ビルド済み実行ファイル）」節も参照。
+
+## GHCR パッケージ可視性の切り替え手順（初回のみ）
 
 GHCR に初めてイメージを公開した直後は、パッケージの可視性が **private** になっている。`GITHUB_TOKEN` の権限では可視性を変更できないため、以下の手順で一度だけ手動で public に切り替える必要がある。
 
@@ -84,8 +73,3 @@ GHCR に初めてイメージを公開した直後は、パッケージの可視
 5. 「Change visibility」をクリックし、確認ダイアログで「public」を選択する
 
 この操作はパッケージ初回作成時に一度だけ必要であり、2回目以降のリリースでは不要である。
-
-## 未確定・今後検討する事項
-
-- 内蔵 cron（`supercronic` 等の具体的な選定）とエントリポイントスクリプトの実装詳細
-- `print-schedule` サブコマンドの入出力仕様
