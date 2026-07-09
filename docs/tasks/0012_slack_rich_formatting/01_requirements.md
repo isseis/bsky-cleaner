@@ -21,7 +21,7 @@
 - サマリ情報と詳細情報の分離
 - 詳細情報を格納する attachment への色付け（正常系=緑、異常系=赤の 2 色。`go-safe-cmd-runner` の green/yellow/red 3 色構成のうち、黄色に対応する明確な中間状態が bsky-cleaner には存在しないため 2 色構成とする）
 
-チャンネル振り分けロジック（正常系/異常系 Webhook URL の選択、部分失敗を異常系として扱う扱い）は 0006 の AC-05〜AC-08 で確定済みであり、本タスクでは変更しない。attachment の色分けもこの既存の 2 分法（`failed := outcome.Err != nil || len(outcome.Result.Failed) > 0`）にそのまま従う。
+チャンネル振り分けロジック（正常系/異常系 Webhook URL の選択、部分失敗を異常系として扱う扱い）は 0006 の AC-05〜AC-08 で確定済みであり、本タスクでは変更しない。attachment の色分けもこの既存の 2 分法（`failed := outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)`）にそのまま従う。
 
 ### 1.2 目的（ゴール）
 
@@ -54,7 +54,7 @@ Slack メッセージの先頭（`text` フィールド）に、実行結果に�
 
 **Acceptance Criteria**:
 - **AC-01**: 実行が正常終了した場合（削除失敗が 0 件かつ `outcome.Err == nil`）、見出しに成功を示す絵文字（例: `✅`）が付与される
-- **AC-02**: 実行がエラー終了した場合（`outcome.Err != nil`、または `outcome.Result == nil`、または部分失敗を含む場合）、見出しに失敗を示す絵文字（例: `❌`）が付与される
+- **AC-02**: 実行がエラー終了した場合（`outcome.Err != nil`、または `outcome.Result != nil && len(outcome.Result.Failed) > 0`）、見出しに失敗を示す絵文字（例: `❌`）が付与される
 
 ### F-002: サマリ情報と詳細情報の分離
 

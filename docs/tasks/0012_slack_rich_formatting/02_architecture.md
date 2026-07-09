@@ -109,7 +109,7 @@ graph TB
 sequenceDiagram
     participant M as cmd/main.go
     participant N as internal/notify (send)
-    participant B as internal/notify (buildPayload)
+    participant B as internal/notify (payload.go)
     participant S as Slack Webhook
 
     M->>N: Send(ctx, cfg, doer, clock, outcome)
@@ -242,7 +242,7 @@ func colorFor(failed bool) string
 
 **この設計を選ぶ理由（AC-10 の決定）**: 可変長になり得る成分は「`text`」と「失敗一覧フィールドの `Value`」の2箇所に増えた（変更前は `text` 1箇所のみ）。両者は互いに独立した Slack ペイロード上のフィールドであり、一方の内容量がもう一方の許容量を圧迫する関係にはないため、2箇所それぞれに同じ `maxPayloadLength` を独立に適用する方式を採り、両者を跨いだ合算予算のような複雑な仕組み（`tlsrpt-digest` のような全体/フィールド2段階、0006 付録で見送り済み）は持ち込まない。
 
-**`maxPayloadLength` を流用することの留意点**: この定数はもともと Slack の実際の受理上限を検証していない保守的な既定値であり（0006 3.3節がすでに明記）、本タスクはこれを「`text` フィールド全体の上限」から転用し、「`text` と attachment field `Value` それぞれ単体の上限」という新しい意味で使う。Slack 側の実際の許容量は `text` と `attachments[].fields[].value` とで異なる可能性があり、この転用によって未検証の前提を新しい適用箇所に広げることになる。8節の実装優先順位に、`make notify-preview -send`（3.5節）による実際の Webhook への送信確認を明示のステップとして加え、実運用前に確認する。
+**`maxPayloadLength` を流用することの留意点**: この定数はもともと Slack の実際の受理上限を検証していない保守的な既定値であり（0006 3.3節がすでに明記）、本タスクはこれを「`text` フィールド全体の上限」から転用し、「`text` と attachment field `Value` それぞれ単体の上限」という新しい意味で使う。Slack 側の実際の許容量は `text` と `attachments[].fields[].value` とで異なる可能性があり、この転用によって未検証の前提を新しい適用箇所に広げることになる。8節の実装優先順位に、`make notify-preview-send`（3.5節）による実際の Webhook への送信確認を明示のステップとして加え、実運用前に確認する。
 
 ### 3.5 開発者プレビューツールへの影響（`notifypreview`）
 
