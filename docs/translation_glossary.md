@@ -23,6 +23,7 @@
 | 曖昧さ | ambiguity | |
 | アプリパスワード | app password | Bluesky のアプリパスワードの文脈 |
 | アプリケーション | application | |
+| 攻撃ベクトル | attack vector | |
 | 引数 | argument | コマンドの引数 |
 | 配列 | array | |
 | 代替案 | alternative | |
@@ -35,6 +36,7 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | バックアップ | backup | |
+| バックオフ | backoff | 指数バックオフの文脈 |
 | バッチ処理 | batch processing | |
 | ベースライン | baseline | |
 | ベストプラクティス | best practices | |
@@ -91,7 +93,10 @@
 | エラー | error | |
 | エラーメッセージ | error message | |
 | 例 | example | |
+| 排他制御 | exclusive control | ロックファイル等による排他制御の文脈 |
 | 例外 | exception | |
+| 実行タイムアウト | execution timeout | |
+| 実行時間 | execution time | |
 | 実行可能ファイル | executable | |
 | 実行 | execute / execution | |
 | 拡張 | extend / extending | |
@@ -116,6 +121,7 @@
 
 | 日本語 | English | 備考 |
 |--------|---------|------|
+| インジェクション | injection | |
 | インターフェース | interface | |
 | 実装 | implementation | |
 | インポート | import | |
@@ -147,6 +153,7 @@
 | マージ | merge / merging | |
 | メソッド | method | |
 | マスキング | masking / redact / redaction | ログ・エラーメッセージ上で秘密情報を隠す処理。「赤acting」は誤変換なので使わないこと |
+| メモリ枯渇 | memory exhaustion | |
 | 移行 | migration | |
 | Mock | mock | テストのモック |
 
@@ -171,6 +178,7 @@
 | パース | parse / parsing | 構文解析 |
 | パス | path | |
 | パフォーマンス | performance | |
+| ページネーション | pagination | |
 | 権限 | permission | ファイル権限の文脈 |
 | ピン留め | pinned | 固定表示（ピン留め）された投稿の文脈 |
 | ビルド済み | pre-built | |
@@ -190,6 +198,8 @@
 | 理由 | reason | |
 | 推奨 | recommend / recommended | |
 | 記録 | record | |
+| ログ偽装 | log forgery / log injection | |
+| ロックファイル | lock file | |
 | 再帰的 | recursive / recursively | |
 | 参照 | reference | |
 | 正規表現 | regex | "regular expression" の略 |
@@ -212,6 +222,7 @@
 | スコープ | scope | 変数スコープの文脈 |
 | スクリプト | script | |
 | 検索 | search | |
+| 秘密情報漏洩 | sensitive information leakage | |
 | 秘匿情報 | sensitive information | パスワード・トークン等の機密データ |
 | セットアップ | setup | |
 | シリアライズ | serialize / serialization | |
@@ -252,6 +263,7 @@
 | 一意 | unique | |
 | 更新 | update | |
 | 使用 | use / usage | |
+| 未完了 | incomplete | 削除の成否が確認できない状態の文脈 |
 | ユースケース | use case | |
 | ユーザー | user | |
 | ユーティリティ | utility | |
@@ -262,6 +274,17 @@
 |--------|---------|------|
 | バリデーション | validation | データ妥当性検証 |
 | 検証 | verification | ファイル整合性検証の文脈 |
+| 伝播 | propagate / propagation | deadline や設定の伝播の文脈 |
+| 多重起動 | multiple concurrent executions / concurrent execution | プロセスの多重起動の文脈 |
+| 冪等性 | idempotency | |
+| ハング | hanging | 応答遅延によるハングの文脈 |
+| 改ざん | tampering | ファイル改ざんの文脈 |
+| 改ざん検知 | tamper detection | |
+| スワップ | swap | メモリスワップの文脈 |
+| レスポンスボディ | response body | |
+| サプライチェーン | supply chain | Docker イメージのサプライチェーンリスクの文脈 |
+| 強行中断 | forced interruption | タイムアウトによる強行中断の文脈 |
+| 自滅的 | self-inflicted | 自滅的なアクセス制限の文脈 |
 | バージョン | version | |
 | 可視性 | visibility | パッケージの可視性設定の文脈 |
 | 変数 | variable | |
@@ -333,3 +356,4 @@
 | 日付 | 変更内容 |
 |------|---------|
 | 2026-07-01 | 初版作成 |
+| 2026-07-09 | `docs/design/security.md` の翻訳で使用したセキュリティ関連用語（攻撃ベクトル、ハング、メモリ枯渇、冪等性、改ざん、サプライチェーン等）を追加 |
