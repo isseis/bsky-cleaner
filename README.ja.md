@@ -48,7 +48,7 @@ mkdir -p config
 
 ```toml
 retention_days = 30
-schedule = "0 3 * * *"  # 毎日 3:00 に実行（分 時 日 月 曜日 の順。* は「指定なし＝毎回」を表す）
+schedule = "0 3 * * *"  # 毎日 3:00 に実行（分 時 日 月 曜日 の順。* は「毎回（すべて）」を表す）
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"  # Slack 通知を使う場合のみ設定する
 ```
@@ -139,7 +139,7 @@ slack_allowed_host = "hooks.slack.com"
 |---|---|---|---|
 | `retention_days` | int | Yes | この日数より古い投稿を削除する。1 以上である必要がある |
 | `execution_timeout_seconds` | int | Yes | 最大実行時間（秒）。1〜86400 |
-| `schedule` | string | No | 定期実行する時刻を [cron 形式](https://en.wikipedia.org/wiki/Cron#Overview)（`分 時 日 月 曜日` の5項目、`*` は「指定なし」を表す。例: `0 3 * * *` = 毎日 3:00）で指定する。Docker/cron での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
+| `schedule` | string | No | 定期実行する時刻を [cron 形式](https://en.wikipedia.org/wiki/Cron#Overview)（`分 時 日 月 曜日` の5項目、`*` は「毎回（すべて）」を表す。例: `0 3 * * *` = 毎日 3:00）で指定する。コンテナ内蔵のスケジューラー（supercronic）での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
 | `slack_allowed_host` | string | 条件付き | Slack webhook URL を設定する場合は必須。webhook URL がこのホスト（例: `hooks.slack.com`）を指しているか検証する |
 
 詳細は[設定リファレンス](docs/design/configuration.ja.md)を参照。
@@ -224,7 +224,7 @@ export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 chmod 600 /path/to/cron.env
 ```
 
-crontab に登録するエントリは `分 時 日 月 曜日 コマンド` の形式で書く（`*` は「指定なし＝毎回」を表す）。
+crontab に登録するエントリは `分 時 日 月 曜日 コマンド` の形式で書く（`*` は「毎回（すべて）」を表す）。
 以下の例の `0 3 * * *` は「毎日 3:00 に実行する」という意味になる。
 
 ```cron

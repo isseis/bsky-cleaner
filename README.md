@@ -48,7 +48,7 @@ Create `config/config.toml`.
 
 ```toml
 retention_days = 30
-schedule = "0 3 * * *"  # Runs daily at 3:00 (order: minute hour day month weekday; * means "not specified = every")
+schedule = "0 3 * * *"  # Runs daily at 3:00 (order: minute hour day month weekday; * means "every")
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"  # Only needed if you use Slack notifications
 ```
@@ -140,7 +140,7 @@ slack_allowed_host = "hooks.slack.com"
 |-------|------|----------|-------------|
 | `retention_days` | int | Yes | Deletes posts older than this number of days. Must be 1 or greater |
 | `execution_timeout_seconds` | int | Yes | Maximum execution time (seconds). 1–86400 |
-| `schedule` | string | No | Specify the time for periodic execution in [cron format](https://en.wikipedia.org/wiki/Cron#Overview) (5 fields: `minute hour day month weekday`; `*` means "not specified". Example: `0 3 * * *` = daily at 3:00). Only required when using scheduled execution via Docker/cron. Omit when using direct execution or system crontab |
+| `schedule` | string | No | Specify the time for periodic execution in [cron format](https://en.wikipedia.org/wiki/Cron#Overview) (5 fields: `minute hour day month weekday`; `*` means "every" value for the field. Example: `0 3 * * *` = daily at 3:00). Only required when using scheduled execution via the container's built-in scheduler (supercronic). Omit when using direct execution or system crontab |
 | `slack_allowed_host` | string | Conditional | Required when setting a Slack webhook URL. Validates that the webhook URL points to this host (e.g., `hooks.slack.com`) |
 
 See [Configuration Reference](docs/design/configuration.md) for details.
@@ -229,8 +229,8 @@ export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 chmod 600 /path/to/cron.env
 ```
 
-A crontab entry is written in the format `minute hour day month weekday command` (`*` means "not
-specified = every"). In the example below, `0 3 * * *` means "run daily at 3:00".
+A crontab entry is written in the format `minute hour day month weekday command` (`*` means "every"
+value for the field). In the example below, `0 3 * * *` means "run daily at 3:00".
 
 ```cron
 0 3 * * * . /path/to/cron.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
