@@ -22,15 +22,19 @@ curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.examp
 cp dot.env.example .env
 ```
 
-`.env` を編集し、以下の秘匿情報を設定する。
+`.env` を編集し、以下の秘匿情報を設定する。`BSKY_HANDLE` と `BSKY_APP_PASSWORD` は例の値ではなく、
+自分の Bluesky アカウントの値に置き換えること。
 
 ```sh
-BSKY_HANDLE=alice.bsky.social
-BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+BSKY_HANDLE=alice.bsky.social      # 自分のハンドルに置き換える
+BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx  # 自分のアプリパスワードに置き換える
 # 以下は Slack 通知を使う場合のみ設定する（省略可）
 BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
 BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ```
+
+`BSKY_APP_PASSWORD` は、通常のログインパスワードではなく
+[アプリパスワード発行ページ](https://bsky.app/settings/app-passwords)で発行した専用のパスワードを使う。
 
 各変数の詳細は後述の[環境変数](#環境変数)を参照。
 
@@ -111,17 +115,6 @@ tar xzf bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz
 展開された `bsky-cleaner` バイナリを、後述の[使い方](#使い方)に従って実行する。
 定期実行にはシステムの cron を使う（[cron によるスケジューリング](#cron-によるスケジューリング)を参照）。
 
-### 設定を確認する（試験実行）
-
-ダウンロードと展開が完了したら、まずは試験実行して設定が正しいことを確認する。
-
-```sh
-./bsky-cleaner --config config.toml
-```
-
-試験実行なので投稿は削除されない。ログイン・設定読み込み・削除対象の一覧表示までが
-エラーなく完了すれば、設定は正しく行われている。
-
 現時点で配布しているのは `linux/amd64` バイナリのみ。macOS/Windows 向けバイナリは提供していない。
 
 ソースからビルドしたい場合は、[ソースからのビルド](docs/dev/developer_guide/build_from_source.md)を参照。
@@ -153,9 +146,11 @@ slack_allowed_host = "hooks.slack.com"
 
 ### 環境変数
 
+`BSKY_HANDLE` と `BSKY_APP_PASSWORD` は例の値ではなく、自分の Bluesky アカウントの値に置き換えること。
+
 ```sh
-export BSKY_HANDLE=alice.bsky.social
-export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+export BSKY_HANDLE=alice.bsky.social      # 自分のハンドルに置き換える
+export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx  # 自分のアプリパスワードに置き換える
 export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
 export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ```
@@ -163,9 +158,20 @@ export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 | 変数 | 必須 | 説明 |
 |---|---|---|
 | `BSKY_HANDLE` | Yes | Bluesky のハンドル（例: `alice.bsky.social`） |
-| `BSKY_APP_PASSWORD` | Yes | Bluesky のアプリパスワード |
+| `BSKY_APP_PASSWORD` | Yes | Bluesky のアプリパスワード。通常のログインパスワードではなく、[アプリパスワード発行ページ](https://bsky.app/settings/app-passwords)で発行した専用のパスワードを使う |
 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | No | 成功通知用の Slack webhook |
 | `BSKY_SLACK_WEBHOOK_URL_FAILURE` | No | 失敗通知用の Slack webhook |
+
+### 設定を確認する（試験実行）
+
+Docker を使わない場合は、TOML 設定ファイルと環境変数の準備ができたら、まずは試験実行して設定が正しいことを確認する。
+
+```sh
+./bsky-cleaner --config config.toml
+```
+
+試験実行なので投稿は削除されない。ログイン・設定読み込み・削除対象の一覧表示までが
+エラーなく完了すれば、設定は正しく行われている。
 
 ## 使い方
 
@@ -203,7 +209,7 @@ syslog に記録することがあり、意図せず秘匿情報がログに残�
 `export VAR=VALUE` 形式のファイル（`cron.env` など。Docker Compose 版の `.env` とは形式が異なるため
 別名にする）に書き込み、パーミッションを `600` に制限した上で、cron エントリからは読み込むだけにする。
 
-`cron.env`（例）:
+`cron.env`（例。`BSKY_HANDLE` と `BSKY_APP_PASSWORD` は自分の値に置き換える）:
 
 ```sh
 export BSKY_HANDLE=alice.bsky.social
@@ -226,7 +232,7 @@ chmod 600 /path/to/cron.env
 - **デフォルトでは試験実行** — `--apply` を指定しない限り投稿は削除されない
 - **フェイルクローズ** — 不正な設定（例: `retention_days = 0`、Slack webhook ホストの不一致）はデフォルト値で
   処理を続行せず、起動時に失敗する
-- **秘匿情報のマスキング** — アプリパスワードと webhook URL は `SecretString` でラップされ、
+- **秘匿情報のマスキング** — アプリパスワードと webhook URL は、
   ログやエラーメッセージ上では `[REDACTED]` と表示される
 - **固定表示（ピン留め）された投稿は削除対象から除外される**
 
