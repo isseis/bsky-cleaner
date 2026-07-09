@@ -98,6 +98,7 @@ Create a TOML file (e.g., `config.toml`).
 ```toml
 retention_days = 30
 execution_timeout_seconds = 3600
+schedule = "0 3 * * *"
 slack_allowed_host = "hooks.slack.com"
 ```
 

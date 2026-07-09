@@ -97,6 +97,7 @@ TOML ファイル（例: `config.toml`）を作成する。
 
 ```toml
 retention_days = 30
+schedule = "0 3 * * *"
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
 ```
