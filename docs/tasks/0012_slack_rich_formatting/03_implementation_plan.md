@@ -100,6 +100,25 @@
 - [ ] `func BuildPayloadPreview(outcome Outcome) string { return buildPayload(outcome) }` の戻り値型を `webhookPayload` に変更する（ラッパー自体のロジックは変更しない、`internal/notify/test_helpers.go:11-13`）。
 - [ ] コメント（5-10行目）内の型に関する記述に矛盾がないか確認する（現状「exposes buildPayload」という抽象的な説明のみで型を明記していないため、変更不要と判断する。実装時に型を明記する記述が追加されていないか再確認する）。
 
+### PR-1 作成ポイント
+- **対象ステップ**: フェーズ1〜6 (型定義、isFailure抽出、buildPayload再設計、切り詰めヘルパー、BuildPayloadPreview追従、テスト更新)
+
+**推奨タイトル**: feat(notify): restructure Slack payload with emoji-prefixed summary, color-coded attachments, and structured failure fields
+
+**レビュー観点**:
+- `webhookPayload`/`slackAttachment`/`slackField` 型の設計がアーキテクチャ設計書 3.2節と一致しているか
+- `buildPayload()` の戻り値が `string` → `webhookPayload` に変わっても既存の `send()` の振る舞い（送信先振り分け・リトライ・タイムアウト）が不変であること
+- `isFailure()` への置き換えで `send()` と `buildPayload()` が同一判定式を使用すること（AC-08）
+- 絵文字・色の固定文字列のみ使用し、外部由来文字列が混入しないこと（AC-11, AC-12）
+- `text` と失敗一覧フィールド `Value` それぞれに独立した切り詰めが適用されること（AC-10）
+- 既存テストのサニタイズ・エスケープ・UTF-8安全な切り詰めの保証が新構造でも維持されていること
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた
+
 ### フェーズ6: `payload_test.go` の更新（設計書 7節）
 
 **対象ファイル**: `internal/notify/payload_test.go`
@@ -131,6 +150,23 @@
 **対象ファイル**: なし（手動確認のみ）
 
 - [ ] `BSKY_SLACK_WEBHOOK_URL_TEST` にテスト用 Slack チャンネルの Incoming Webhook URL を設定したうえで `make notify-preview-send` を実行し、`success-empty`/`success-apply`/`partial-failure`/`run-error`/`truncation` の5シナリオすべてが、実際の Slack クライアント（デスクトップアプリまたはブラウザのいずれか1種類）上で絵文字・色付き attachment・フィールド分離を含めて意図通りに描画されることを目視で確認する（NF-005、設計書 3.4節で指摘された「`maxPayloadLength` の新しい適用箇所の未検証リスク」の解消）。
+
+### PR-2 作成ポイント
+- **対象ステップ**: フェーズ7〜8 (notifypreview 表示整形、実送信確認)
+
+**推奨タイトル**: feat(notifypreview): update preview display for rich payload format and verify with real send
+
+**レビュー観点**:
+- `printScenarios()` が `webhookPayload` の全フィールド（text, color, fields）を欠落なく表示しているか
+- `sendScenarios()` が変更不要であることの確認（`buildPayload` の戻り値型変更に影響されない独立経路）
+- `make notify-preview` で全5シナリオが意図通り表示されること
+- `make notify-preview-send` による実送信確認が完了していること
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた
 
 ### フェーズ9: ドキュメント更新
 
@@ -169,6 +205,22 @@
 | `maxPayloadLength`（4000）を `text` と attachment field `Value` それぞれ単体の上限として転用することが、Slack の実際の受理上限を検証しないままの決定である（設計書 3.4節） | 実際の Slack 受理拒否・表示崩れ | フェーズ8で `make notify-preview-send` による実送信確認を実装完了前の必須ステップとする |
 | `buildPayload` の戻り値型変更に伴い、フェーズ1〜4の間は一時的にコンパイルが通らない期間が生じる | 中間コミットでの `make test`/`make lint` 失敗 | フェーズ1〜6を1つの作業単位として連続実施し、コンパイルが通り `make test` が緑になるフェーズ6完了時点で初めて `make lint`/コミットを行う（設計書 8節の順序をそのまま踏襲） |
 | `notifypreview/main.go` の表示整形処理を新規に書き起こすため、意図しない情報欠落（例: `Fields` が複数件になった場合の表示崩れ）が起こりうる | 開発者向けプレビュー表示の可読性低下（本番動作には影響しない） | フェーズ7完了後に `make notify-preview` を実行し、5シナリオ全てで `text`・色・フィールドが欠落なく表示されることを目視確認する |
+
+### PR-3 作成ポイント
+- **対象ステップ**: フェーズ9〜10 (ドキュメント更新、品質確認)
+
+**推奨タイトル**: docs: update package_reference for rich Slack payload format and run final quality gate
+
+**レビュー観点**:
+- `package_reference.md` の `internal/notify` 説明が新構造（`text` + `attachments`）を正しく反映しているか
+- `make fmt && make test && make lint && make deadcode` が全て成功すること
+- AC-01〜AC-12 が全て緑であること
+
+PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
+- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた
 
 ## 6. 実装チェックリスト
 
