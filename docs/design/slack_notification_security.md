@@ -24,7 +24,7 @@ This document describes the security measures in the Slack notification feature 
 
 The following topics are out of scope for this document:
 
-- The notification specification itself (success/failure routing etc.): see [Project overview](../overview.md#result-notification)
+- The notification specification itself (success/failure routing etc.): see [Project overview](../overview.md#execution-result-notification)
 - How to obtain Slack Incoming Webhooks and Slack app configuration procedures
 
 ## Design
