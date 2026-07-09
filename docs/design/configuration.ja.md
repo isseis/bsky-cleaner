@@ -2,7 +2,7 @@
 
 - 作成日: 2026-07-02
 - ステータス: Draft
-- 関連ドキュメント: [プロジェクト概要](../overview.md), [設定管理 タスク](../tasks/0001_config/01_requirements.md)
+- 関連ドキュメント: [プロジェクト概要](../overview.ja.md), [設定管理 タスク](../tasks/0001_config/01_requirements.md)
 
 ## 位置付け
 
