@@ -79,7 +79,7 @@ const colorDanger = "danger"
 // 3.4節) and payload.go's color/emoji selection (F-001・F-003) call this
 // single function, so the two decisions cannot diverge (AC-08).
 func isFailure(outcome Outcome) bool {
-	return outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)
+	return outcome.Err != nil || outcome.Result == nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)
 }
 
 // colorFor maps isFailure's result to a Slack legacy attachment color:

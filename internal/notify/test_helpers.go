@@ -10,9 +10,10 @@ package notify
 // reaches the production binary.
 //
 // The caller (notifypreview) reads the returned webhookPayload's fields for
-// display and never constructs one itself.
+// display and never constructs one itself. The unexported return type is
+// intentional: notifypreview reads the returned fields directly.
 //
-//nolint:revive // unexported return type is intentional: notifypreview only
+//nolint:revive
 func BuildPayloadPreview(outcome Outcome) webhookPayload {
 	return buildPayload(outcome)
 }

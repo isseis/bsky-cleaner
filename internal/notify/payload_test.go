@@ -246,12 +246,14 @@ func TestIsFailure_FourOutcomePatterns(t *testing.T) {
 		{
 			name: "result_nil_and_err_nil",
 			// internal/runner.Run's contract guarantees this combination
-			// is never produced, but isFailure defensively returns false.
+			// is never produced, but isFailure defensively treats a
+			// missing Result as failure so that formatting/color/routing
+			// remain consistent if it leaks in (AC-08).
 			outcome: Outcome{
 				Result: nil,
 				Err:    nil,
 			},
-			want: false,
+			want: true,
 		},
 		{
 			name: "partial_failure",
