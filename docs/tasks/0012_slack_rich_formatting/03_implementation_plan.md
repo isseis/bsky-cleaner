@@ -53,52 +53,52 @@
 
 **対象ファイル**: `internal/notify/payload.go`、`internal/notify/notify.go`
 
-- [ ] `internal/notify/notify.go` の66-71行目（`webhookPayload` 型定義とその直前のコメント）を削除する。
-- [ ] `internal/notify/payload.go` に `webhookPayload`（`Text string`, `Attachments []slackAttachment` の2フィールド、`json:"attachments,omitempty"`）を追加する。コメントは設計書 3.2節のものをそのまま用いる。
-- [ ] `internal/notify/payload.go` に `slackAttachment`（`Color string`, `Fields []slackField`、いずれも `omitempty`）を追加する。
-- [ ] `internal/notify/payload.go` に `slackField`（`Title string`, `Value string`、`Short` フィールドは持たない — 設計書付録の決定履歴参照）を追加する。
-- [ ] `internal/notify/notify.go` の132行目 `json.Marshal(webhookPayload{Text: buildPayload(outcome)})` を `json.Marshal(buildPayload(outcome))` に変更する（この時点では `buildPayload` はまだ `string` を返すため、フェーズ3までは一時的にコンパイルエラーになる。フェーズ1〜3は1コミット内で連続して行い、コンパイルが通る状態でのみ `make test`/`make lint` を実行する）。
-- [ ] `make fmt && make test -run '^$' ./internal/notify/...`（コンパイルのみ確認、フェーズ3完了までテストは緑にならない前提）で構文エラーがないことを確認する。
+- [x] `internal/notify/notify.go` の66-71行目（`webhookPayload` 型定義とその直前のコメント）を削除する。
+- [x] `internal/notify/payload.go` に `webhookPayload`（`Text string`, `Attachments []slackAttachment` の2フィールド、`json:"attachments,omitempty"`）を追加する。コメントは設計書 3.2節のものをそのまま用いる。
+- [x] `internal/notify/payload.go` に `slackAttachment`（`Color string`, `Fields []slackField`、いずれも `omitempty`）を追加する。
+- [x] `internal/notify/payload.go` に `slackField`（`Title string`, `Value string`、`Short` フィールドは持たない — 設計書付録の決定履歴参照）を追加する。
+- [x] `internal/notify/notify.go` の132行目 `json.Marshal(webhookPayload{Text: buildPayload(outcome)})` を `json.Marshal(buildPayload(outcome))` に変更する（この時点では `buildPayload` はまだ `string` を返すため、フェーズ3までは一時的にコンパイルエラーになる。フェーズ1〜3は1コミット内で連続して行い、コンパイルが通る状態でのみ `make test`/`make lint` を実行する）。
+- [x] `make fmt && make test -run '^$' ./internal/notify/...`（コンパイルのみ確認、フェーズ3完了までテストは緑にならない前提）で構文エラーがないことを確認する。
 
 ### フェーズ2: `isFailure()` の抽出（設計書 3.1節）
 
 **対象ファイル**: `internal/notify/payload.go`、`internal/notify/notify.go`
 
-- [ ] `internal/notify/payload.go` に `func isFailure(outcome Outcome) bool { return outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0) }` を追加する（設計書 3.1節のコメントをそのまま用いる）。
-- [ ] `internal/notify/notify.go` の120行目 `failed := outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)` を `failed := isFailure(outcome)` に変更する。
-- [ ] `make test ./internal/notify/...` を実行し、既存の `TestSend_ChannelRouting_*`（3件）・`TestSend_SameWebhookURLForBothChannels_RoutesCorrectlyInBothOutcomes`・`TestSend_SelectedWebhookURLEmpty_SkipsSendReturnsNil` が変更前と同じ結果で緑であることを確認する（振る舞い不変の回帰確認）。
+- [x] `internal/notify/payload.go` に `func isFailure(outcome Outcome) bool { return outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0) }` を追加する（設計書 3.1節のコメントをそのまま用いる）。
+- [x] `internal/notify/notify.go` の120行目 `failed := outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)` を `failed := isFailure(outcome)` に変更する。
+- [x] `make test ./internal/notify/...` を実行し、既存の `TestSend_ChannelRouting_*`（3件）・`TestSend_SameWebhookURLForBothChannels_RoutesCorrectlyInBothOutcomes`・`TestSend_SelectedWebhookURLEmpty_SkipsSendReturnsNil` が変更前と同じ結果で緑であることを確認する（振る舞い不変の回帰確認）。
 
 ### フェーズ3: `buildPayload()` の再設計（設計書 3.3節）
 
 **対象ファイル**: `internal/notify/payload.go`
 
-- [ ] `internal/notify/payload.go` に定数 `emojiSuccess = "✅"` / `emojiFailure = "❌"` / `colorGood = "good"` / `colorDanger = "danger"` を追加する。
-- [ ] `func colorFor(failed bool) string`（設計書 3.3節のシグネチャ・コメント）を追加する。`failed` が `true` なら `colorDanger`、`false` なら `colorGood` を返す。
-- [ ] `buildPayload` のシグネチャを `func buildPayload(outcome Outcome) string` から `func buildPayload(outcome Outcome) webhookPayload` に変更する。
-- [ ] `text` の組み立てロジックを、既存の3分岐（`outcome.Err != nil` / `outcome.Result == nil` / デフォルト）の一行サマリ文言はそのまま維持しつつ、デフォルト分岐末尾の「失敗した投稿ごとの個別行を連結するループ」（既存コード76-78行目）を削除する形に変更する。具体的な before/after:
+- [x] `internal/notify/payload.go` に定数 `emojiSuccess = "✅"` / `emojiFailure = "❌"` / `colorGood = "good"` / `colorDanger = "danger"` を追加する。
+- [x] `func colorFor(failed bool) string`（設計書 3.3節のシグネチャ・コメント）を追加する。`failed` が `true` なら `colorDanger`、`false` なら `colorGood` を返す。
+- [x] `buildPayload` のシグネチャを `func buildPayload(outcome Outcome) string` から `func buildPayload(outcome Outcome) webhookPayload` に変更する。
+- [x] `text` の組み立てロジックを、既存の3分岐（`outcome.Err != nil` / `outcome.Result == nil` / デフォルト）の一行サマリ文言はそのまま維持しつつ、デフォルト分岐末尾の「失敗した投稿ごとの個別行を連結するループ」（既存コード76-78行目）を削除する形に変更する。具体的な before/after:
   - Before（既存コード60-79行目、`outcome.Result != nil` かつ `Failed` が1件以上のケースの実行結果、`buildPayload` の戻り値文字列）: `"bsky-cleaner run completed with failures: deleted 2 post(s), 1 failure(s).\n  rkey1: atproto http error: com.atproto.repo.deleteRecord status=500\n"`
   - After（`text` フィールドの内容、絵文字プレフィックス付き）: `"❌ bsky-cleaner run completed with failures: deleted 2 post(s), 1 failure(s)."`（末尾の失敗一覧2行は削除し、代わりに `Attachments[0].Fields[0].Value` に `"rkey1: atproto http error: com.atproto.repo.deleteRecord status=500"` として格納する。以降複数件ある場合は `\n` 区切りで連結する）
   - `outcome.Err != nil` の分岐（既存: `"bsky-cleaner run failed: %s\n"`）は `"❌ bsky-cleaner run failed: %s"` に、`outcome.Result == nil` の分岐（既存: `"bsky-cleaner run failed: unknown error\n"`）は `"❌ bsky-cleaner run failed: unknown error"` に、完全成功の分岐（既存: `"bsky-cleaner run succeeded: deleted %d post(s).\n"`）は `"✅ bsky-cleaner run succeeded: deleted %d post(s)."` にする（いずれも末尾の `\n` を落とし、絵文字を先頭に付与する）。
-- [ ] `attachments` を常に1件生成する: `slackAttachment{Color: colorFor(isFailure(outcome))}`（設計書 3.3節手順3、AC-06/AC-07）。この時点では `Fields` は未設定（ゼロ値）のままにする。
-- [ ] `outcome.Result != nil && len(outcome.Result.Failed) > 0` の場合のみ、既存コード76-78行目のループ内容（`sanitizeForPayload(failure.Post.RKey)` と `sanitizeForPayload(errorKind(failure.Err))` を `": "` で連結した行）を失敗投稿ごとに生成し、`"\n"` で連結したテキストを組み立てる。`slackField{Title: "Failed posts", Value: <組み立てたテキスト>}` を作り、`attachments[0].Fields` に設定する（設計書 3.3節手順4）。
-- [ ] `outcome.Result == nil` または `len(outcome.Result.Failed) == 0` の場合、`attachments[0].Fields` はゼロ値（空スライス）のままにする（設計書 3.3節手順5、AC-05）。
-- [ ] `webhookPayload{Text: text, Attachments: []slackAttachment{attachment}}` を返す（この時点では `text`/`Value` への切り詰め適用はフェーズ4で行う）。
+- [x] `attachments` を常に1件生成する: `slackAttachment{Color: colorFor(isFailure(outcome))}`（設計書 3.3節手順3、AC-06/AC-07）。この時点では `Fields` は未設定（ゼロ値）のままにする。
+- [x] `outcome.Result != nil && len(outcome.Result.Failed) > 0` の場合のみ、既存コード76-78行目のループ内容（`sanitizeForPayload(failure.Post.RKey)` と `sanitizeForPayload(errorKind(failure.Err))` を `": "` で連結した行）を失敗投稿ごとに生成し、`"\n"` で連結したテキストを組み立てる。`slackField{Title: "Failed posts", Value: <組み立てたテキスト>}` を作り、`attachments[0].Fields` に設定する（設計書 3.3節手順4）。
+- [x] `outcome.Result == nil` または `len(outcome.Result.Failed) == 0` の場合、`attachments[0].Fields` はゼロ値（空スライス）のままにする（設計書 3.3節手順5、AC-05）。
+- [x] `webhookPayload{Text: text, Attachments: []slackAttachment{attachment}}` を返す（この時点では `text`/`Value` への切り詰め適用はフェーズ4で行う）。
 
 ### フェーズ4: 切り詰めヘルパーの抽出と適用（設計書 3.4節）
 
 **対象ファイル**: `internal/notify/payload.go`
 
-- [ ] 既存の切り詰めロジック（既存コード81-85行目 `text := b.String(); if len(text) <= maxPayloadLength { return text }; return text[:truncationCutPoint(text)] + truncatedMarker`）を `func truncate(s string) string` という独立した小さなヘルパーとして抽出する（`truncationCutPoint` はそのまま再利用する内部関数として維持）。
-- [ ] フェーズ3で組み立てた `text`（絵文字+サマリ文言）に対して独立に `truncate()` を適用する（設計書 3.4節1番目の理由: `errorKind(outcome.Err)` が外部由来の無制限長文字列を埋め込みうるため）。
-- [ ] フェーズ3で組み立てた失敗一覧の `Value` に対して独立に `truncate()` を適用する（設計書 3.4節2番目の理由: 大量の削除失敗による肥大化防止、既存と同じ役割の引き継ぎ）。
-- [ ] `make test ./internal/notify/...` を実行し、この時点で `buildPayload` 関連の既存テスト（フェーズ6で書き換える前の状態）がコンパイルエラーになることを確認したうえで、フェーズ6に進む（型変更に伴う一時的な赤は許容し、フェーズ6完了時点で緑に戻す）。
+- [x] 既存の切り詰めロジック（既存コード81-85行目 `text := b.String(); if len(text) <= maxPayloadLength { return text }; return text[:truncationCutPoint(text)] + truncatedMarker`）を `func truncate(s string) string` という独立した小さなヘルパーとして抽出する（`truncationCutPoint` はそのまま再利用する内部関数として維持）。
+- [x] フェーズ3で組み立てた `text`（絵文字+サマリ文言）に対して独立に `truncate()` を適用する（設計書 3.4節1番目の理由: `errorKind(outcome.Err)` が外部由来の無制限長文字列を埋め込みうるため）。
+- [x] フェーズ3で組み立てた失敗一覧の `Value` に対して独立に `truncate()` を適用する（設計書 3.4節2番目の理由: 大量の削除失敗による肥大化防止、既存と同じ役割の引き継ぎ）。
+- [x] `make test ./internal/notify/...` を実行し、この時点で `buildPayload` 関連の既存テスト（フェーズ6で書き換える前の状態）がコンパイルエラーになることを確認したうえで、フェーズ6に進む（型変更に伴う一時的な赤は許容し、フェーズ6完了時点で緑に戻す）。
 
 ### フェーズ5: `BuildPayloadPreview` の戻り値型追従
 
 **対象ファイル**: `internal/notify/test_helpers.go`
 
-- [ ] `func BuildPayloadPreview(outcome Outcome) string { return buildPayload(outcome) }` の戻り値型を `webhookPayload` に変更する（ラッパー自体のロジックは変更しない、`internal/notify/test_helpers.go:11-13`）。
-- [ ] コメント（5-10行目）内の型に関する記述に矛盾がないか確認する（現状「exposes buildPayload」という抽象的な説明のみで型を明記していないため、変更不要と判断する。実装時に型を明記する記述が追加されていないか再確認する）。
+- [x] `func BuildPayloadPreview(outcome Outcome) string { return buildPayload(outcome) }` の戻り値型を `webhookPayload` に変更する（ラッパー自体のロジックは変更しない、`internal/notify/test_helpers.go:11-13`）。
+- [x] コメント（5-10行目）内の型に関する記述に矛盾がないか確認する（現状「exposes buildPayload」という抽象的な説明のみで型を明記していないため、変更不要と判断する。実装時に型を明記する記述が追加されていないか再確認する）。
 
 ### フェーズ6: `payload_test.go` の更新（設計書 7節）
 
@@ -106,18 +106,18 @@
 
 既存11件のテストのうち、`TestEscapeSlackMarkup_EscapesAmpersandLtGt`（14行目、`escapeSlackMarkup` 単体テストで `buildPayload` に依存しない）は無変更。残り10件は `buildPayload` の戻り値が `webhookPayload` になることに伴い書き換える。
 
-- [ ] `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（19行目）を、`got.Text` に `"2"` と絵文字 `emojiSuccess`（`"✅"`）を含み、`got.Attachments` が1件で `Color == colorGood`、`Fields` が空であることを検証するテストに書き換える（AC-01, AC-05, AC-06）。
-- [ ] `TestBuildPayload_RunError_IncludesErrorKind`（31行目）を、`got.Text` に `emojiFailure`（`"❌"`）と `errorKind` 文字列を含み、`got.Attachments` が1件で `Color == colorDanger`、`Fields` が空であることを検証するテストに書き換える（AC-02, AC-07）。このケースは、失敗一覧の有無によらず attachment が常に生成・色付けされることの回帰テストを兼ねる（設計書 3.3節の設計判断そのものの検証）。
-- [ ] `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`（38行目）を、`got.Text` に `emojiFailure` を含むが `rkey1`/`rkey2` などの個別詳細は含まないこと（AC-03）、`got.Attachments[0].Color == colorDanger`（AC-07）、`got.Attachments[0].Fields[0].Value` に `rkey1`・`"atproto http error: com.atproto.repo.deleteRecord status=500"`・`rkey2`・`"atproto http error: com.atproto.repo.deleteRecord status=429"` がいずれも含まれること（AC-04）を検証するテストに書き換える。
-- [ ] `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（57行目）を、`got.Attachments[0].Fields[0]` が `slackField{Title: "Failed posts", Value: "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500"}` と完全一致すること（`assert.Equal`、部分一致ではなく完全一致にすることで `atproto.Post` に将来 body 相当のフィールドが追加された場合の回帰を検知する）を検証するテストに書き換える（AC-04, AC-12）。
-- [ ] `TestBuildPayload_EscapesMentionSyntaxInFailedRKey`（76行目）を、`got.Attachments[0].Fields[0].Value` が `<!channel>` を含まず `&lt;!channel&gt;` を含むことを検証するテストに書き換える（AC-09）。
-- [ ] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`（91行目）を、`got.Attachments[0].Fields[0].Value` が `\x1b` を含まないことを検証するテストに書き換える（AC-09）。
-- [ ] `TestBuildPayload_SanitizesNewlineInFailedRKey`（105行目）を、`got.Attachments[0].Fields[0].Value` が `"evil\nFAKE LOG LINE"` をそのままの形では含まない（サニタイズ済みである）ことを検証するテストに書き換える（AC-09）。
-- [ ] `TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint`（127行目）を、`got.Text` が `<!channel>` を含まず `&lt;!channel&gt;` を含むことを検証するテストに書き換える（AC-09、`text` 側のサニタイズの回帰確認）。
-- [ ] `TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker`（141行目）の名称を `TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker` に変更し、200件の失敗を与えた場合に `got.Attachments[0].Fields[0].Value` が `maxPayloadLength` 以内に切り詰められ `truncatedMarker` で終わることを検証する（AC-10、設計書 3.4節2番目の適用箇所の回帰テスト）。
-- [ ] `TestBuildPayload_TruncationIsUTF8Safe`（163行目）を同様に `got.Attachments[0].Fields[0].Value` を対象にし、`utf8.ValidString` であることを検証するよう書き換える（AC-10）。
-- [ ] 新規テスト `TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker` を追加する: `outcome.Err` に、`errorKind` が `atproto.HTTPError.ErrorName` を経由して極端に長い文字列（例: 5000文字の英数字列）を返すエラー値（`&atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, ErrorName: strings.Repeat("x", 5000)}`）を与え、`got.Text` が `maxPayloadLength` 以内に切り詰められ `truncatedMarker` で終わることを検証する（AC-10、設計書 3.4節1番目の適用箇所 — `text` 自体への切り詰め — の新規テスト）。
-- [ ] 新規テスト `TestIsFailure_FourOutcomePatterns` を追加する: `Outcome` の4パターン（完全成功／`Err != nil`／`Result == nil` かつ `Err == nil`／部分失敗）それぞれで `isFailure()` の戻り値が `false`/`true`/`false`/`true` であることを表形式テスト（`t.Run` サブテスト）で検証する（AC-08）。`Result == nil` かつ `Err == nil` のケースにコメントを付し、`internal/runner.Run` の契約上この組み合わせは生成されない想定であるが `isFailure` は防御的に `false` を返す旨を明記する（設計書 7節）。
+- [x] `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（19行目）を、`got.Text` に `"2"` と絵文字 `emojiSuccess`（`"✅"`）を含み、`got.Attachments` が1件で `Color == colorGood`、`Fields` が空であることを検証するテストに書き換える（AC-01, AC-05, AC-06）。
+- [x] `TestBuildPayload_RunError_IncludesErrorKind`（31行目）を、`got.Text` に `emojiFailure`（`"❌"`）と `errorKind` 文字列を含み、`got.Attachments` が1件で `Color == colorDanger`、`Fields` が空であることを検証するテストに書き換える（AC-02, AC-07）。このケースは、失敗一覧の有無によらず attachment が常に生成・色付けされることの回帰テストを兼ねる（設計書 3.3節の設計判断そのものの検証）。
+- [x] `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`（38行目）を、`got.Text` に `emojiFailure` を含むが `rkey1`/`rkey2` などの個別詳細は含まないこと（AC-03）、`got.Attachments[0].Color == colorDanger`（AC-07）、`got.Attachments[0].Fields[0].Value` に `rkey1`・`"atproto http error: com.atproto.repo.deleteRecord status=500"`・`rkey2`・`"atproto http error: com.atproto.repo.deleteRecord status=429"` がいずれも含まれること（AC-04）を検証するテストに書き換える。
+- [x] `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（57行目）を、`got.Attachments[0].Fields[0]` が `slackField{Title: "Failed posts", Value: "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500"}` と完全一致すること（`assert.Equal`、部分一致ではなく完全一致にすることで `atproto.Post` に将来 body 相当のフィールドが追加された場合の回帰を検知する）を検証するテストに書き換える（AC-04, AC-12）。
+- [x] `TestBuildPayload_EscapesMentionSyntaxInFailedRKey`（76行目）を、`got.Attachments[0].Fields[0].Value` が `<!channel>` を含まず `<!channel>` を含むことを検証するテストに書き換える（AC-09）。
+- [x] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`（91行目）を、`got.Attachments[0].Fields[0].Value` が `\x1b` を含まないことを検証するテストに書き換える（AC-09）。
+- [x] `TestBuildPayload_SanitizesNewlineInFailedRKey`（105行目）を、`got.Attachments[0].Fields[0].Value` が `"evil\nFAKE LOG LINE"` をそのままの形では含まない（サニタイズ済みである）ことを検証するテストに書き換える（AC-09）。
+- [x] `TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint`（127行目）を、`got.Text` が `<!channel>` を含まず `<!channel>` を含むことを検証するテストに書き換える（AC-09、`text` 側のサニタイズの回帰確認）。
+- [x] `TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker`（141行目）の名称を `TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker` に変更し、200件の失敗を与えた場合に `got.Attachments[0].Fields[0].Value` が `maxPayloadLength` 以内に切り詰められ `truncatedMarker` で終わることを検証する（AC-10、設計書 3.4節2番目の適用箇所の回帰テスト）。
+- [x] `TestBuildPayload_TruncationIsUTF8Safe`（163行目）を同様に `got.Attachments[0].Fields[0].Value` を対象にし、`utf8.ValidString` であることを検証するよう書き換える（AC-10）。
+- [x] 新規テスト `TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker` を追加する: `outcome.Err` に、`errorKind` が `atproto.HTTPError.ErrorName` を経由して極端に長い文字列（例: 5000文字の英数字列）を返すエラー値（`&atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, ErrorName: strings.Repeat("x", 5000)}`）を与え、`got.Text` が `maxPayloadLength` 以内に切り詰められ `truncatedMarker` で終わることを検証する（AC-10、設計書 3.4節1番目の適用箇所 — `text` 自体への切り詰め — の新規テスト）。
+- [x] 新規テスト `TestIsFailure_FourOutcomePatterns` を追加する: `Outcome` の4パターン（完全成功／`Err != nil`／`Result == nil` かつ `Err == nil`／部分失敗）それぞれで `isFailure()` の戻り値が `false`/`true`/`false`/`true` であることを表形式テスト（`t.Run` サブテスト）で検証する（AC-08）。`Result == nil` かつ `Err == nil` のケースにコメントを付し、`internal/runner.Run` の契約上この組み合わせは生成されない想定であるが `isFailure` は防御的に `false` を返す旨を明記する（設計書 7節）。
 
 ### PR-1 作成ポイント
 - **対象ステップ**: フェーズ1〜6 (型定義、isFailure抽出、buildPayload再設計、切り詰めヘルパー、BuildPayloadPreview追従、テスト更新)
@@ -224,12 +224,12 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 ## 6. 実装チェックリスト
 
-- [ ] フェーズ1: ペイロード型の追加
-- [ ] フェーズ2: `isFailure()` の抽出
-- [ ] フェーズ3: `buildPayload()` の再設計
-- [ ] フェーズ4: 切り詰めヘルパーの抽出と適用
-- [ ] フェーズ5: `BuildPayloadPreview` の戻り値型追従
-- [ ] フェーズ6: `payload_test.go` の更新
+- [x] フェーズ1: ペイロード型の追加
+- [x] フェーズ2: `isFailure()` の抽出
+- [x] フェーズ3: `buildPayload()` の再設計
+- [x] フェーズ4: 切り詰めヘルパーの抽出と適用
+- [x] フェーズ5: `BuildPayloadPreview` の戻り値型追従
+- [x] フェーズ6: `payload_test.go` の更新
 - [ ] フェーズ7: `notifypreview` の表示整形
 - [ ] フェーズ8: `make notify-preview-send` による実送信確認
 - [ ] フェーズ9: ドキュメント更新

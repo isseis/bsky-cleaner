@@ -9,7 +9,8 @@ package notify
 // Gated behind the test build tag like notifypreview itself, so it never
 // reaches the production binary.
 //
-// reads its fields for display, never constructs one itself.
+// The caller (notifypreview) reads the returned webhookPayload's fields for
+// display and never constructs one itself.
 //
 //nolint:revive // unexported return type is intentional: notifypreview only
 func BuildPayloadPreview(outcome Outcome) webhookPayload {
