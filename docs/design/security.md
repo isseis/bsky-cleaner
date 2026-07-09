@@ -4,15 +4,15 @@ English | [Japanese](security.ja.md)
 
 - Created: 2026-07-02
 - Status: Draft
-- Related Documents: [Project Overview](../overview.ja.md)
+- Related Documents: [Project Overview](../overview.md)
 
 ## Position
 
-This document describes the implementation-level details of the risk categories listed in the "Security Considerations" section of the [Project Overview](../overview.ja.md). For policy-level decisions, refer to the overview; this document only addresses "how to handle them."
+This document describes the implementation-level details of the risk categories listed in the "Security Considerations" section of the [Project Overview](../overview.md). For policy-level decisions, refer to the overview; this document only addresses "how to handle them."
 
 ## Attack Vectors to Consider
 
-Although the Bluesky official API is used, the AT Protocol is a federated structure where the actual communication partner is each user's PDS determined by DID resolution, not necessarily `bsky.social` itself. Therefore, attack vectors that assume the communication destination is broken or under the control of an attacker (malicious PDS, compromised PDS, DID document spoofing, etc.) must also be considered, and it cannot be said that "because it is the official API, typical DoS is unlikely." Safety-related policies are also described in other sections (see [Safety Policy](../overview.ja.md#安全性についての方針), [Retry Policy](../overview.ja.md#リトライ方針), [Information Leakage Countermeasures in Slack Notifications](../overview.ja.md#slack-通知における情報漏洩対策)), and this document supplements the attack vectors not covered by those sections.
+Although the Bluesky official API is used, the AT Protocol is a federated structure where the actual communication partner is each user's PDS determined by DID resolution, not necessarily `bsky.social` itself. Therefore, attack vectors that assume the communication destination is broken or under the control of an attacker (malicious PDS, compromised PDS, DID document spoofing, etc.) must also be considered, and it cannot be said that "because it is the official API, typical DoS is unlikely." Safety-related policies are also described in other sections (see [Safety Policy](../overview.md#safety-policy), [Retry Policy](../overview.md#retry-policy), [Information Leakage Protection in Slack Notifications](../overview.md#information-leakage-protection-in-slack-notifications)), and this document supplements the attack vectors not covered by those sections.
 
 - **Indirect injection via post body**: If the post body (which may include content from reply targets or quoted sources, even for your own posts) is included as-is in Slack notifications or console output, it may cause unintended notification diffusion via `@channel` / `@here` mentions, ANSI escape sequence injection (screen manipulation, clipboard writing, etc.), or log forgery via log line breaks (log injection).
 - **Risks arising from the AT Protocol's federated structure**: Actual data is not necessarily stored on `bsky.social` but on each user's PDS determined by DID resolution. If there is a flaw in the DID resolution or PDS endpoint determination logic, app passwords or session tokens may be sent to unintended hosts (effectively an SSRF).

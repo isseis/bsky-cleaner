@@ -61,7 +61,7 @@ docker compose logs
 3. `docker compose up -d` で新しいイメージで再起動する
 
 Docker 配布の詳細（`.env` の扱い、TOML と内蔵 cron の橋渡し方法など）は
-[Docker 配布の詳細設計](docs/design/docker_deployment.md)を参照。
+[Docker 配布の詳細設計](docs/design/docker_deployment.ja.md)を参照。
 
 ## インストールと実行（ビルド済み実行ファイル）
 
@@ -108,7 +108,7 @@ slack_allowed_host = "hooks.slack.com"
 | `schedule` | string | No | cron 式。Docker/cron での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
 | `slack_allowed_host` | string | 条件付き | Slack webhook URL を設定する場合は必須。webhook URL がこのホスト（例: `hooks.slack.com`）を指しているか検証する |
 
-詳細は[設定リファレンス](docs/design/configuration.md)を参照。
+詳細は[設定リファレンス](docs/design/configuration.ja.md)を参照。
 
 ### 環境変数
 
@@ -170,7 +170,7 @@ Docker を使わずホスト上で定期実行したい場合は、システム�
   ログやエラーメッセージ上では `[REDACTED]` と表示される
 - **固定表示（ピン留め）された投稿は削除対象から除外される**
 
-詳細は[セキュリティ設計](docs/design/security.md)を参照。
+詳細は[セキュリティ設計](docs/design/security.ja.md)を参照。
 
 ## 開発者向け情報
 

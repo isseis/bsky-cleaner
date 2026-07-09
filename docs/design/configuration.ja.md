@@ -49,7 +49,7 @@ slack_allowed_host = "hooks.slack.com"
 `internal/config.LoadCredentials()` が読み込む。以下の方針で動作する。
 
 - **秘匿情報**: いずれも秘匿情報として扱い、TOML には書かない。
-- **Docker 配布時**: `.env` 経由で渡す（[Docker 配布の詳細設計](docker_deployment.md) 参照）。
+- **Docker 配布時**: `.env` 経由で渡す（[Docker 配布の詳細設計](docker_deployment.ja.md) 参照）。
 
 | 変数名 | 型 | 必須/任意 | デフォルト値 | 書式・制約 |
 |---|---|---|---|---|

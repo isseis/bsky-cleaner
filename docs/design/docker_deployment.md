@@ -4,11 +4,11 @@ English | [Japanese](docker_deployment.ja.md)
 
 - Created: 2026-07-02
 - Status: Draft
-- Related documents: [Project Overview](../overview.ja.md)
+- Related documents: [Project Overview](../overview.md)
 
 ## Positioning
 
-This document describes the implementation-level details of the Docker deployment strategy described in the "Development and Deployment Strategy" section of the [Project Overview](../overview.ja.md). For the strategy-level decisions (why this configuration was chosen), refer to the overview; this document only covers "how to implement it."
+This document describes the implementation-level details of the Docker deployment strategy described in the "Development and Deployment Strategy" section of the [Project Overview](../overview.md). For the strategy-level decisions (why this configuration was chosen), refer to the overview; this document only covers "how to implement it."
 
 ## Sensitive Information Management (`.env`)
 
