@@ -8,6 +8,8 @@ package notify
 // exact same formatting code as production Send, never a reimplementation.
 // Gated behind the test build tag like notifypreview itself, so it never
 // reaches the production binary.
-func BuildPayloadPreview(outcome Outcome) string {
+//
+//nolint:revive // unexported return is intentional: notifypreview only reads its fields for display, never constructs one itself.
+func BuildPayloadPreview(outcome Outcome) webhookPayload {
 	return buildPayload(outcome)
 }

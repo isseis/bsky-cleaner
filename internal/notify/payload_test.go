@@ -9,6 +9,7 @@ import (
 	"github.com/isseis/bsky-cleaner/internal/atproto"
 	"github.com/isseis/bsky-cleaner/internal/report"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEscapeSlackMarkup_EscapesAmpersandLtGt(t *testing.T) {
@@ -24,15 +25,23 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 		},
 	}
 	got := buildPayload(outcome)
-	assert.Contains(t, got, "2")
-	assert.Contains(t, strings.ToLower(got), "succeeded")
+	assert.Contains(t, got.Text, emojiSuccess)
+	assert.Contains(t, got.Text, "2")
+	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
+	assert.Len(t, got.Attachments, 1)
+	assert.Equal(t, colorGood, got.Attachments[0].Color)
+	assert.Empty(t, got.Attachments[0].Fields)
 }
 
 func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
 	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
 	outcome := Outcome{Result: nil, Err: someErr}
 	got := buildPayload(outcome)
-	assert.Contains(t, got, "atproto http error: com.atproto.server.createSession status=401")
+	assert.Contains(t, got.Text, emojiFailure)
+	assert.Contains(t, got.Text, "atproto http error: com.atproto.server.createSession status=401")
+	assert.Len(t, got.Attachments, 1)
+	assert.Equal(t, colorDanger, got.Attachments[0].Color)
+	assert.Empty(t, got.Attachments[0].Fields)
 }
 
 func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.T) {
@@ -48,10 +57,19 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 		},
 	}
 	got := buildPayload(outcome)
-	assert.Contains(t, got, "rkey1")
-	assert.Contains(t, got, "atproto http error: com.atproto.repo.deleteRecord status=500")
-	assert.Contains(t, got, "rkey2")
-	assert.Contains(t, got, "atproto http error: com.atproto.repo.deleteRecord status=429")
+	// AC-03: text should not contain individual failure details
+	assert.Contains(t, got.Text, emojiFailure)
+	assert.NotContains(t, got.Text, "rkey1")
+	assert.NotContains(t, got.Text, "rkey2")
+	// AC-07: color should be danger
+	assert.Len(t, got.Attachments, 1)
+	assert.Equal(t, colorDanger, got.Attachments[0].Color)
+	// AC-04: failure details in fields
+	assert.Len(t, got.Attachments[0].Fields, 1)
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "rkey1")
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.repo.deleteRecord status=500")
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "rkey2")
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.repo.deleteRecord status=429")
 }
 
 func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T) {
@@ -65,12 +83,11 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 		},
 	}
 	got := buildPayload(outcome)
-	// atproto.Post structurally has no body field; full equality (not
-	// Contains) is required so an accidentally-added extra field would
-	// actually fail this regression guard.
-	want := "bsky-cleaner run completed with failures: deleted 0 post(s), 1 failure(s).\n" +
-		"  rkey1: atproto http error: com.atproto.repo.deleteRecord status=500\n"
-	assert.Equal(t, want, got)
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	// AC-04, AC-12: full equality on the field ensures no extra fields leak in
+	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[0].Title)
+	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[0].Value)
 }
 
 func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
@@ -84,8 +101,10 @@ func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
 		},
 	}
 	got := buildPayload(outcome)
-	assert.NotContains(t, got, "<!channel>")
-	assert.Contains(t, got, "&lt;!channel&gt;")
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "<!channel>")
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "&lt;!channel&gt;")
 }
 
 func TestBuildPayload_SanitizesANSIEscapeInFailedRKey(t *testing.T) {
@@ -99,7 +118,9 @@ func TestBuildPayload_SanitizesANSIEscapeInFailedRKey(t *testing.T) {
 		},
 	}
 	got := buildPayload(outcome)
-	assert.NotContains(t, got, "\x1b")
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "\x1b")
 }
 
 func TestBuildPayload_SanitizesNewlineInFailedRKey(t *testing.T) {
@@ -113,17 +134,12 @@ func TestBuildPayload_SanitizesNewlineInFailedRKey(t *testing.T) {
 		},
 	}
 	got := buildPayload(outcome)
-	lineCountBefore := strings.Count("evil\nFAKE LOG LINE", "\n")
-	assert.Equal(t, 1, lineCountBefore) // sanity check on the fixture itself
-	assert.NotContains(t, got, "evil\nFAKE LOG LINE")
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	// Sanitize strips newlines, so the output must not contain a newline character
+	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "\n")
 }
 
-// TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint covers
-// the outcome.Err branch of buildPayload, which the other mention/ANSI/
-// newline sanitization tests above do not: SSRFError.Endpoint is derived
-// from DID/PDS resolution (see internal/atproto's SSRF threat model) and so,
-// like a failed post's RKey, is externally-influenced text that must not
-// reach Slack as live mrkdwn mention syntax.
 func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testing.T) {
 	err := &atproto.SSRFError{
 		Endpoint: "https://evil.example.com/<!channel>",
@@ -134,11 +150,11 @@ func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testin
 
 	got := buildPayload(outcome)
 
-	assert.NotContains(t, got, "<!channel>")
-	assert.Contains(t, got, "&lt;!channel&gt;")
+	assert.NotContains(t, got.Text, "<!channel>")
+	assert.Contains(t, got.Text, "&lt;!channel&gt;")
 }
 
-func TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
+func TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
 	failures := make([]report.DeleteFailure, 0, 200)
 	err := errors.New("boom")
 	for range 200 {
@@ -151,15 +167,12 @@ func TestBuildPayload_TruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testin
 		},
 	}
 	got := buildPayload(outcome)
-	assert.LessOrEqual(t, len(got), maxPayloadLength)
-	assert.True(t, strings.HasSuffix(got, truncatedMarker))
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.LessOrEqual(t, len(got.Attachments[0].Fields[0].Value), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
 }
 
-// TestBuildPayload_TruncationIsUTF8Safe guards against cutting a
-// multi-byte rune in half: RKey values here are all multi-byte Japanese
-// characters, sized so the naive byte-offset cut point (maxPayloadLength
-// - len(truncatedMarker)) lands mid-rune unless truncationCutPoint backs
-// up to a rune boundary.
 func TestBuildPayload_TruncationIsUTF8Safe(t *testing.T) {
 	failures := make([]report.DeleteFailure, 0, 200)
 	err := errors.New("boom")
@@ -175,7 +188,75 @@ func TestBuildPayload_TruncationIsUTF8Safe(t *testing.T) {
 
 	got := buildPayload(outcome)
 
-	assert.LessOrEqual(t, len(got), maxPayloadLength)
-	assert.True(t, strings.HasSuffix(got, truncatedMarker))
-	assert.True(t, utf8.ValidString(got), "truncated payload must not split a multi-byte rune")
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.LessOrEqual(t, len(got.Attachments[0].Fields[0].Value), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
+	assert.True(t, utf8.ValidString(got.Attachments[0].Fields[0].Value), "truncated field value must not split a multi-byte rune")
+}
+
+func TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
+	outcome := Outcome{
+		Result: nil,
+		Err: &atproto.HTTPError{
+			Method:     "com.atproto.repo.deleteRecord",
+			StatusCode: 500,
+			ErrorName:  strings.Repeat("x", 5000),
+		},
+	}
+	got := buildPayload(outcome)
+	assert.LessOrEqual(t, len(got.Text), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(got.Text, truncatedMarker))
+}
+
+func TestIsFailure_FourOutcomePatterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		outcome Outcome
+		want    bool
+	}{
+		{
+			name: "complete_success",
+			outcome: Outcome{
+				Result: &report.Result{
+					Deleted: []atproto.Post{{RKey: "a"}},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "err_not_nil",
+			outcome: Outcome{
+				Result: &report.Result{},
+				Err:    errors.New("some error"),
+			},
+			want: true,
+		},
+		{
+			name: "result_nil_and_err_nil",
+			outcome: Outcome{
+				Result: nil,
+				Err:    nil,
+			},
+			want: false,
+		},
+		{
+			name: "partial_failure",
+			outcome: Outcome{
+				Result: &report.Result{
+					Failed: []report.DeleteFailure{
+						{Post: atproto.Post{RKey: "rkey1"}, Err: errors.New("boom")},
+					},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isFailure(tt.outcome)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
