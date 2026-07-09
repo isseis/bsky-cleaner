@@ -211,9 +211,10 @@ chmod 600 /path/to/cron.env
 
 ## 開発者向け情報
 
-ソースコードの取得・ビルド方法は[ソースからのビルド](docs/dev/developer_guide/build_from_source.md)を、
-プロジェクトの規約は [CLAUDE.md](CLAUDE.md) を、その他の開発者向けドキュメントは
-[docs/dev/developer_guide/](docs/dev/developer_guide/) を参照。
+- **GitHub リポジトリ**: [https://github.com/isseis/bsky-cleaner](https://github.com/isseis/bsky-cleaner)
+- **ソースコードの取得・ビルド**: [ソースからのビルド](docs/dev/developer_guide/build_from_source.md)
+- **プロジェクトの規約**: [CLAUDE.md](CLAUDE.md)
+- **開発者向けドキュメント**: [docs/dev/developer_guide/](docs/dev/developer_guide/)
 
 ## ライセンス
 

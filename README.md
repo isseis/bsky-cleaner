@@ -213,10 +213,10 @@ See [Security Design](docs/design/security.md) for details.
 
 ## Developer Information
 
-For source code retrieval and build instructions, see
-[Building from Source](docs/dev/developer_guide/build_from_source.md).
-For project conventions, see [CLAUDE.md](CLAUDE.md).
-For other developer documentation, see [docs/dev/developer_guide/](docs/dev/developer_guide/).
+- **GitHub repository**: [https://github.com/isseis/bsky-cleaner](https://github.com/isseis/bsky-cleaner)
+- **Source code retrieval and build**: [Building from Source](docs/dev/developer_guide/build_from_source.md)
+- **Project conventions**: [CLAUDE.md](CLAUDE.md)
+- **Developer documentation**: [docs/dev/developer_guide/](docs/dev/developer_guide/)
 
 ## License
 
