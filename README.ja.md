@@ -20,8 +20,19 @@ Docker Compose を使うのが標準的な利用方法です。
 ```sh
 curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.example
 cp dot.env.example .env
-# .env を編集し、Bluesky のハンドルとアプリパスワードを設定する
 ```
+
+`.env` を編集し、以下の秘匿情報を設定する。
+
+```sh
+BSKY_HANDLE=alice.bsky.social
+BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+# 以下は Slack 通知を使う場合のみ設定する（省略可）
+BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
+BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
+```
+
+各変数の詳細は後述の[環境変数](#環境変数)を参照。
 
 ### 2. 設定ファイル（TOML）を用意する
 
@@ -29,7 +40,16 @@ cp dot.env.example .env
 mkdir -p config
 ```
 
-`config/config.toml` を作成する（内容は後述の[設定](#設定)を参照）。
+`config/config.toml` を作成する。
+
+```toml
+retention_days = 30
+schedule = "0 3 * * *"
+execution_timeout_seconds = 3600
+slack_allowed_host = "hooks.slack.com"  # Slack 通知を使う場合のみ設定する
+```
+
+各フィールドの詳細は後述の[TOML 設定ファイル](#toml-設定ファイル)を参照。
 
 ### 3. docker-compose.yml を用意する
 
@@ -59,9 +79,6 @@ docker compose logs
 1. `docker-compose.yml` を編集し、`image:` のバージョンタグを上げる
 2. `docker compose pull` で新しいイメージを取得する
 3. `docker compose up -d` で新しいイメージで再起動する
-
-Docker 配布の詳細（`.env` の扱い、TOML と内蔵 cron の橋渡し方法など）は
-[Docker 配布の詳細設計](docs/design/docker_deployment.ja.md)を参照。
 
 ## インストールと実行（ビルド済み実行ファイル）
 
@@ -97,6 +114,7 @@ TOML ファイル（例: `config.toml`）を作成する。
 
 ```toml
 retention_days = 30
+schedule = "0 3 * * *"
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
 ```
@@ -157,8 +175,27 @@ bsky-cleaner print-schedule --config config.toml
 Docker を使わずホスト上で定期実行したい場合は、システムの crontab にバイナリを登録する
 （TOML の `schedule` フィールドは使わない）。
 
+秘匿情報を crontab に直接書き込むと、cron がジョブ実行時にコマンドライン全体（環境変数の値を含む）を
+syslog に記録することがあり、意図せず秘匿情報がログに残ってしまう。これを避けるため、秘匿情報は
+`export VAR=VALUE` 形式のファイル（`cron.env` など。Docker Compose 版の `.env` とは形式が異なるため
+別名にする）に書き込み、パーミッションを `600` に制限した上で、cron エントリからは読み込むだけにする。
+
+`cron.env`（例）:
+
+```sh
+export BSKY_HANDLE=alice.bsky.social
+export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+# 以下は Slack 通知を使う場合のみ設定する（省略可）
+export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
+export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
+```
+
+```sh
+chmod 600 /path/to/cron.env
+```
+
 ```cron
-0 3 * * * BSKY_HANDLE=alice.bsky.social BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx /path/to/bsky-cleaner --apply --config /path/to/config.toml
+0 3 * * * . /path/to/cron.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
 
 ## 安全性

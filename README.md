@@ -20,8 +20,19 @@ and using Docker Compose is the standard usage method.
 ```sh
 curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.example
 cp dot.env.example .env
-# Edit .env to set your Bluesky handle and app password
 ```
+
+Edit `.env` to set the following sensitive information.
+
+```sh
+BSKY_HANDLE=alice.bsky.social
+BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+# Only needed if you use Slack notifications (optional)
+BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
+BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
+```
+
+See [Environment Variables](#environment-variables) below for details on each variable.
 
 ### 2. Prepare a configuration file (TOML)
 
@@ -29,7 +40,16 @@ cp dot.env.example .env
 mkdir -p config
 ```
 
-Create `config/config.toml` (see [Configuration](#configuration) below for the contents).
+Create `config/config.toml`.
+
+```toml
+retention_days = 30
+schedule = "0 3 * * *"
+execution_timeout_seconds = 3600
+slack_allowed_host = "hooks.slack.com"  # Only needed if you use Slack notifications
+```
+
+See [TOML Configuration File](#toml-configuration-file) below for details on each field.
 
 ### 3. Prepare docker-compose.yml
 
@@ -59,9 +79,6 @@ docker compose logs
 1. Edit `docker-compose.yml` and bump the version tag in `image:`
 2. Run `docker compose pull` to fetch the new image
 3. Run `docker compose up -d` to restart with the new image
-
-For details on Docker distribution (how `.env` is handled, how TOML bridges to the built-in cron, etc.),
-see [Docker Deployment Design](docs/design/docker_deployment.md).
 
 ## Installation and Execution (Pre-built Binary)
 
@@ -98,6 +115,7 @@ Create a TOML file (e.g., `config.toml`).
 ```toml
 retention_days = 30
 execution_timeout_seconds = 3600
+schedule = "0 3 * * *"
 slack_allowed_host = "hooks.slack.com"
 ```
 
@@ -157,8 +175,29 @@ bsky-cleaner print-schedule --config config.toml
 If you want to run periodic execution on the host without Docker, register the binary in the
 system's crontab (do not use the TOML `schedule` field).
 
+Writing sensitive information directly into the crontab entry can cause cron to log the entire
+command line (including the environment variable values) to syslog when it runs the job,
+unintentionally leaving the sensitive information in the logs. To avoid this, write the sensitive
+information to a file in `export VAR=VALUE` format (e.g. `cron.env`; use a different name from the
+Docker Compose version's `.env`, since the format differs), restrict its permissions to `600`, and
+have the crontab entry only read it.
+
+`cron.env` (example):
+
+```sh
+export BSKY_HANDLE=alice.bsky.social
+export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+# Set the following only if you use Slack notifications (optional)
+export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
+export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
+```
+
+```sh
+chmod 600 /path/to/cron.env
+```
+
 ```cron
-0 3 * * * BSKY_HANDLE=alice.bsky.social BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx /path/to/bsky-cleaner --apply --config /path/to/config.toml
+0 3 * * * . /path/to/cron.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
 
 ## Safety
