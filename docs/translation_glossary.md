@@ -48,6 +48,8 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | キャッシュ | cache | |
+| 一元化 | centralized | 設定の一元管理の文脈 |
+| チェックサム | checksum | |
 | CI/CD | CI/CD | |
 | クリーンアップ | cleanup | |
 | コマンド | command | |
@@ -82,6 +84,8 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | エッジケース | edge case | |
+| 暗号化 | encryption | |
+| エントリポイントスクリプト | entry point script | Dockerコンテナ起動時のスクリプト |
 | 環境 | environment | |
 | 環境変数 | environment variable | |
 | エラー | error | |
@@ -117,6 +121,7 @@
 | インポート | import | |
 | 影響 | impact | |
 | 継承 | inheritance | |
+| 内蔵cron | built-in cron | コンテナ内で動作するcron（supercronic） |
 | 整数 | integer | |
 
 ### L
@@ -207,6 +212,7 @@
 | スコープ | scope | 変数スコープの文脈 |
 | スクリプト | script | |
 | 検索 | search | |
+| 秘匿情報 | sensitive information | パスワード・トークン等の機密データ |
 | セットアップ | setup | |
 | シリアライズ | serialize / serialization | |
 | シェル | shell | |
@@ -257,6 +263,7 @@
 | バリデーション | validation | データ妥当性検証 |
 | 検証 | verification | ファイル整合性検証の文脈 |
 | バージョン | version | |
+| 可視性 | visibility | パッケージの可視性設定の文脈 |
 | 変数 | variable | |
 | 変数名 | variable name | |
 | 変数スコープ | variable scope | |
