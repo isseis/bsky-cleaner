@@ -283,7 +283,7 @@
 | スワップ | swap | メモリスワップの文脈 |
 | レスポンスボディ | response body | |
 | サプライチェーン | supply chain | Docker イメージのサプライチェーンリスクの文脈 |
-| 強行中断 | forced interruption | タイムアウトによる強行中断の文脈 |
+| 強制中断 | forced interruption | タイムアウトによる強制中断の文脈 |
 | 自滅的 | self-inflicted | 自滅的なアクセス制限の文脈 |
 | バージョン | version | |
 | 可視性 | visibility | パッケージの可視性設定の文脈 |
