@@ -2,7 +2,7 @@
 
 # bsky-cleaner
 
-Bluesky（AT Protocol）アカウントを定期的にクリーンアップする Go 製 CLI ツールです。
+[Bluesky](https://bsky.app/)（AT Protocol）アカウントを定期的にクリーンアップする Go 製 CLI ツールです。
 設定した保持期間より古い投稿を削除します。
 
 ## 前提条件
@@ -22,15 +22,19 @@ curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.examp
 cp dot.env.example .env
 ```
 
-`.env` を編集し、以下の秘匿情報を設定する。
+`.env` を編集し、以下の秘匿情報を設定する。`BSKY_HANDLE` と `BSKY_APP_PASSWORD` は例の値ではなく、
+自分の Bluesky アカウントの値に置き換えること。
 
 ```sh
-BSKY_HANDLE=alice.bsky.social
-BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+BSKY_HANDLE=alice.bsky.social      # 自分のハンドルに置き換える
+BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx  # 自分のアプリパスワードに置き換える
 # 以下は Slack 通知を使う場合のみ設定する（省略可）
 BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
 BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ```
+
+`BSKY_APP_PASSWORD` は、通常のログインパスワードではなく
+[アプリパスワード発行ページ](https://bsky.app/settings/app-passwords)で発行した専用のパスワードを使う。
 
 各変数の詳細は後述の[環境変数](#環境変数)を参照。
 
@@ -44,7 +48,7 @@ mkdir -p config
 
 ```toml
 retention_days = 30
-schedule = "0 3 * * *"
+schedule = "0 3 * * *"  # 毎日 3:00 に実行（分 時 日 月 曜日 の順。* は「毎回（すべて）」を表す）
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"  # Slack 通知を使う場合のみ設定する
 ```
@@ -73,6 +77,18 @@ docker compose up -d
 docker compose ps
 docker compose logs
 ```
+
+### 5. 設定を確認する（試験実行）
+
+`schedule` による定期実行を待つと、設定ミスに気づくのが早くても翌日以降になってしまう。
+コンテナ内のバイナリを直接呼び出すことで、`schedule` を待たずにその場で試験実行できる。
+
+```sh
+docker compose exec bsky-cleaner /usr/local/bin/bsky-cleaner --config /config/config.toml
+```
+
+試験実行なので投稿は削除されない。ログイン・設定読み込み・削除対象の一覧表示までが
+エラーなく完了すれば、`.env` と `config.toml` は正しく設定されている。
 
 ### アップグレード
 
@@ -114,7 +130,7 @@ TOML ファイル（例: `config.toml`）を作成する。
 
 ```toml
 retention_days = 30
-schedule = "0 3 * * *"
+schedule = "0 3 * * *"  # 毎日 3:00 に実行
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
 ```
@@ -123,16 +139,19 @@ slack_allowed_host = "hooks.slack.com"
 |---|---|---|---|
 | `retention_days` | int | Yes | この日数より古い投稿を削除する。1 以上である必要がある |
 | `execution_timeout_seconds` | int | Yes | 最大実行時間（秒）。1〜86400 |
-| `schedule` | string | No | cron 式。Docker/cron での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
+| `schedule` | string | No | 定期実行する時刻を [cron 形式](https://en.wikipedia.org/wiki/Cron#Overview)（`分 時 日 月 曜日` の5項目、`*` は「毎回（すべて）」を表す。例: `0 3 * * *` = 毎日 3:00）で指定する。コンテナ内蔵のスケジューラー（supercronic）での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
 | `slack_allowed_host` | string | 条件付き | Slack webhook URL を設定する場合は必須。webhook URL がこのホスト（例: `hooks.slack.com`）を指しているか検証する |
 
 詳細は[設定リファレンス](docs/design/configuration.ja.md)を参照。
 
 ### 環境変数
 
+`BSKY_HANDLE` と `BSKY_APP_PASSWORD` は例の値ではなく、自分の Bluesky アカウントの値に置き換えること。
+
 ```sh
-export BSKY_HANDLE=alice.bsky.social
-export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+export BSKY_HANDLE=alice.bsky.social      # 自分のハンドルに置き換える
+export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx  # 自分のアプリパスワードに置き換える
+# 以下は Slack 通知を使う場合のみ設定する（省略可）
 export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
 export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ```
@@ -140,14 +159,25 @@ export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 | 変数 | 必須 | 説明 |
 |---|---|---|
 | `BSKY_HANDLE` | Yes | Bluesky のハンドル（例: `alice.bsky.social`） |
-| `BSKY_APP_PASSWORD` | Yes | Bluesky のアプリパスワード |
+| `BSKY_APP_PASSWORD` | Yes | Bluesky のアプリパスワード。通常のログインパスワードではなく、[アプリパスワード発行ページ](https://bsky.app/settings/app-passwords)で発行した専用のパスワードを使う |
 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | No | 成功通知用の Slack webhook |
 | `BSKY_SLACK_WEBHOOK_URL_FAILURE` | No | 失敗通知用の Slack webhook |
+
+### 設定を確認する（試験実行）
+
+Docker を使わない場合は、TOML 設定ファイルと環境変数の準備ができたら、まずは試験実行して設定が正しいことを確認する。
+
+```sh
+./bsky-cleaner --config config.toml
+```
+
+試験実行なので投稿は削除されない。ログイン・設定読み込み・削除対象の一覧表示までが
+エラーなく完了すれば、設定は正しく行われている。
 
 ## 使い方
 
 ```sh
-# ドライラン: 削除対象の投稿を一覧表示するだけで、実際には削除しない
+# 試験実行: 削除対象の投稿を一覧表示するだけで、実際には削除しない
 bsky-cleaner --config config.toml
 
 # 適用: 実際に投稿を削除する
@@ -165,7 +195,7 @@ bsky-cleaner print-schedule --config config.toml
 
 | コード | 意味 |
 |---|---|
-| `0` | 成功 — 対象の投稿をすべて削除した（またはドライランが完了した） |
+| `0` | 成功 — 対象の投稿をすべて削除した（または試験実行が完了した） |
 | `1` | セットアップ/実行時の失敗 — 設定エラー、ログイン失敗、ネットワークエラーなど |
 | `2` | 使い方エラー — `--config` の指定漏れ、未知のフラグ、余分な位置引数など |
 | `3` | 部分的な失敗 — 一部の投稿は削除できたが、少なくとも1件の削除に失敗した |
@@ -180,7 +210,7 @@ syslog に記録することがあり、意図せず秘匿情報がログに残�
 `export VAR=VALUE` 形式のファイル（`cron.env` など。Docker Compose 版の `.env` とは形式が異なるため
 別名にする）に書き込み、パーミッションを `600` に制限した上で、cron エントリからは読み込むだけにする。
 
-`cron.env`（例）:
+`cron.env`（例。`BSKY_HANDLE` と `BSKY_APP_PASSWORD` は自分の値に置き換える）:
 
 ```sh
 export BSKY_HANDLE=alice.bsky.social
@@ -194,16 +224,21 @@ export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 chmod 600 /path/to/cron.env
 ```
 
+crontab に登録するエントリは `分 時 日 月 曜日 コマンド` の形式で書く（`*` は「毎回（すべて）」を表す）。
+以下の例の `0 3 * * *` は「毎日 3:00 に実行する」という意味になる。
+
 ```cron
 0 3 * * * . /path/to/cron.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
 
+`crontab -e` でエディタが開くので、上記の行を追記して保存する。
+
 ## 安全性
 
-- **デフォルトでドライラン** — `--apply` を指定しない限り投稿は削除されない
+- **デフォルトでは試験実行** — `--apply` を指定しない限り投稿は削除されない
 - **フェイルクローズ** — 不正な設定（例: `retention_days = 0`、Slack webhook ホストの不一致）はデフォルト値で
   処理を続行せず、起動時に失敗する
-- **秘匿情報のマスキング** — アプリパスワードと webhook URL は `SecretString` でラップされ、
+- **秘匿情報のマスキング** — アプリパスワードと webhook URL は、
   ログやエラーメッセージ上では `[REDACTED]` と表示される
 - **固定表示（ピン留め）された投稿は削除対象から除外される**
 
