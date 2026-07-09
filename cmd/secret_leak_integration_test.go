@@ -1,5 +1,3 @@
-//go:build test
-
 // Package main holds the CLI-level integration tests for secret non-leakage
 // (happy path and error paths). Every test uses high-distinction secret literals distinct
 // from setEnvCredentials — which uses weak values ("app-password",
