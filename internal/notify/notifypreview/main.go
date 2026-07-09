@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"time"
@@ -74,21 +75,24 @@ func printScenarios(scenarios []scenario) {
 // the single test webhook URL from BSKY_SLACK_WEBHOOK_URL_TEST for both the
 // success and failure destinations.
 func sendScenarios(scenarios []scenario) error {
-	url := os.Getenv(testWebhookEnvVar)
-	if url == "" {
+	rawURL := os.Getenv(testWebhookEnvVar)
+	if rawURL == "" {
 		return fmt.Errorf("%s is not set; create a test-channel Incoming Webhook and set it before using -send", testWebhookEnvVar)
 	}
-	webhook := config.NewSecretStringForTest(url)
+	if _, err := url.ParseRequestURI(rawURL); err != nil {
+		return fmt.Errorf("invalid %s value %q: %w", testWebhookEnvVar, rawURL, err)
+	}
+	webhook := config.NewSecretStringForTest(rawURL)
 	cfg := notify.Config{SuccessWebhookURL: webhook, FailureWebhookURL: webhook}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	for _, s := range scenarios {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		fmt.Printf("sending %q...\n", s.name)
 		if err := notify.Send(ctx, cfg, http.DefaultClient, retry.RealClock{}, s.outcome); err != nil {
+			cancel()
 			return fmt.Errorf("scenario %q: %w", s.name, err)
 		}
+		cancel()
 	}
 	return nil
 }
