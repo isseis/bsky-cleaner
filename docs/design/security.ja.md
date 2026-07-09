@@ -1,3 +1,5 @@
+[English](security.md) | Japanese
+
 # セキュリティ設計
 
 - 作成日: 2026-07-02

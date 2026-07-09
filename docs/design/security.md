@@ -1,3 +1,5 @@
+English | [Japanese](security.ja.md)
+
 # Security Design
 
 - Created: 2026-07-02
