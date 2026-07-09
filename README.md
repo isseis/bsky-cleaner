@@ -1,3 +1,5 @@
+English | [Japanese](README.ja.md)
+
 # bsky-cleaner
 
 A Go CLI tool that periodically cleans up Bluesky (AT Protocol) accounts.
