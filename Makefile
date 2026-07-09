@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build clean deadcode
+.PHONY: fmt test lint build clean deadcode notify-preview notify-preview-send
 
 BINARY=build/bsky-cleaner
 
@@ -20,3 +20,9 @@ lint:
 
 deadcode:
 	deadcode ./...
+
+notify-preview:
+	go run -tags test ./internal/notify/notifypreview $(ARGS)
+
+notify-preview-send:
+	go run -tags test ./internal/notify/notifypreview -send $(ARGS)

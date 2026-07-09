@@ -50,6 +50,14 @@ func sanitizeForPayload(s string) string {
 	return escapeSlackMarkup(Sanitize(s))
 }
 
+// BuildPayloadPreview exposes buildPayload to internal/notify/notifypreview
+// (a //go:build test developer tool that renders canned Outcome values
+// without sending them), so the preview tool always renders through the
+// exact same formatting code as production Send, never a reimplementation.
+func BuildPayloadPreview(outcome Outcome) string {
+	return buildPayload(outcome)
+}
+
 // buildPayload renders outcome as Slack mrkdwn text. It includes only the
 // run's outcome (success/failure), delete count, failed posts' rkeys, and
 // error category text (errorKind) -- never post body content, which

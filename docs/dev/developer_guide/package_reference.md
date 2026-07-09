@@ -16,6 +16,7 @@ codebase grows.
     - `testutil/`: `HTTPDoer` test double and lexicon-checked response fixtures for `internal/atproto`'s own tests
   - `retry/`: generic `HTTPDoer` decorator that retries transient failures (transport errors, 429, 5xx) with bounded exponential backoff, with no dependency on internal/atproto (see docs/tasks/0005_retry_timeout)
   - `notify/`: builds a Slack Incoming Webhook payload from a report.Result/error outcome, sanitizes/escapes externally-sourced identifiers and error text, and sends it via internal/retry with a URL-redacting retry log (see docs/tasks/0006_slack_notification)
+    - `notifypreview/`: `//go:build test`-gated developer CLI that renders canned report.Result/notify.Outcome scenarios through the production payload formatter (stdout) or sends them to a test Slack channel via `BSKY_SLACK_WEBHOOK_URL_TEST` (`-send`), for iterating on notification format without a real Bluesky delete pass (`make notify-preview`)
   - `cleanup/`: filters an account's post inventory down to deletion targets based on retention days, post type, and pinned status (see docs/tasks/0003_cleanup_engine)
   - `runner/`: wires config/atproto/cleanup together into a single dry-run/apply run, producing a report.Result (see docs/tasks/0004_cli_entrypoint)
   - `report/`: structured run result (Result/Mode/DeleteFailure) and its stdout text rendering (FormatText), independent of how the result was produced (see docs/tasks/0004_cli_entrypoint)
