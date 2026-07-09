@@ -1,9 +1,10 @@
+English | [Japanese](docker_deployment.ja.md)
+
 # Docker Deployment Detailed Design
 
 - Created: 2026-07-02
 - Status: Draft
 - Related documents: [Project Overview](../overview.ja.md)
-- Japanese: [docker_deployment.ja.md](docker_deployment.ja.md)
 
 ## Positioning
 
