@@ -21,7 +21,9 @@
 | アクセス | access | |
 | 値 | value | |
 | 曖昧さ | ambiguity | |
+| アプリパスワード | app password | Bluesky のアプリパスワードの文脈 |
 | アプリケーション | application | |
+| 攻撃ベクトル | attack vector | |
 | 引数 | argument | コマンドの引数 |
 | 配列 | array | |
 | 代替案 | alternative | |
@@ -34,9 +36,11 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | バックアップ | backup | |
+| バックオフ | backoff | 指数バックオフの文脈 |
 | バッチ処理 | batch processing | |
 | ベースライン | baseline | |
 | ベストプラクティス | best practices | |
+| バイナリ | binary | |
 | 真偽値 | boolean | |
 | 破壊的変更 | breaking change | |
 | ビルド | build | |
@@ -46,6 +50,8 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | キャッシュ | cache | |
+| 一元化 | centralized | 設定の一元管理の文脈 |
+| チェックサム | checksum | |
 | CI/CD | CI/CD | |
 | クリーンアップ | cleanup | |
 | コマンド | command | |
@@ -80,12 +86,17 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | エッジケース | edge case | |
+| 暗号化 | encryption | |
+| エントリポイントスクリプト | entry point script | Dockerコンテナ起動時のスクリプト |
 | 環境 | environment | |
 | 環境変数 | environment variable | |
 | エラー | error | |
 | エラーメッセージ | error message | |
 | 例 | example | |
+| 排他制御 | exclusive control | ロックファイル等による排他制御の文脈 |
 | 例外 | exception | |
+| 実行タイムアウト | execution timeout | |
+| 実行時間 | execution time | |
 | 実行可能ファイル | executable | |
 | 実行 | execute / execution | |
 | 拡張 | extend / extending | |
@@ -97,6 +108,7 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | FAQ | FAQ | Frequently Asked Questions |
+| フェイルクローズ | fail-closed | |
 | 汎用的 | generic | |
 | 機能 | feature / functionality | |
 | フィードバック | feedback | |
@@ -109,11 +121,13 @@
 
 | 日本語 | English | 備考 |
 |--------|---------|------|
+| インジェクション | injection | |
 | インターフェース | interface | |
 | 実装 | implementation | |
 | インポート | import | |
 | 影響 | impact | |
 | 継承 | inheritance | |
+| 内蔵cron | built-in cron | コンテナ内で動作するcron（supercronic） |
 | 整数 | integer | |
 
 ### L
@@ -138,6 +152,8 @@
 | メッセージ | message | |
 | マージ | merge / merging | |
 | メソッド | method | |
+| マスキング | masking / redact / redaction | ログ・エラーメッセージ上で秘密情報を隠す処理。「赤acting」は誤変換なので使わないこと |
+| メモリ枯渇 | memory exhaustion | |
 | 移行 | migration | |
 | Mock | mock | テストのモック |
 
@@ -162,7 +178,10 @@
 | パース | parse / parsing | 構文解析 |
 | パス | path | |
 | パフォーマンス | performance | |
+| ページネーション | pagination | |
 | 権限 | permission | ファイル権限の文脈 |
+| ピン留め | pinned | 固定表示（ピン留め）された投稿の文脈 |
+| ビルド済み | pre-built | |
 | 前提条件 | prerequisite | |
 | 優先度 | priority | |
 | プロセス | process | |
@@ -179,6 +198,8 @@
 | 理由 | reason | |
 | 推奨 | recommend / recommended | |
 | 記録 | record | |
+| ログ偽装 | log forgery / log injection | |
+| ロックファイル | lock file | |
 | 再帰的 | recursive / recursively | |
 | 参照 | reference | |
 | 正規表現 | regex | "regular expression" の略 |
@@ -188,6 +209,7 @@
 | 要件 | requirement | |
 | 解決する | resolve / resolving | |
 | リソース | resource | |
+| 保持期間 | retention period | |
 | 戻り値 | return value | |
 | 責務 | responsibility | |
 
@@ -200,9 +222,12 @@
 | スコープ | scope | 変数スコープの文脈 |
 | スクリプト | script | |
 | 検索 | search | |
+| 秘密情報漏洩 | sensitive information leakage | |
+| 秘匿情報 | sensitive information | パスワード・トークン等の機密データ |
 | セットアップ | setup | |
 | シリアライズ | serialize / serialization | |
 | シェル | shell | |
+| 暗黙に | silently / implicitly | 文脈に応じた訳し分けは「技術用語の訳し分け」の「暗黙に」を参照 |
 | サイズ | size | |
 | 仕様 | specification | |
 | 標準 | standard | |
@@ -238,6 +263,7 @@
 | 一意 | unique | |
 | 更新 | update | |
 | 使用 | use / usage | |
+| 未完了 | incomplete | 削除の成否が確認できない状態の文脈 |
 | ユースケース | use case | |
 | ユーザー | user | |
 | ユーティリティ | utility | |
@@ -248,7 +274,19 @@
 |--------|---------|------|
 | バリデーション | validation | データ妥当性検証 |
 | 検証 | verification | ファイル整合性検証の文脈 |
+| 伝播 | propagate / propagation | deadline や設定の伝播の文脈 |
+| 多重起動 | multiple concurrent executions / concurrent execution | プロセスの多重起動の文脈 |
+| 冪等性 | idempotency | |
+| ハング | hanging | 応答遅延によるハングの文脈 |
+| 改ざん | tampering | ファイル改ざんの文脈 |
+| 改ざん検知 | tamper detection | |
+| スワップ | swap | メモリスワップの文脈 |
+| レスポンスボディ | response body | |
+| サプライチェーン | supply chain | Docker イメージのサプライチェーンリスクの文脈 |
+| 強制中断 | forced interruption | タイムアウトによる強制中断の文脈 |
+| 自滅的 | self-inflicted | 自滅的なアクセス制限の文脈 |
 | バージョン | version | |
+| 可視性 | visibility | パッケージの可視性設定の文脈 |
 | 変数 | variable | |
 | 変数名 | variable name | |
 | 変数スコープ | variable scope | |
@@ -311,10 +349,17 @@
 - **setting**: 個別の設定項目
 - **option**: オプション設定
 
+### 「暗黙に」の訳し分け
+
+- **silently**: ユーザーへの通知・ログ出力なしに処理が進む（黙って、無言で）ことを指す場合。例: エラーを無視して黙って処理を続行する（silently ignore the error）
+- **implicitly**: 明示的な指定がなくても、動作や意味が暗黙のうちに決まる・成立することを指す場合。例: 型が暗黙に変換される（the type is implicitly converted）、暗黙の前提（implicit assumption）
+
 ---
 
 ## 更新履歴
 
 | 日付 | 変更内容 |
 |------|---------|
-| 2026-07-01 | 初版作成（go-safe-cmd-runner の用語集から汎用的な用語のみを移植） |
+| 2026-07-01 | 初版作成 |
+| 2026-07-09 | `docs/design/security.md` の翻訳で使用したセキュリティ関連用語（攻撃ベクトル、ハング、メモリ枯渇、冪等性、改ざん、サプライチェーン等）を追加 |
+| 2026-07-09 | 「暗黙に」の訳語に silently に加えて implicitly を追加し、文脈に応じた訳し分けの指針を追記 |

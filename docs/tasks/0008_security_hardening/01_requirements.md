@@ -57,7 +57,7 @@
 
 **Acceptance Criteria**:
 - **AC-05**: 一覧取得後、削除実行までの間に対象投稿が既に削除されていた場合でも、処理全体がクラッシュせず正常系として扱われることを統合テストで検証する
-- **AC-06**: 実行タイムアウトが処理途中で発生した場合でも、それまでに削除済みの投稿と未処理の投稿が判別可能な形で結果が得られ、次回実行時に重複削除の試行によってエラーにならないことを検証する。この安全性は `DeleteRecord` の冪等性（[0002_atproto_client](../0002_atproto_client/01_requirements.md) AC-12）および実行タイムアウトの強行中断の扱い（[0005_retry_timeout](../0005_retry_timeout/01_requirements.md) AC-08・AC-09）に依拠する
+- **AC-06**: 実行タイムアウトが処理途中で発生した場合でも、それまでに削除済みの投稿と未処理の投稿が判別可能な形で結果が得られ、次回実行時に重複削除の試行によってエラーにならないことを検証する。この安全性は `DeleteRecord` の冪等性（[0002_atproto_client](../0002_atproto_client/01_requirements.md) AC-12）および実行タイムアウトの強制中断の扱い（[0005_retry_timeout](../0005_retry_timeout/01_requirements.md) AC-08・AC-09）に依拠する
 
 ## 4. 非機能要件
 

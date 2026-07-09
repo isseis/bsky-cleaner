@@ -1,25 +1,32 @@
-# 設定リファレンス
+English | [Japanese](configuration.ja.md)
 
-- 作成日: 2026-07-02
-- ステータス: Draft
-- 関連ドキュメント: [プロジェクト概要](../overview.md), [設定管理 タスク](../tasks/0001_config/01_requirements.md)
+# Configuration Reference
 
-## 位置付け
+- Created: 2026-07-02
+- Status: Draft
+- Related documents: [Project Overview](../overview.md), [Configuration Management Task](../tasks/0001_config/01_requirements.md)
 
-本ドキュメントは `internal/config` パッケージが読み込む設定値（TOML 設定ファイル・環境変数の双方）の統合リファレンスである。各項目の型・必須/任意・デフォルト値・書式や制約・記述例を記載する。実装レベルの設計判断（なぜこの構成にしたか）は [設定管理 アーキテクチャ設計書](../tasks/0001_config/02_architecture.md) を参照する。
+## Position
 
-## TOML 設定ファイル
+This document is the integrated reference for the configuration values loaded by the `internal/config` package (both TOML configuration files and environment variables). It describes the type, required/optional, default value, format and constraints, and example for each item. For implementation-level design decisions (why this structure was chosen), see the [Configuration Management Architecture Design](../tasks/0001_config/02_architecture.md).
 
-`internal/config.Load(path)` が読み込む。`slack_allowed_host` と `schedule` を除く項目は必須であり、いずれかが欠落している場合は読み込みが失敗する（必須項目についてはデフォルト値での黙った補完は行わない）。任意項目のデフォルト値は下記テーブルに明示する。秘匿情報（app パスワード・Slack Webhook URL）は TOML には書かず、下記「環境変数」の節で扱う。`slack_allowed_host` は Webhook URL 自体とは異なりそれ単体では投稿権限を持たないため秘匿情報として扱わず、TOML 側に置く（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) 参照）。
+## TOML Configuration
 
-| 項目名 | 型 | 必須/任意 | デフォルト値 | 書式・制約 |
+Read by `internal/config.Load(path)`. It operates with the following policies.
+
+- **Required items**: All items except `slack_allowed_host` and `schedule`. If any of them is missing, loading fails (no implicit completion with default values for required items).
+- **Optional items**: Default values are explicitly shown in the table below.
+- **Handling of secrets**: App passwords and Slack Webhook URLs are not written in TOML; they are handled in the "Environment Variables" section below.
+- **Reason for placing `slack_allowed_host` in TOML**: Unlike the Webhook URL itself, it does not have posting permissions on its own, so it is not treated as a secret (see [0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md)).
+
+| Item | Type | Required/Optional | Default Value | Format / Constraints |
 |---|---|---|---|---|
-| `retention_days` | 整数 | 必須 | なし | 正の整数（`1` 以上）。`0` 以下は起動失敗（全投稿即削除を防ぐ fail-closed 検証） |
-| `schedule` | 文字列 | 任意 | `""`（キー省略時） | cron 相当のスケジュール文字列。Docker 配布時の `print-schedule` サブコマンド（[0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md)）でのみ使用するため、Docker を介さず直接実行・crontab 登録する場合は不要。本パッケージ自体は値の有無のみを扱い、cron 構文としての妥当性検証は `print-schedule` 側の責務 |
-| `execution_timeout_seconds` | 整数 | 必須 | なし | 秒単位。`1`〜`86400`（24時間）の範囲の整数。`0` 以下または `86400` を超える値は起動失敗 |
-| `slack_allowed_host` | 文字列 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` のいずれかが設定されている場合は必須 | 未設定 | Slack Webhook URL のホスト部として許可する値（例: `hooks.slack.com`）。設定されている Webhook URL のホスト部（ポート番号を除く、大文字小文字を区別しない）がこの値と一致しない場合、起動失敗（fail-closed）。Webhook URL が両方とも未設定の場合は本項目が未設定でも起動失敗しない（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005） |
+| `retention_days` | integer | required | none | Positive integer (`1` or greater). `0` or below causes startup failure (fail-closed validation to prevent deletion of all posts immediately) |
+| `schedule` | string | optional | `""` (when key omitted) | A cron-like schedule string. Only used by the `print-schedule` subcommand during Docker distribution (see [0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md)), so not required when running directly or registering in crontab without Docker. This package itself only handles the presence or absence of the value; validation of the cron syntax is the responsibility of the `print-schedule` side |
+| `execution_timeout_seconds` | integer | required | none | Specified in seconds. An integer in the range `1` to `86400` (24 hours). Values `0` or below, or exceeding `86400`, cause startup failure |
+| `slack_allowed_host` | string | required if either `BSKY_SLACK_WEBHOOK_URL_SUCCESS` or `BSKY_SLACK_WEBHOOK_URL_FAILURE` is set | not set | The value allowed as the host part of the Slack Webhook URL (e.g., `hooks.slack.com`). If the host part (excluding port number, case-insensitive) of the configured Webhook URL does not match this value, startup fails (fail-closed). If both Webhook URLs are unset, startup does not fail even if this item is not set (see [0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005) |
 
-### 記述例
+### Example
 
 ```toml
 retention_days = 30
@@ -28,22 +35,34 @@ execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
 ```
 
-> `execution_timeout_seconds` は、投稿一覧取得・投稿削除などの個々の API 呼び出しがリトライ込みで要する最悪ケース時間を考慮して設定すること。本ツールのリトライポリシー（既定値: 最大リトライ回数5回、初回バックオフ1秒、最大バックオフ30秒）では、1回の API 呼び出しが継続的に一時的エラー（429/5xx/タイムアウト）に遭遇した場合の最悪ケース待機時間は約31秒である（[0005_retry_timeout アーキテクチャ設計書](../tasks/0005_retry_timeout/02_architecture.md#34-f-002実行タイムアウトの充足状況とリトライポリシーの数値ac-05ac-07)）。削除対象の投稿数が多い場合、この待機時間が呼び出し回数分積み重なりうるため、`execution_timeout_seconds` はスケジュール間隔（`schedule`）より十分小さい範囲で、想定される最大投稿数を踏まえて余裕を持たせて設定することを推奨する。実行タイムアウトに到達した場合、実行中の削除呼び出しは強制中断されるが、これによってデータが破壊されることはない（`DeleteRecord` の冪等性、[0002_atproto_client](../tasks/0002_atproto_client/01_requirements.md) AC-12 参照）。また Slack 通知処理（[0006_slack_notification アーキテクチャ設計書](../tasks/0006_slack_notification/02_architecture.md#35-副作用契約dry-run--apply-とネットワーク送信) 3.5節）が、削除処理とは独立したタイムアウト予算（既定で約12秒: 単発HTTPタイムアウト3秒 × 最大3試行 + バックオフ1秒+2秒）を追加で消費するため、`execution_timeout_seconds` とスケジュール間隔の余裕を検討する際はこの追加分も考慮すること。
+### Notes on Setting `execution_timeout_seconds`
 
-## 環境変数
+`execution_timeout_seconds` should be set considering the worst-case time required for individual API calls such as fetching post lists and deleting posts, including retries. The following factors should be considered.
 
-`internal/config.LoadCredentials()` が読み込む。いずれも秘匿情報として扱い、TOML には書かない。Docker 配布時は `.env` 経由で渡す（[Docker 配布の詳細設計](docker_deployment.md) 参照）。
+- **Worst-case wait time for retry policy**: With this tool's retry policy (default: maximum 5 retries, initial backoff 1 second, maximum backoff 30 seconds), the worst-case wait time when a single API call continuously encounters transient errors (429/5xx/timeout) is approximately 31 seconds (see [0005_retry_timeout Architecture Design](../tasks/0005_retry_timeout/02_architecture.md#34-f-002実行タイムアウトの充足状況とリトライポリシーの数値ac-05ac-07)).
+- **Proportional to the number of posts to delete**: When there are many posts to delete, the above wait time can accumulate for each call. Therefore, it is recommended to set `execution_timeout_seconds` with a sufficient margin within a range sufficiently smaller than the schedule interval (`schedule`), taking into account the expected maximum number of posts.
+- **Safety on timeout expiration**: If the execution timeout is reached, deletion calls in progress are forcibly terminated, but this does not cause data corruption (due to the idempotency of `DeleteRecord`; see [0002_atproto_client](../tasks/0002_atproto_client/01_requirements.md) AC-12).
+- **Additional timeout budget for Slack notifications**: The Slack notification process (see [0006_slack_notification Architecture Design](../tasks/0006_slack_notification/02_architecture.md#35-副作用契約dry-run--apply-とネットワーク送信) Section 3.5) consumes an additional timeout budget independent of the deletion process (default: approximately 12 seconds: single HTTP timeout 3 seconds × maximum 3 attempts + backoff 1 second + 2 seconds). Consider this additional budget when evaluating the margin between `execution_timeout_seconds` and the schedule interval.
 
-| 変数名 | 型 | 必須/任意 | デフォルト値 | 書式・制約 |
+## Environment Variables
+
+Read by `internal/config.LoadCredentials()`. It operates with the following policies.
+
+- **Secrets**: All are treated as secrets and are not written in TOML.
+- **Docker distribution**: Passed via `.env` (see [Docker Deployment Design](docker_deployment.md)).
+
+| Variable Name | Type | Required/Optional | Default Value | Format / Constraints |
 |---|---|---|---|---|
-| `BSKY_HANDLE` | 文字列 | 必須 | なし | Bluesky アカウントの handle（例: `alice.bsky.social`）。空文字列・未設定はいずれも起動失敗 |
-| `BSKY_APP_PASSWORD` | 文字列（秘匿） | 必須 | なし | Bluesky の app パスワード。空文字列・未設定はいずれも起動失敗 |
-| `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | 文字列（秘匿・URL） | 任意 | 未設定（該当チャンネルへの通知を行わない） | 成功時通知用の Slack Incoming Webhook URL。設定する場合はスキームが `https` であること、かつホスト部を含む構文的に妥当な URL であることのみを検証する（パス・クエリパラメータの内容には制約を設けない）。未設定の場合はエラーにせず、当該チャンネルへの通知を行わない設定として扱う。なお環境変数が未設定の場合と空文字列に設定された場合は区別されず、いずれも「通知を行わない」として同一に扱われる |
-| `BSKY_SLACK_WEBHOOK_URL_FAILURE` | 文字列（秘匿・URL） | 任意 | 未設定（該当チャンネルへの通知を行わない） | 失敗時通知用の Slack Incoming Webhook URL。制約・未設定時の挙動は `BSKY_SLACK_WEBHOOK_URL_SUCCESS` と同じ |
+| `BSKY_HANDLE` | string | required | none | The handle of the Bluesky account (e.g., `alice.bsky.social`). Empty string or unset both cause startup failure |
+| `BSKY_APP_PASSWORD` | string (secret) | required | none | The Bluesky app password. Empty string or unset both cause startup failure |
+| `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | string (secret, URL) | optional | not set (no notification to the corresponding channel) | Slack Incoming Webhook URL for success notifications. If set, only validates that the scheme is `https` and that it is a syntactically valid URL including the host part (no constraints on the path or query parameters). If unset, no error is raised and it is treated as a configuration that does not send notifications to that channel. Note that an unset environment variable and a variable set to an empty string are not distinguished; both are treated identically as "no notification" |
+| `BSKY_SLACK_WEBHOOK_URL_FAILURE` | string (secret, URL) | optional | not set (no notification to the corresponding channel) | Slack Incoming Webhook URL for failure notifications. The constraints and behavior when unset are the same as `BSKY_SLACK_WEBHOOK_URL_SUCCESS` |
 
-Slack Webhook URL のホスト部が TOML `slack_allowed_host` と一致することの検証は、TOML（`Config`）と環境変数（`Credentials`）の両方を必要とするため `LoadAppConfig()` が両方を読み込んだ後に行う（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005）。
+### Host Verification Timing
 
-### 記述例（`.env`）
+Verification that the host part of the Slack Webhook URL matches the TOML `slack_allowed_host` requires both the TOML (`Config`) and environment variables (`Credentials`). Therefore, it is performed after `LoadAppConfig()` reads both (see [0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005).
+
+### Example (`.env`)
 
 ```
 BSKY_HANDLE=alice.bsky.social
@@ -52,6 +71,10 @@ BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/<workspace-id>/<
 BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/<workspace-id>/<channel-id>/<token>
 ```
 
-## 秘匿情報の取り扱い
+## Handling of Secrets
 
-`BSKY_APP_PASSWORD` と Slack Webhook URL（正常系・異常系）は `internal/config.SecretString` 型でラップされ、`%v`/`%s`/`%#v` によるフォーマットや `log/slog` 経由の構造化ログでは固定文字列（`"[REDACTED]"`）に置き換わる。実際の値を取得できるのは `Reveal()` の呼び出しのみであり、認証リクエスト構築や Slack 通知ペイロード構築などの利用直前でのみ呼び出す運用とする。`BSKY_HANDLE` は Bluesky 上で公開されるアカウント識別子であり秘匿情報ではないため、`SecretString` でラップしない。
+`BSKY_APP_PASSWORD` and the Slack Webhook URLs (success and failure) are wrapped in the `internal/config.SecretString` type. This provides the following characteristics.
+
+- **Protection in log output**: When formatted with `%v`/`%s`/`%#v` or used in structured logging via `log/slog`, they are replaced with the fixed string `[REDACTED]`.
+- **Retrieving the value**: The actual value can only be obtained by calling `Reveal()`, and it is intended to be called only immediately before use, such as when constructing authentication requests or building Slack notification payloads.
+- **`BSKY_HANDLE` is not applicable**: `BSKY_HANDLE` is an account identifier exposed publicly on Bluesky and is not a secret, so it is not wrapped in `SecretString`.

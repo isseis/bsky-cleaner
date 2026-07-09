@@ -1,160 +1,159 @@
-# bsky-cleaner プロジェクト概要
+# bsky-cleaner Project Overview
 
-- 作成日: 2026-07-02
-- 最終更新日: 2026-07-02
-- ステータス: Draft
+- Created: 2026-07-02
+- Last updated: 2026-07-02
+- Status: Draft
 
-## 概要
+## Overview
 
-`bsky-cleaner` は、Bluesky (bsky) アカウントの投稿を定期的にクリーンアップする Go 製の CLI ツールである。設定した日数より古い投稿を自動的に削除する。
+`bsky-cleaner` is a CLI tool written in Go that periodically cleans up posts from a Bluesky (bsky) account. It automatically deletes posts older than a configured number of days.
 
-## 背景・目的
+## Background / Purpose
 
-Bluesky に投稿し続けると過去の投稿が蓄積していく。一定期間より古い投稿は定期的に削除し、アカウントを「その時々の発信」に保ちたい、というニーズに応えるツールである。
+Continued posting on Bluesky leads to an accumulation of past posts. This tool addresses the need to periodically delete posts older than a certain period, keeping the account focused on "current content."
 
-## スコープ
+## Scope
 
-### 対象とすること
+### In Scope
 
-- 単一の Bluesky アカウントを対象に、設定した日数より古い投稿を削除する
-- cron 相当のスケジューリング（Docker イメージへの内蔵）による定期実行
-- 実行結果の Slack 通知
+- On a single run, targets a single Bluesky account and deletes posts older than the configured number of days
+- Scheduled execution equivalent to cron (built into the Docker image)
+- Slack notification of execution results
 
-### スコープ外（Non-goals）
+### Out of Scope (Non-goals)
 
-- 複数アカウントの一括管理
-- Web UI / GUI の提供（CLI ツールとしてのみ提供する）
-- 投稿のアーカイブ・バックアップ機能（削除前提のツールであり、削除した投稿を復元する手段は提供しない）
-- 投稿内容の編集・加工機能
-- Bluesky 以外の SNS への対応
+- Batch management of multiple accounts
+- Web UI / GUI (provided only as a CLI tool)
+- Post archiving or backup functionality (this tool assumes deletion; no means of restoring deleted posts is provided)
+- Post editing or modification
+- Support for social networks other than Bluesky
 
-## 用語集
+## Glossary
 
-| 用語 | 説明 |
-|------|------|
-| AT Protocol | Bluesky が採用する、フェデレーション（分散）型の SNS プロトコル |
-| PDS (Personal Data Server) | AT Protocol においてユーザーのデータ（投稿等）を実際に保持するサーバー。`bsky.social` とは限らず、ユーザーごとに異なりうる |
-| DID (Decentralized Identifier) | AT Protocol におけるアカウントの永続的な識別子。DID を解決することで、そのアカウントの PDS の所在などが分かる |
-| rkey (record key) | AT Protocol のレコード（投稿など）を一意に識別するキー。投稿の削除時に指定する |
-| AT-URI | AT Protocol 上のレコードを指し示す URI 形式（例: `at://did:plc:xxxx/app.bsky.feed.post/yyyy`） |
-| XRPC | AT Protocol が採用する HTTP ベースの RPC 方式。本ツールが Bluesky とやり取りする際のプロトコル |
-| app パスワード | Bluesky アカウントの通常パスワードとは別に発行できる、外部アプリケーション連携用の認証情報 |
-| fail-closed | エラーや異常を検知した際に、処理を「とりあえず続行する」のではなく安全側（＝止まる・失敗する）に倒す設計方針。本ツールでは、検証エラー時に不完全な処理を続けるより、起動・送信を失敗させることを優先する |
+| Term | Description |
+|------|-------------|
+| AT Protocol | The federation (decentralized) social networking protocol adopted by Bluesky |
+| PDS (Personal Data Server) | The server that actually holds user data (posts, etc.) in AT Protocol. Not necessarily `bsky.social`; it may differ per user |
+| DID (Decentralized Identifier) | A persistent identifier for an account in AT Protocol. Resolving a DID reveals the location of the account's PDS, among other information |
+| rkey (record key) | A key that uniquely identifies an AT Protocol record (such as a post). Specified when deleting a post |
+| AT-URI | A URI format pointing to a record on AT Protocol (e.g., `at://did:plc:xxxx/app.bsky.feed.post/yyyy`) |
+| XRPC | An HTTP-based RPC method adopted by AT Protocol. The protocol used by this tool to communicate with Bluesky |
+| app password | Authentication credentials that can be issued separately from a Bluesky account's regular password, intended for external application integration |
+| fail-closed | A design principle that, when an error or anomaly is detected, favors the safe side (stopping/failing) rather than "continuing anyway." In this tool, validation errors cause startup or sending to fail rather than continuing with incomplete processing |
 
-## 前提条件・制約
+## Assumptions and Constraints
 
-### 前提条件（Assumptions）
+### Assumptions
 
-- 対象の Bluesky アカウントと、そのアカウント用の app パスワードは、本ツールの利用開始前にユーザー自身が発行済みであること
+- The target Bluesky account and an app password for that account must have already been issued by the user before using this tool
 
-### 制約（Constraints）
+### Constraints
 
-- **言語**: Go 1.26.2 以上（`go.mod` 参照）
-- **対象アカウント**: 1 アカウントのみを対象とする
-- **秘匿情報**: Bluesky の app パスワード、および Slack Webhook URL（正常系・異常系）は環境変数から取得する（設定ファイルに秘匿情報は書かない）。Slack Webhook URL は、値を知っていれば該当チャンネルに投稿できてしまうケーパビリティを持つ値であるため、app パスワードと同様に秘匿情報として扱う
-- **設定ファイル形式**: TOML
-- **外部依存の最小化**: 将来にわたっての保守コストを抑え、安定動作を確保するため、外部ライブラリ・外部ツールへの依存は必要最小限に留める。自作で十分に実現できる機能（例: 薄い XRPC クライアント）を大きな依存に置き換えない。依存を追加する場合は、それによって削減できる実装コストと、追加される保守負債（バージョン追従、脆弱性対応、ライセンス管理等）を比較した上で判断する
+- **Language**: Go 1.26.2 or later (see `go.mod`)
+- **Target account**: A single run targets only one account. To manage multiple accounts, prepare a set of TOML configuration files and environment variables (`.env`) for each account, and run the tool as multiple processes (or multiple Docker containers)
+- **Sensitive information**: The Bluesky app password and Slack Webhook URLs (for normal and error cases) are obtained from environment variables (sensitive information is not written in configuration files). Slack Webhook URLs are treated as sensitive information just like app passwords, since anyone who knows the value can post to the corresponding channel
+- **Configuration file format**: TOML
+- **Minimize external dependencies**: To keep maintenance costs low and ensure stable operation over time, dependencies on external libraries and tools are kept to the necessary minimum. Do not replace functionality that can be adequately implemented in-house (e.g., a thin XRPC client) with a large dependency. When adding a dependency, weigh the implementation cost it reduces against the maintenance burden it adds (version tracking, vulnerability response, license management, etc.)
 
-## 開発・配布方針
+## Development and Distribution Strategy
 
-導入の容易さを重視し、以下の二層構造とする。
+Ease of deployment is prioritized, using the following two-tier structure.
 
-- **バイナリ自体**: あくまで「一発実行の CLI」として設計する。デーモン化・スケジューリング機能は持たない。開発時は Docker を介さず、直接ビルド・実行・テストを行う（今まで通りのシンプルな開発サイクル）
-- **配布形態**: リリース時は Docker イメージとしてパッケージングする。イメージには軽量 cron を同梱し、コンテナが内蔵スケジューラとして動作する。ユーザーは `docker-compose.yml` で環境変数（秘匿情報）・TOML 設定ファイル（ボリュームマウント）を用意して起動するだけでよい
-- **設定の一元化**: 実行スケジュールや実行タイムアウトを含むすべての設定は TOML に一元化する。秘匿情報のみ `.env` に分離し、`docker-compose.yml` からは変数参照のみ行う
+- **The binary itself**: Designed purely as a "one-shot CLI." It does not include daemonization or scheduling functionality. During development, build, run, and test directly without Docker (maintaining a simple development cycle)
+- **Distribution format**: Packaged as a Docker image at release time. The image includes a lightweight cron, allowing the container to act as a built-in scheduler. Users only need to prepare environment variables (sensitive information) and a TOML configuration file (volume mount) in `docker-compose.yml` to get started
+- **Centralized configuration**: All settings including the execution schedule and execution timeout are centralized in TOML. Only sensitive information is separated into `.env`, which is referenced via variables in `docker-compose.yml`
 
-実装レベルの詳細（`.env` の git 管理方針、TOML のスケジュール設定を内蔵 cron に橋渡しする方法など）は [Docker 配布の詳細設計](design/docker_deployment.md) を参照。
+For implementation-level details (such as git management policy for `.env`, how TOML schedule settings are bridged to the built-in cron), see [Docker Deployment Design Details](design/docker_deployment.md).
 
-## 削除仕様
+## Deletion Specifications
 
-### 削除対象
+### Posts to Delete
 
-以下を削除対象に含める。
+The following are included as deletion targets.
 
-- 通常の投稿（オリジナルポスト）
-- リプライ
-- リポスト
-- 引用ポスト
+- Regular posts (original posts)
+- Replies
+- Reposts
+- Quote posts
 
-### 削除対象外
+### Posts Not to Delete
 
-- ピン留めされた投稿: 日数条件に合致していても削除対象から除外する
+- Pinned posts: Excluded from deletion targets even if they meet the age condition
 
-### 削除条件の判定基準
+### Criteria for Determining Deletion
 
-- 設定ファイルに「何日前より古い投稿を削除するか」を日数（整数）で指定する
-- 経過日数の判定は投稿の作成日時（`createdAt`）を **UTC 基準** で計算する
+- The configuration file specifies the age threshold (in days, as an integer) for posts to be deleted
+- The elapsed days are calculated based on the post's creation time (`createdAt`) in **UTC**
 
-## 安全性についての方針
+## Safety Policy
 
-削除は不可逆な操作であるため、以下を基本方針とする。
+Since deletion is an irreversible operation, the following basic policies apply.
 
-- **デフォルトは dry-run**: 明示的なフラグ（例: `--apply`）を指定しない限り、実際の削除は行わず「削除対象一覧の表示」に留める
-- **削除件数の上限は設けない**: 条件に合致した投稿はすべて削除対象とする。ただし設定ミス（例: `retention_days=0`）による意図しない大量削除を防ぐガードレール（件数が閾値超過時の確認プロンプトや `--max-delete` フラグ等）は将来的な検討事項とする
+- **Default is dry-run**: Unless an explicit flag (e.g., `--apply`) is specified, actual deletion is not performed; only the "list of posts to delete" is displayed
+- **No upper limit on deletion count**: All posts matching the condition are targeted for deletion. However, guardrails to prevent unintentional mass deletion due to configuration mistakes (e.g., `retention_days=0`), such as a confirmation prompt when the count exceeds a threshold or a `--max-delete` flag, are left as future considerations
 
-削除ログのファイル等への記録は行わない。実行結果は Slack 通知（後述）で確認できるため、別途のログ記録は不要と判断した。
+No deletion logs are written to files. Since execution results can be confirmed via Slack notification (described below), separate log recording is deemed unnecessary.
 
-## リトライ方針
+## Retry Policy
 
-API 呼び出しがエラーになった場合、指数バックオフ（exponential backoff）で数回リトライする。リトライ回数・待機時間の具体的なパラメータは今後決定する。
+If an API call results in an error, it is retried several times with exponential backoff. The defaults are a maximum of 5 retries, an initial backoff of 1 second, and a maximum backoff of 30 seconds. The worst-case wait time for a single API call that encounters persistent temporary errors is approximately 31 seconds. See the [Configuration Reference](design/configuration.md) for parameter details.
 
-リトライの累積時間は、多重起動対策として設ける実行タイムアウト（後述）の範囲内に収まるよう設計する。大量の投稿を削除する場合、1件ごとのリトライが積み重なってタイムアウトを超過しうるため、タイムアウト値はリトライの最悪ケース時間を考慮して決定する。
+The cumulative retry time is designed to stay within the execution timeout (described below) that is set as a measure against concurrent executions. When deleting a large number of posts, the per-post retries can accumulate and potentially exceed the timeout; therefore, the timeout value should be determined taking the worst-case retry time into account.
 
-## 実行結果の通知
+## Execution Result Notification
 
-実行結果は Slack に通知する。
+Execution results are notified via Slack.
 
-- 正常系と異常系で、それぞれ異なる Slack チャンネルに投稿できるようにする（同一チャンネルに統一する運用も可能とする）
-- 正常系・異常系の通知先 Webhook URL は、設定ファイルで指定する許可ホスト（例: `hooks.slack.com`）のホスト部（ドメイン）と一致している前提とする
-- ホスト部が一致しない場合は fail-closed とする。すなわち、不一致を検知した場合は通知を諦めて送信するのではなく、設定エラーとして起動を失敗させる（`go-safe-cmd-runner` のホスト検証と同様の考え方）
+- Normal and error cases can be posted to different Slack channels (operating with both using the same channel is also possible)
+- The Webhook URLs for normal and error notifications are assumed to match the host part (domain) of the allowed host specified in the configuration file (e.g., `hooks.slack.com`)
+- If the host part does not match, the system is fail-closed. That is, if a mismatch is detected, the tool does not proceed with sending the notification; instead, it treats the mismatch as a configuration error and fails to start (see [Slack Notification Security Design](design/slack_notification_security.md) for details)
 
-### Slack 通知における情報漏洩対策
+### Information Leakage Protection in Slack Notifications
 
-Slack への通知に機密情報が不用意に含まれないよう対策する。具体的な実装方針は本ドキュメントには記載しないが、姉妹プロジェクトである `go-safe-cmd-runner` と同様の対策（通知内容に含まれる機密情報のマスキング、Webhook URL のホスト検証など）を踏襲する想定とする。
+Measures are taken to prevent sensitive information from inadvertently being included in Slack notifications. For specific implementation details, see the [Slack Notification Security Design](design/slack_notification_security.md).
 
-## セキュリティ考慮事項
+## Security Considerations
 
-主なリスクカテゴリは以下の通り。実装レベルの詳細は [セキュリティ設計](design/security.md) を参照。
+The main risk categories are as follows. For implementation-level details, see the [Security Design](design/security.md).
 
-- **投稿本文経由のインジェクション**: Slack 通知・コンソール出力に投稿本文をそのまま含めると、メンション拡散・ANSI エスケープ注入・ログ偽装が起こりうる
-- **SSRF（PDS エンドポイント偽装）**: DID 解決ロジックに不備があると、認証情報を意図しないホストへ送信しうる
-- **秘密情報漏洩**: エラーオブジェクトに `Authorization` ヘッダー等が含まれたまま Slack や panic ログへ流出するリスク
-- **リトライ過多による自滅的なアクセス制限**: リトライのバックオフ上限がないと Bluesky 側のレート制限・アカウント制限を誘発しうる
-- **多重起動**: 処理中に cron の次回起動が重なるリスク。実行タイムアウトで対処する
-- **設定改ざん**: `retention_days` 改ざんによる全投稿削除リスク
-- **Docker サプライチェーン**: ベースイメージはタグではなく digest で固定する
+- **Injection via post body**: Including post body text directly in Slack notifications or console output can lead to mention spreading, ANSI escape injection, and log forgery
+- **SSRF (PDS endpoint spoofing)**: Flaws in the DID resolution logic could send authentication credentials to unintended hosts
+- **Sensitive information leakage**: Risk of `Authorization` headers or similar data leaking into Slack or panic logs when included in error objects
+- **Self-inflicted rate limiting from excessive retries**: Without a backoff cap on retries, this could trigger rate limits or account restrictions on the Bluesky side
+- **Concurrent execution**: Risk of overlapping cron invocations during processing. Addressed with an execution timeout
+- **Configuration tampering**: Risk of deleting all posts due to tampering with `retention_days`
+- **Docker supply chain**: Base images are pinned by digest, not by tag
 
-## 使用する API
+## APIs Used
 
-Bluesky は AT Protocol 上に構築されており、本ツールは以下の AT Protocol の XRPC エンドポイントを利用する想定である。
+Bluesky is built on the AT Protocol. This tool uses the following AT Protocol XRPC endpoints.
 
-- `com.atproto.server.createSession`: app パスワードによるログイン（セッション取得）
-- `com.atproto.repo.listRecords` もしくは `app.bsky.feed.getAuthorFeed`: 自分の投稿一覧の取得
-- `com.atproto.repo.deleteRecord`: 投稿の削除
+- `com.atproto.server.createSession`: Login (session acquisition) using an app password
+- `com.atproto.repo.listRecords`: Retrieve a list of one's own posts
+- `com.atproto.repo.deleteRecord`: Delete a post
 
-Go 向けクライアントとして公式の `bluesky-social/indigo` を利用するか、XRPC を直接叩く薄いラッパーを自作するかは今後検討するが、「外部依存の最小化」方針に照らすと、本ツールが利用するエンドポイントはごく一部（ログイン・一覧取得・削除）に限られるため、依存の大きい `indigo` を丸ごと導入するより、薄い自作ラッパーを優先する方向で検討する。
+In addition, the following are used for DID and PDS endpoint resolution.
 
-## 参考文献
+- Handle resolution: First tries DNS TXT records (`_atproto.<handle>` with `did=...`); on failure, falls back to HTTPS well-known (`https://{handle}/.well-known/atproto-did`)
+- DID document resolution: For `did:plc`, references the PLC directory (`https://plc.directory/{did}`); for `did:web`, references `.well-known/did.json` (or `did.json` with a path) on the relevant domain
 
-- AT Protocol 公式ドキュメント: https://atproto.com/
-- Bluesky 公式 Go クライアント実装 (`indigo`): https://github.com/bluesky-social/indigo
+In line with the "minimize external dependencies" policy, the official `bluesky-social/indigo` Go client is not used; instead, a thin custom wrapper (`internal/atproto`) that directly calls XRPC is used. This is because the number of endpoints this tool uses (login, list retrieval, deletion, DID/PDS resolution) is limited, and the cost of importing the large `indigo` library in its entirety is not justified.
 
-## 完了の定義
+## References
 
-以下がすべて満たされた状態を、本プロジェクトの初期リリースの完了とする。
+- AT Protocol official documentation: https://atproto.com/
+- Bluesky official Go client implementation (`indigo`): https://github.com/bluesky-social/indigo
 
-- 単一アカウントに対し、dry-run でのポスト一覧の表示ができる
-- `--apply` フラグ指定時に、条件に合致した投稿（通常投稿・リプライ・リポスト・引用ポスト）が実際に削除され、ピン留め投稿は除外される
-- 実行結果（正常系・異常系）が Slack に通知される
-- Docker イメージとして配布され、`docker-compose.yml` と TOML 設定ファイル・`.env` を用意するだけで cron 相当の定期実行が行える
+## Definition of Done
 
-## 未確定・今後検討する事項
+The initial release of this project is considered complete when all of the following are satisfied.
 
-- リトライ回数・待機時間などの具体的なパラメータ
-- Slack 通知メッセージの内容・フォーマット
-- Slack 通知の情報漏洩対策の具体的な実装内容（`go-safe-cmd-runner` を参考に別途検討）
-- DID 解決・PDS エンドポイント決定ロジックの安全な実装方法（API 調査フェーズで確認）
-- 設定ファイルの権限管理・改ざん検知の要否
-- Docker 配布の実装詳細（[Docker 配布の詳細設計](design/docker_deployment.md) 参照）
-- 実行タイムアウトの具体的な時間・スケジュール間隔との比率
-- 「外部依存の最小化」方針に照らした既存の依存候補（`indigo`、内蔵 cron ツール（`supercronic` 等）、`git-crypt`）の要否の再検討
+- A dry-run display of the post list for a single account is possible
+- When the `--apply` flag is specified, posts matching the condition (regular posts, replies, reposts, quote posts) are actually deleted, and pinned posts are excluded
+- Execution results (both normal and error cases) are notified via Slack
+- Distributed as a Docker image, and scheduled execution equivalent to cron is achievable simply by preparing a `docker-compose.yml`, a TOML configuration file, and `.env`
+
+## Undetermined / Future Considerations
+
+- Whether configuration file permission management and tamper detection are necessary
+- Whether guardrails for having no upper limit on deletion count (such as a confirmation prompt when the count exceeds a threshold or a `--max-delete` flag) are necessary

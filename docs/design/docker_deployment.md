@@ -1,91 +1,77 @@
-# Docker 配布の詳細設計
+English | [Japanese](docker_deployment.ja.md)
 
-- 作成日: 2026-07-02
-- ステータス: Draft
-- 関連ドキュメント: [プロジェクト概要](../overview.md)
+# Docker Deployment Detailed Design
 
-## 位置付け
+- Created: 2026-07-02
+- Status: Draft
+- Related documents: [Project Overview](../overview.md)
 
-本ドキュメントは、[プロジェクト概要](../overview.md) の「開発・配布方針」で述べた Docker 配布方針の実装レベルの詳細を記載する。方針レベルの決定事項（なぜこの構成にしたか）は overview 側を参照し、ここでは「どう実装するか」のみを扱う。
+## Positioning
 
-## 秘匿情報の管理（`.env`）
+This document describes the implementation-level details of the Docker deployment strategy described in the "Development and Deployment Strategy" section of the [Project Overview](../overview.md). For the strategy-level decisions (why this configuration was chosen), refer to the overview; this document only covers "how to implement it."
 
-`docker-compose.yml` には秘匿情報を直接書かず、Compose の変数展開機能を通じて `.env` の値を参照する形にする。
+## Sensitive Information Management (`.env`)
 
-> **`.env` と `env_file` の役割の違い**: Compose における `.env` ファイルは `docker-compose.yml` 内の変数展開（例: `${BSKY_APP_PASSWORD}`）専用であり、コンテナの環境変数には自動では入らない。コンテナへは `environment:` キーで `BSKY_APP_PASSWORD: ${BSKY_APP_PASSWORD}` のように明示的に渡す。`env_file:` ディレクティブはファイル内の変数をコンテナに丸ごと渡す別機能であり、本設計では使用しない。
+Sensitive information should not be written directly in `docker-compose.yml`; instead, reference values from `.env` through Compose's variable expansion feature.
 
-- `.env` に実際の app パスワード等を記載する
-- `.env` の扱いは、運用に応じて以下のいずれかを選択できるようにする
-  - **`git-crypt` で `.env` のみを暗号化対象にする**: `.gitattributes` に `.env filter=git-crypt diff=git-crypt` を設定する。`docker-compose.yml` や TOML 設定など秘匿情報を含まないファイルは平文のまま差分管理・レビューでき、秘匿情報だけをリポジトリ内で安全に共有できる。複数人・複数環境で `.env` 自体をバージョン管理・共有したい場合に向く
-  - **`.env` を `.gitignore` に追加してバージョン管理から外す**: 最もシンプルで事故りにくいが、`.env` 自体の共有は git 管理外の手段（パスワードマネージャ等）に委ねる必要がある
-- `.env.example`（値は空/ダミー）はいずれの方式でも通常通りコミットし、初期セットアップの手引きとする
+> **Difference between `.env` and `env_file`**: In Compose, the `.env` file is exclusively for variable expansion in `docker-compose.yml` (e.g., `${BSKY_APP_PASSWORD}`) and does not automatically populate container environment variables. To pass variables to containers, explicitly specify them with the `environment:` key, such as `BSKY_APP_PASSWORD: ${BSKY_APP_PASSWORD}`. The `env_file:` directive is a separate feature that passes all variables in a file to the container; this design does not use it.
 
-## スケジュール設定と内蔵 cron の連携
+- The `.env` file contains the actual app password and other sensitive values
+- The handling of `.env` can be selected from the following options depending on the operational needs:
+  - **Encrypt only `.env` with `git-crypt`**: Set `.env filter=git-crypt diff=git-crypt` in `.gitattributes`. Files that do not contain sensitive information, such as `docker-compose.yml` and TOML configuration, can be version-controlled and reviewed in plain text, while only sensitive information can be securely shared within the repository. Suitable for scenarios where `.env` itself needs to be version-controlled and shared across multiple people and environments
+  - **Add `.env` to `.gitignore` and exclude it from version control**: The simplest and least error-prone approach, but sharing `.env` itself must be handled outside of git (e.g., password manager)
+- `dot.env.example` (with empty/dummy values) is committed as usual in either approach, serving as a guide for initial setup
 
-実行スケジュールも他の設定と同様に TOML に一元化する（`docker-compose.yml` の環境変数には出さない）。TOML はコンテナ起動時にしか読めない内蔵 cron 定義ファイルとは別物のため、以下の手順で橋渡しする。
+## Schedule Configuration and Built-in Cron Integration
 
-1. バイナリに `print-schedule` のような隠しサブコマンドを用意し、TOML から schedule フィールド（例: `schedule = "0 3 * * *"`）だけを取り出して標準出力する。TOML のパース処理をこのサブコマンドに集約し、二重実装を避ける。出力前に「改行を含まない1行の cron 式」であることを検証し、不正な値の場合は非0で終了する（改行を含む値をそのまま crontab に書き込むと、crontab の追加行として任意コマンドを注入できるため）
-2. イメージ同梱のエントリポイントスクリプトが、コンテナ起動時にこのサブコマンドを呼び出し、結果を使って `supercronic` 用の crontab ファイルを動的生成する
-3. `exec supercronic <生成した crontab>` で内蔵 cron を起動し、以降はそのスケジュールに従って本体（`bsky-cleaner --apply --config ...`）を定期実行する
+The execution schedule is centralized in TOML, like other settings (not exposed as environment variables in `docker-compose.yml`). TOML is a configuration file that can only be read at container startup and is separate from the crontab definition file that the built-in cron (supercronic) reads. Therefore, the TOML configuration values are bridged to the crontab using the following procedure:
 
-この方式により、設定は TOML に一元化されたまま、ユーザーは Docker イメージを起動するだけで良く、ホスト側の cron 設定は不要になる。
+1. The binary provides a hidden subcommand `print-schedule` that extracts only the schedule field (e.g., `schedule = "0 3 * * *"`) from TOML and outputs it to stdout. TOML parsing is consolidated in this subcommand to avoid double implementation. Before output, it verifies that the value is a "single-line cron expression without line breaks" and exits with a non-zero status if the value is invalid (writing a value containing line breaks directly into a crontab could inject arbitrary commands as additional crontab lines)
+2. The entry point script bundled with the image calls this subcommand at container startup and dynamically generates a crontab file for `supercronic` using the result
+3. The built-in cron is started with `exec supercronic <generated crontab>`, and the main program (`bsky-cleaner --apply --config ...`) is executed periodically according to that schedule
 
-## リリース公開手順（開発者向け）
+With this approach, the configuration remains centralized in TOML, and the user only needs to start the Docker image; no host-side cron configuration is required.
 
-### 通常のリリース
+## Release
+
+Releases are automated by CI (`.github/workflows/release.yml`). The operations performed by the developer are as follows.
+
+### Normal Release
 
 ```sh
-# 1. タグを作成して push する
 git tag vX.Y.Z
 git push --tags
 ```
 
-これにより、`.github/workflows/release.yml` が起動し、以下の処理が自動的に行われる。
+Pushing a tag triggers CI to automatically execute the following:
 
-1. タグが semver 形式（`vX.Y.Z`）であることを検証する
-2. 同じ `vX.Y.Z` タグが GHCR に既に存在しないことを確認する
-3. Docker イメージをビルドし、`VERSION=vX.Y.Z` と短縮コミット SHA を埋め込む
-4. `linux/amd64` バイナリをビルドし、`bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` アーカイブを生成する
-5. 上記アーカイブの SHA256 チェックサムファイル（`SHA256SUMS`）を生成する
-6. `latest`・`vX`・`vX.Y`・`vX.Y.Z` の4タグを GHCR に push する（`vX.Y.Z` は最後）
-7. `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` と `SHA256SUMS` を添付した GitHub Release を作成し、GitHub 標準の自動生成リリースノート（`--generate-notes`）を Release 本文に反映する
+- Validate the semver format and check for duplicate existing tags
+- Build the Docker image and push it to GHCR (4 tags: `latest`, `vX`, `vX.Y`, `vX.Y.Z`)
+- Generate a binary archive (`bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz`) and SHA256 checksum
+- Create a GitHub Release and attach the archive
 
-### 動作確認用の手動実行
+### Manual Execution for Verification
 
-`workflow_dispatch` を使用して、任意のタグ名を指定して同じワークフローを手動実行できる。
+The same workflow can be executed with `workflow_dispatch` by specifying an arbitrary tag. If the specified tag does not exist, checkout will fail. When triggered by `workflow_dispatch`, a GitHub Release is created in **draft** state. After verification, either delete it with `gh release delete <tag>` or publish it with `gh release edit <tag> --draft=false`.
 
-1. GitHub リポジトリの Actions タブを開く
-2. 左側のメニューから「Release」ワークフローを選択する
-3. 「Run workflow」ボタンをクリックする
-4. 「Git tag to release」フィールドにタグ名（例: `v1.2.3`）を入力する
-5. 「Run workflow」をクリックする
+### Checksum Verification After Download
 
-`workflow_dispatch` で指定したタグが実在しない git tag の場合、チェックアウトステップが失敗し、ワークフローは非0で終了する。
+```sh
+# Place the downloaded bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz and SHA256SUMS in the same directory, then run:
+sha256sum -c SHA256SUMS
+# → If the output shows bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz: OK, the file has not been tampered with
+```
 
-`workflow_dispatch` 契機の実行では、GitHub Release が **ドラフト** 状態（`--draft`）で作成される。これは動作確認用の Release が本番の Release 一覧に表示されるのを防ぐための設計である。確認後は `gh release delete <tag>` で削除するか、`gh release edit <tag> --draft=false` で明示的に公開する必要がある。
+See also the "Installation and Execution (Pre-built Executable)" section of `README.md` for details.
 
-### ダウンロード後のチェックサム検証
+## GHCR Package Visibility Switching Procedure (First Time Only)
 
-1. GitHub Release ページから `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz` と `SHA256SUMS` をダウンロードする
-2. 同じディレクトリに両ファイルを配置し、以下を実行する:
-   ```sh
-   sha256sum -c SHA256SUMS
-   ```
-3. `bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz: OK` と出力されれば改ざんされていないことが確認できる（詳細は `README.md` の「インストールと実行（ビルド済み実行ファイル）」節も参照）
+Immediately after publishing an image to GHCR for the first time, the package visibility is set to **private**. Since the `GITHUB_TOKEN` permissions cannot change the visibility, you must manually switch it to public once using the following procedure:
 
-## GHCR パッケージ可視性の切り替え手順
+1. Open the GitHub repository page
+2. Click `bsky-cleaner` in the "Packages" section on the right sidebar
+3. Click "Package settings" on the package's top page
+4. Scroll down to the "Danger Zone" section
+5. Click "Change visibility" and select "public" in the confirmation dialog
 
-GHCR に初めてイメージを公開した直後は、パッケージの可視性が **private** になっている。`GITHUB_TOKEN` の権限では可視性を変更できないため、以下の手順で一度だけ手動で public に切り替える必要がある。
-
-1. GitHub リポジトリのページを開く
-2. 右側のサイドバーにある「Packages」セクションから `bsky-cleaner` をクリックする
-3. パッケージのトップページで「Package settings」をクリックする
-4. 「Danger Zone」セクションまでスクロールする
-5. 「Change visibility」をクリックし、確認ダイアログで「public」を選択する
-
-この操作はパッケージ初回作成時に一度だけ必要であり、2回目以降のリリースでは不要である。
-
-## 未確定・今後検討する事項
-
-- 内蔵 cron（`supercronic` 等の具体的な選定）とエントリポイントスクリプトの実装詳細
-- `print-schedule` サブコマンドの入出力仕様
+This operation is only required once when the package is first created; it is not needed for subsequent releases.

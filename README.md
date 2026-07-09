@@ -1,97 +1,99 @@
+English | [Japanese](README.ja.md)
+
 # bsky-cleaner
 
-Bluesky（AT Protocol）アカウントを定期的にクリーンアップする Go 製 CLI ツールです。
-設定した保持期間より古い投稿を削除します。
+A Go CLI tool that periodically cleans up Bluesky (AT Protocol) accounts.
+It deletes posts older than the configured retention period.
 
-## 前提条件
+## Prerequisites
 
-- Bluesky アカウントの [アプリパスワード](https://bsky.app/settings/app-passwords)
-- Docker Compose（v2 以降）※ Docker Compose での実行方法を使う場合
+- A Bluesky account [app password](https://bsky.app/settings/app-passwords)
+- Docker Compose (v2 or later) ※ if using the Docker Compose execution method
 
-## インストールと実行（Docker Compose）
+## Installation and Execution (Docker Compose)
 
-Docker イメージが [GHCR](https://ghcr.io/isseis/bsky-cleaner) で配布されており、
-Docker Compose を使うのが標準的な利用方法です。
+Docker images are distributed via [GHCR](https://ghcr.io/isseis/bsky-cleaner),
+and using Docker Compose is the standard usage method.
 
-### 1. 環境変数ファイルを準備する
+### 1. Prepare an environment variable file
 
 ```sh
 curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.example
 cp dot.env.example .env
-# .env を編集し、Bluesky のハンドルとアプリパスワードを設定する
+# Edit .env to set your Bluesky handle and app password
 ```
 
-### 2. 設定ファイル（TOML）を用意する
+### 2. Prepare a configuration file (TOML)
 
 ```sh
 mkdir -p config
 ```
 
-`config/config.toml` を作成する（内容は後述の[設定](#設定)を参照）。
+Create `config/config.toml` (see [Configuration](#configuration) below for the contents).
 
-### 3. docker-compose.yml を用意する
+### 3. Prepare docker-compose.yml
 
 ```sh
 curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/docker-compose.yml
 ```
 
-`image:` のバージョンタグを、使いたいリリースバージョンに合わせて確認・修正する。
+Check and adjust the version tag in `image:` to match the release version you want to use.
 
-### 4. コンテナを起動する
+### 4. Start the container
 
 ```sh
 docker compose pull
 docker compose up -d
 ```
 
-コンテナは TOML 設定ファイルの `schedule` フィールドに従って定期実行される。
-起動確認は以下のコマンドで行う。
+The container runs periodically according to the `schedule` field in the TOML configuration file.
+Use the following commands to verify that it started successfully.
 
 ```sh
 docker compose ps
 docker compose logs
 ```
 
-### アップグレード
+### Upgrading
 
-1. `docker-compose.yml` を編集し、`image:` のバージョンタグを上げる
-2. `docker compose pull` で新しいイメージを取得する
-3. `docker compose up -d` で新しいイメージで再起動する
+1. Edit `docker-compose.yml` and bump the version tag in `image:`
+2. Run `docker compose pull` to fetch the new image
+3. Run `docker compose up -d` to restart with the new image
 
-Docker 配布の詳細（`.env` の扱い、TOML と内蔵 cron の橋渡し方法など）は
-[Docker 配布の詳細設計](docs/design/docker_deployment.md)を参照。
+For details on Docker distribution (how `.env` is handled, how TOML bridges to the built-in cron, etc.),
+see [Docker Deployment Design](docs/design/docker_deployment.md).
 
-## インストールと実行（ビルド済み実行ファイル）
+## Installation and Execution (Pre-built Binary)
 
-Docker を使わずホスト上で直接実行したい場合は、[GitHub Releases](https://github.com/isseis/bsky-cleaner/releases)
-からビルド済みバイナリ（`linux/amd64`）をダウンロードできる。
+If you want to run directly on the host without Docker, you can download pre-built binaries
+(`linux/amd64`) from [GitHub Releases](https://github.com/isseis/bsky-cleaner/releases).
 
 ```sh
-# vX.Y.Z は使いたいリリースバージョンに置き換える
+# Replace vX.Y.Z with the release version you want to use
 curl -LO https://github.com/isseis/bsky-cleaner/releases/download/vX.Y.Z/bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz
 curl -LO https://github.com/isseis/bsky-cleaner/releases/download/vX.Y.Z/SHA256SUMS
 
-# チェックサムを検証する
+# Verify the checksum
 sha256sum -c SHA256SUMS
 
 tar xzf bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz
 ```
 
-展開された `bsky-cleaner` バイナリを、後述の[使い方](#使い方)に従って実行する。
-定期実行にはシステムの cron を使う（[cron によるスケジューリング](#cron-によるスケジューリング)を参照）。
+Run the extracted `bsky-cleaner` binary according to [Usage](#usage) below.
+For periodic execution, use the system's cron (see [Scheduling with cron](#scheduling-with-cron)).
 
-現時点で配布しているのは `linux/amd64` バイナリのみ。macOS/Windows 向けバイナリは提供していない。
+Currently, only `linux/amd64` binaries are distributed. macOS/Windows binaries are not provided.
 
-ソースからビルドしたい場合は、[ソースからのビルド](docs/dev/developer_guide/build_from_source.md)を参照。
+If you want to build from source, see [Building from Source](docs/dev/developer_guide/build_from_source.md).
 
-## 設定
+## Configuration
 
-bsky-cleaner は秘匿情報以外の設定を **TOML 設定ファイル** から、秘匿情報を **環境変数** から読み込む。
-秘匿情報が TOML ファイルに書き込まれることはない。
+bsky-cleaner reads non-sensitive settings from a **TOML configuration file** and sensitive information
+from **environment variables**. Sensitive information is never written to the TOML file.
 
-### TOML 設定ファイル
+### TOML Configuration File
 
-TOML ファイル（例: `config.toml`）を作成する。
+Create a TOML file (e.g., `config.toml`).
 
 ```toml
 retention_days = 30
@@ -99,16 +101,16 @@ execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
 ```
 
-| フィールド | 型 | 必須 | 説明 |
-|---|---|---|---|
-| `retention_days` | int | Yes | この日数より古い投稿を削除する。1 以上である必要がある |
-| `execution_timeout_seconds` | int | Yes | 最大実行時間（秒）。1〜86400 |
-| `schedule` | string | No | cron 式。Docker/cron での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
-| `slack_allowed_host` | string | 条件付き | Slack webhook URL を設定する場合は必須。webhook URL がこのホスト（例: `hooks.slack.com`）を指しているか検証する |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `retention_days` | int | Yes | Deletes posts older than this number of days. Must be 1 or greater |
+| `execution_timeout_seconds` | int | Yes | Maximum execution time (seconds). 1–86400 |
+| `schedule` | string | No | cron expression. Only required when using scheduled execution via Docker/cron. Omit when using direct execution or system crontab |
+| `slack_allowed_host` | string | Conditional | Required when setting a Slack webhook URL. Validates that the webhook URL points to this host (e.g., `hooks.slack.com`) |
 
-詳細は[設定リファレンス](docs/design/configuration.md)を参照。
+See [Configuration Reference](docs/design/configuration.md) for details.
 
-### 環境変数
+### Environment Variables
 
 ```sh
 export BSKY_HANDLE=alice.bsky.social
@@ -117,65 +119,66 @@ export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
 export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ```
 
-| 変数 | 必須 | 説明 |
-|---|---|---|
-| `BSKY_HANDLE` | Yes | Bluesky のハンドル（例: `alice.bsky.social`） |
-| `BSKY_APP_PASSWORD` | Yes | Bluesky のアプリパスワード |
-| `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | No | 成功通知用の Slack webhook |
-| `BSKY_SLACK_WEBHOOK_URL_FAILURE` | No | 失敗通知用の Slack webhook |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BSKY_HANDLE` | Yes | Bluesky handle (e.g., `alice.bsky.social`) |
+| `BSKY_APP_PASSWORD` | Yes | Bluesky app password |
+| `BSKY_SLACK_WEBHOOK_URL_SUCCESS` | No | Slack webhook for success notifications |
+| `BSKY_SLACK_WEBHOOK_URL_FAILURE` | No | Slack webhook for failure notifications |
 
-## 使い方
+## Usage
 
 ```sh
-# ドライラン: 削除対象の投稿を一覧表示するだけで、実際には削除しない
+# Dry run: list posts that would be deleted without actually deleting them
 bsky-cleaner --config config.toml
 
-# 適用: 実際に投稿を削除する
+# Apply: actually delete posts
 bsky-cleaner --config config.toml --apply
 
-# バージョン情報を表示する
+# Display version information
 bsky-cleaner --version
-# 出力例: v1.2.3 (a1b2c3d)
+# Example output: v1.2.3 (a1b2c3d)
 
-# cron スケジュールを表示する（Docker/cron での定期実行用）
+# Display the cron schedule (for scheduled execution via Docker/cron)
 bsky-cleaner print-schedule --config config.toml
 ```
 
-### 終了コード
+### Exit Codes
 
-| コード | 意味 |
-|---|---|
-| `0` | 成功 — 対象の投稿をすべて削除した（またはドライランが完了した） |
-| `1` | セットアップ/実行時の失敗 — 設定エラー、ログイン失敗、ネットワークエラーなど |
-| `2` | 使い方エラー — `--config` の指定漏れ、未知のフラグ、余分な位置引数など |
-| `3` | 部分的な失敗 — 一部の投稿は削除できたが、少なくとも1件の削除に失敗した |
+| Code | Meaning |
+|------|---------|
+| `0` | Success — all target posts were deleted (or dry run completed) |
+| `1` | Setup/execution failure — configuration error, login failure, network error, etc. |
+| `2` | Usage error — missing `--config`, unknown flag, extra positional argument, etc. |
+| `3` | Partial failure — some posts were deleted but at least one deletion failed |
 
-### cron によるスケジューリング
+### Scheduling with cron
 
-Docker を使わずホスト上で定期実行したい場合は、システムの crontab にバイナリを登録する
-（TOML の `schedule` フィールドは使わない）。
+If you want to run periodic execution on the host without Docker, register the binary in the
+system's crontab (do not use the TOML `schedule` field).
 
 ```cron
 0 3 * * * BSKY_HANDLE=alice.bsky.social BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
 
-## 安全性
+## Safety
 
-- **デフォルトでドライラン** — `--apply` を指定しない限り投稿は削除されない
-- **フェイルクローズ** — 不正な設定（例: `retention_days = 0`、Slack webhook ホストの不一致）はデフォルト値で
-  処理を続行せず、起動時に失敗する
-- **秘匿情報のマスキング** — アプリパスワードと webhook URL は `SecretString` でラップされ、
-  ログやエラーメッセージ上では `[REDACTED]` と表示される
-- **固定表示（ピン留め）された投稿は削除対象から除外される**
+- **Dry run by default** — posts are not deleted unless `--apply` is specified
+- **Fail-closed** — invalid configuration (e.g., `retention_days = 0`, Slack webhook host mismatch)
+  does not fall back to default values; it fails at startup
+- **Sensitive information masking** — app passwords and webhook URLs are wrapped in `SecretString`
+  and displayed as `[REDACTED]` in logs and error messages
+- **Pinned posts are excluded from deletion targets**
 
-詳細は[セキュリティ設計](docs/design/security.md)を参照。
+See [Security Design](docs/design/security.md) for details.
 
-## 開発者向け情報
+## Developer Information
 
-ソースコードの取得・ビルド方法は[ソースからのビルド](docs/dev/developer_guide/build_from_source.md)を、
-プロジェクトの規約は [CLAUDE.md](CLAUDE.md) を、その他の開発者向けドキュメントは
-[docs/dev/developer_guide/](docs/dev/developer_guide/) を参照。
+For source code retrieval and build instructions, see
+[Building from Source](docs/dev/developer_guide/build_from_source.md).
+For project conventions, see [CLAUDE.md](CLAUDE.md).
+For other developer documentation, see [docs/dev/developer_guide/](docs/dev/developer_guide/).
 
-## ライセンス
+## License
 
 [MIT](LICENSE)
