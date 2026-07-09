@@ -227,7 +227,7 @@
 | セットアップ | setup | |
 | シリアライズ | serialize / serialization | |
 | シェル | shell | |
-| 暗黙の | silently | |
+| 暗黙に | silently / implicitly | 文脈に応じた訳し分けは「技術用語の訳し分け」の「暗黙に」を参照 |
 | サイズ | size | |
 | 仕様 | specification | |
 | 標準 | standard | |
@@ -349,6 +349,11 @@
 - **setting**: 個別の設定項目
 - **option**: オプション設定
 
+### 「暗黙に」の訳し分け
+
+- **silently**: ユーザーへの通知・ログ出力なしに処理が進む（黙って、無言で）ことを指す場合。例: エラーを無視して黙って処理を続行する（silently ignore the error）
+- **implicitly**: 明示的な指定がなくても、動作や意味が暗黙のうちに決まる・成立することを指す場合。例: 型が暗黙に変換される（the type is implicitly converted）、暗黙の前提（implicit assumption）
+
 ---
 
 ## 更新履歴
@@ -357,3 +362,4 @@
 |------|---------|
 | 2026-07-01 | 初版作成 |
 | 2026-07-09 | `docs/design/security.md` の翻訳で使用したセキュリティ関連用語（攻撃ベクトル、ハング、メモリ枯渇、冪等性、改ざん、サプライチェーン等）を追加 |
+| 2026-07-09 | 「暗黙に」の訳語に silently に加えて implicitly を追加し、文脈に応じた訳し分けの指針を追記 |
