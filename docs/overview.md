@@ -96,7 +96,7 @@ No deletion logs are written to files. Since execution results can be confirmed 
 
 ## Retry Policy
 
-If an API call results in an error, it is retried several times with exponential backoff. The defaults are a maximum of 5 retries, an initial backoff of 1 second, and a maximum backoff of 30 seconds. The worst-case wait time for a single API call that encounters persistent temporary errors is approximately 31 seconds. See the [Configuration Reference](design/configuration.md) for parameter details.
+If an API call results in an error, it is retried several times with exponential backoff. The defaults are a maximum of 5 retries, an initial backoff of 1 second, and a maximum backoff of 30 seconds. The worst-case wait time for a single API call that encounters persistent temporary errors is approximately 31 seconds. See the [Configuration Reference](design/configuration.md#notes-on-setting-execution_timeout_seconds) for parameter details.
 
 The cumulative retry time is designed to stay within the execution timeout (described below) that is set as a measure against concurrent executions. When deleting a large number of posts, the per-post retries can accumulate and potentially exceed the timeout; therefore, the timeout value should be determined taking the worst-case retry time into account.
 
