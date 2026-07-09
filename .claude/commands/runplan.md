@@ -51,7 +51,20 @@ Work in order.
   - A Go test file importing a `testutil` that imports the package under test uses `package foo_test` to avoid an import cycle.
   - Any new or modified file with build tags beyond `//go:build test` alone (e.g. `//go:build test && foo`): confirm it is reached by at least one `make lint` invocation, or explicitly document the gap. Ask: "does `make lint` compile this file?"
 
-- When complete, update checkboxes (`[x]` done, `[-]` skipped with a note) and commit.
+- When complete, proceed to step 5.5 before committing.
+
+5.5. **Mandatory checkbox-update gate.** This step exists because agents have previously committed a completed phase group without updating `03_implementation_plan.md`, silently leaving its progress tracking stale. Do not skip it.
+- Edit `03_implementation_plan.md` and change every checkbox for the item(s) just implemented from `[ ]` to `[x]` (done) or `[-]` (skipped, with a note explaining why — see step 4).
+- Before running the phase group's final `git commit`, verify the plan document actually changed:
+  ```bash
+  if git status --porcelain -- '**/03_implementation_plan.md' | grep -q .; then
+    echo "OK: implementation plan has pending changes"
+  else
+    echo "FAIL: 03_implementation_plan.md has no pending changes — checkboxes for this phase group were not updated. Go back and update them before committing."
+  fi
+  ```
+- If the check reports FAIL, stop and update the checkboxes — do not commit the phase group until it reports OK.
+- Stage the updated plan document together with the phase group's code/test changes (`git add`) and commit them as one commit.
 
 5a. **PR checkpoint** (reached when step 4 directed you here instead of step 5).
 - Verify the green gate (defined in `_context.md`) passes. Fix any failures before continuing.
