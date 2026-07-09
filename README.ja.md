@@ -2,7 +2,7 @@
 
 # bsky-cleaner
 
-Bluesky（AT Protocol）アカウントを定期的にクリーンアップする Go 製 CLI ツールです。
+[Bluesky](https://bsky.app/)（AT Protocol）アカウントを定期的にクリーンアップする Go 製 CLI ツールです。
 設定した保持期間より古い投稿を削除します。
 
 ## 前提条件
@@ -74,6 +74,18 @@ docker compose ps
 docker compose logs
 ```
 
+### 5. 設定を確認する（試験実行）
+
+`schedule` による定期実行を待つと、設定ミスに気づくのが早くても翌日以降になってしまう。
+コンテナ内のバイナリを直接呼び出すことで、`schedule` を待たずにその場で試験実行できる。
+
+```sh
+docker compose exec bsky-cleaner /usr/local/bin/bsky-cleaner --config /config/config.toml
+```
+
+試験実行なので投稿は削除されない。ログイン・設定読み込み・削除対象の一覧表示までが
+エラーなく完了すれば、`.env` と `config.toml` は正しく設定されている。
+
 ### アップグレード
 
 1. `docker-compose.yml` を編集し、`image:` のバージョンタグを上げる
@@ -98,6 +110,17 @@ tar xzf bsky-cleaner-vX.Y.Z-linux-amd64.tar.gz
 
 展開された `bsky-cleaner` バイナリを、後述の[使い方](#使い方)に従って実行する。
 定期実行にはシステムの cron を使う（[cron によるスケジューリング](#cron-によるスケジューリング)を参照）。
+
+### 設定を確認する（試験実行）
+
+ダウンロードと展開が完了したら、まずは試験実行して設定が正しいことを確認する。
+
+```sh
+./bsky-cleaner --config config.toml
+```
+
+試験実行なので投稿は削除されない。ログイン・設定読み込み・削除対象の一覧表示までが
+エラーなく完了すれば、設定は正しく行われている。
 
 現時点で配布しているのは `linux/amd64` バイナリのみ。macOS/Windows 向けバイナリは提供していない。
 
@@ -147,7 +170,7 @@ export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ## 使い方
 
 ```sh
-# ドライラン: 削除対象の投稿を一覧表示するだけで、実際には削除しない
+# 試験実行: 削除対象の投稿を一覧表示するだけで、実際には削除しない
 bsky-cleaner --config config.toml
 
 # 適用: 実際に投稿を削除する
@@ -165,7 +188,7 @@ bsky-cleaner print-schedule --config config.toml
 
 | コード | 意味 |
 |---|---|
-| `0` | 成功 — 対象の投稿をすべて削除した（またはドライランが完了した） |
+| `0` | 成功 — 対象の投稿をすべて削除した（または試験実行が完了した） |
 | `1` | セットアップ/実行時の失敗 — 設定エラー、ログイン失敗、ネットワークエラーなど |
 | `2` | 使い方エラー — `--config` の指定漏れ、未知のフラグ、余分な位置引数など |
 | `3` | 部分的な失敗 — 一部の投稿は削除できたが、少なくとも1件の削除に失敗した |
@@ -200,7 +223,7 @@ chmod 600 /path/to/cron.env
 
 ## 安全性
 
-- **デフォルトでドライラン** — `--apply` を指定しない限り投稿は削除されない
+- **デフォルトでは試験実行** — `--apply` を指定しない限り投稿は削除されない
 - **フェイルクローズ** — 不正な設定（例: `retention_days = 0`、Slack webhook ホストの不一致）はデフォルト値で
   処理を続行せず、起動時に失敗する
 - **秘匿情報のマスキング** — アプリパスワードと webhook URL は `SecretString` でラップされ、
