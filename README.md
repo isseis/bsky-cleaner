@@ -178,16 +178,26 @@ system's crontab (do not use the TOML `schedule` field).
 Writing sensitive information directly into the crontab entry can cause cron to log the entire
 command line (including the environment variable values) to syslog when it runs the job,
 unintentionally leaving the sensitive information in the logs. To avoid this, write the sensitive
-information to a `.env` file (same format and file name as the Docker Compose version; see
-[Environment Variables](#environment-variables)), restrict its permissions to `600`, and have the
-crontab entry only read it.
+information to a file in `export VAR=VALUE` format (e.g. `cron.env`; use a different name from the
+Docker Compose version's `.env`, since the format differs), restrict its permissions to `600`, and
+have the crontab entry only read it.
+
+`cron.env` (example):
 
 ```sh
-chmod 600 /path/to/.env
+export BSKY_HANDLE=alice.bsky.social
+export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+# Set the following only if you use Slack notifications (optional)
+export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
+export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
+```
+
+```sh
+chmod 600 /path/to/cron.env
 ```
 
 ```cron
-0 3 * * * . /path/to/.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
+0 3 * * * . /path/to/cron.env && /path/to/bsky-cleaner --apply --config /path/to/config.toml
 ```
 
 ## Safety
