@@ -1,3 +1,5 @@
+[English](configuration.md) | Japanese
+
 # 設定リファレンス
 
 - 作成日: 2026-07-02

@@ -3,6 +3,7 @@
 - 作成日: 2026-07-02
 - ステータス: Draft
 - 関連ドキュメント: [プロジェクト概要](../overview.ja.md)
+- English: [docker_deployment.md](docker_deployment.md)
 
 ## 位置付け
 

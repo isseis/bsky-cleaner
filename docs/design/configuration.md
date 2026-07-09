@@ -1,3 +1,5 @@
+English | [Japanese](configuration.ja.md)
+
 # Configuration Reference
 
 - Created: 2026-07-02
