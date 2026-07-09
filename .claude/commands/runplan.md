@@ -61,6 +61,7 @@ Work in order.
     echo "OK: implementation plan has pending changes"
   else
     echo "FAIL: 03_implementation_plan.md has no pending changes — checkboxes for this phase group were not updated. Go back and update them before committing."
+    exit 1
   fi
   ```
 - If the check reports FAIL, stop and update the checkboxes — do not commit the phase group until it reports OK.
