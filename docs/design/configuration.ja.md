@@ -75,6 +75,6 @@ BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/<workspace-id>/<
 
 `BSKY_APP_PASSWORD` と Slack Webhook URL（正常系・異常系）は `internal/config.SecretString` 型でラップされる。これにより以下の特性を持つ。
 
-- **ログ出力時の保護**: `%v`/`%s`/`%#v` によるフォーマットや `log/slog` 経由の構造化ログでは固定文字列（`"[REDACTED]"`）に置き換わる。
+- **ログ出力時の保護**: `%v`/`%s`/`%#v` によるフォーマットや `log/slog` 経由の構造化ログでは固定文字列（`[REDACTED]`）に置き換わる。
 - **値の取得**: 実際の値を取得できるのは `Reveal()` の呼び出しのみであり、認証リクエスト構築や Slack 通知ペイロード構築などの利用直前でのみ呼び出す運用とする。
 - **`BSKY_HANDLE` は対象外**: Bluesky 上で公開されるアカウント識別子であり秘匿情報ではないため、`SecretString` でラップしない。
