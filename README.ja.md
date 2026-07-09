@@ -151,6 +151,7 @@ slack_allowed_host = "hooks.slack.com"
 ```sh
 export BSKY_HANDLE=alice.bsky.social      # 自分のハンドルに置き換える
 export BSKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx  # 自分のアプリパスワードに置き換える
+# 以下は Slack 通知を使う場合のみ設定する（省略可）
 export BSKY_SLACK_WEBHOOK_URL_SUCCESS=https://hooks.slack.com/services/...
 export BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 ```
