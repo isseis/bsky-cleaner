@@ -21,6 +21,7 @@
 | アクセス | access | |
 | 値 | value | |
 | 曖昧さ | ambiguity | |
+| アプリパスワード | app password | Bluesky のアプリパスワードの文脈 |
 | アプリケーション | application | |
 | 引数 | argument | コマンドの引数 |
 | 配列 | array | |
@@ -37,6 +38,7 @@
 | バッチ処理 | batch processing | |
 | ベースライン | baseline | |
 | ベストプラクティス | best practices | |
+| バイナリ | binary | |
 | 真偽値 | boolean | |
 | 破壊的変更 | breaking change | |
 | ビルド | build | |
@@ -97,6 +99,7 @@
 | 日本語 | English | 備考 |
 |--------|---------|------|
 | FAQ | FAQ | Frequently Asked Questions |
+| フェイルクローズ | fail-closed | |
 | 汎用的 | generic | |
 | 機能 | feature / functionality | |
 | フィードバック | feedback | |
@@ -164,6 +167,8 @@
 | パス | path | |
 | パフォーマンス | performance | |
 | 権限 | permission | ファイル権限の文脈 |
+| ピン留め | pinned | 固定表示（ピン留め）された投稿の文脈 |
+| ビルド済み | pre-built | |
 | 前提条件 | prerequisite | |
 | 優先度 | priority | |
 | プロセス | process | |
@@ -189,6 +194,7 @@
 | 要件 | requirement | |
 | 解決する | resolve / resolving | |
 | リソース | resource | |
+| 保持期間 | retention period | |
 | 戻り値 | return value | |
 | 責務 | responsibility | |
 
