@@ -119,6 +119,19 @@
 - [ ] 新規テスト `TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker` を追加する: `outcome.Err` に、`errorKind` が `atproto.HTTPError.ErrorName` を経由して極端に長い文字列（例: 5000文字の英数字列）を返すエラー値（`&atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, ErrorName: strings.Repeat("x", 5000)}`）を与え、`got.Text` が `maxPayloadLength` 以内に切り詰められ `truncatedMarker` で終わることを検証する（AC-10、設計書 3.4節1番目の適用箇所 — `text` 自体への切り詰め — の新規テスト）。
 - [ ] 新規テスト `TestIsFailure_FourOutcomePatterns` を追加する: `Outcome` の4パターン（完全成功／`Err != nil`／`Result == nil` かつ `Err == nil`／部分失敗）それぞれで `isFailure()` の戻り値が `false`/`true`/`false`/`true` であることを表形式テスト（`t.Run` サブテスト）で検証する（AC-08）。`Result == nil` かつ `Err == nil` のケースにコメントを付し、`internal/runner.Run` の契約上この組み合わせは生成されない想定であるが `isFailure` は防御的に `false` を返す旨を明記する（設計書 7節）。
 
+### PR-1 作成ポイント: notify payload attachment refactor
+
+**対象ステップ**: フェーズ1 / フェーズ2 / フェーズ3 / フェーズ4 / フェーズ5 / フェーズ6
+
+**推奨タイトル**: `feat(0012): add color-coded attachments to slack payload`
+
+**レビュー観点**: `webhookPayload`/`slackAttachment`/`slackField` の型設計とAC-04/AC-05の解釈の妥当性 / `isFailure()` 抽出後もチャンネル振り分け(0006)の挙動が非回帰であること / `text`と失敗一覧フィールドへの独立した切り詰め適用(AC-10) / サニタイズ(AC-09)・秘密情報非混入(AC-11)・投稿本文非混入(AC-12)の継続
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### フェーズ7: `notifypreview` の表示整形（設計書 3.5節）
 
 **対象ファイル**: `internal/notify/notifypreview/main.go`
@@ -131,6 +144,20 @@
 **対象ファイル**: なし（手動確認のみ）
 
 - [ ] `BSKY_SLACK_WEBHOOK_URL_TEST` にテスト用 Slack チャンネルの Incoming Webhook URL を設定したうえで `make notify-preview-send` を実行し、`success-empty`/`success-apply`/`partial-failure`/`run-error`/`truncation` の5シナリオすべてが、実際の Slack クライアント（デスクトップアプリまたはブラウザのいずれか1種類）上で絵文字・色付き attachment・フィールド分離を含めて意図通りに描画されることを目視で確認する（NF-005、設計書 3.4節で指摘された「`maxPayloadLength` の新しい適用箇所の未検証リスク」の解消）。
+
+### PR-2 作成ポイント: notifypreview display formatting and send verification
+
+**対象ステップ**: フェーズ7 / フェーズ8
+
+**推奨タイトル**: `feat(0012): render slack payload preview with color and fields`
+
+**レビュー観点**: `printScenarios()` の整形出力が5シナリオすべて（`text`/色/フィールド）を欠落なく表示すること / `sendScenarios()` が `webhookPayload` を経由しない独立経路のままであることの確認 / `make notify-preview-send` による実送信確認結果（`maxPayloadLength` 転用リスクの解消）がPR説明に記録されていること
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] `BSKY_SLACK_WEBHOOK_URL_TEST` を設定したうえで `make notify-preview-send` を実行し、5シナリオ（`success-empty`/`success-apply`/`partial-failure`/`run-error`/`truncation`）すべてが実際の Slack クライアント上で絵文字・色・フィールド分離を含めて意図通り描画されることを確認した（フェーズ8、NF-005）うえで、その確認結果（成功した旨、またはスクリーンショット）を PR 説明に貼付した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ9: ドキュメント更新
 
@@ -145,15 +172,38 @@
 - [ ] `make lint` を実行し、警告・エラーがないことを確認する。
 - [ ] `make deadcode` を実行し、`buildPayload`/`isFailure`/`colorFor`/`truncate` 等の新規シンボルに到達不能コードがないことを確認する。
 
+### PR-3 作成ポイント: package reference update and final quality gate
+
+**対象ステップ**: フェーズ9 / フェーズ10
+
+**推奨タイトル**: `docs(0012): update package reference for slack payload attachments`
+
+**レビュー観点**: `package_reference.md` の記述が実装後の `internal/notify` の責務（`text` summary + color-coded `attachments`）と一致していること / `make fmt && make test && make lint && make deadcode` が全て成功していること（リポジトリ全体、PR-1/PR-2で導入した新規シンボルの到達可能性を含む）
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ## 3. 実装順序とマイルストーン
+
+### 3.1 マイルストーン
+
+マイルストーンは PR 境界（§3.2）に合わせて区切る。PR をまたぐ完了基準は作らない（フェーズ単位の内訳は各フェーズの節を参照）。
 
 | マイルストーン | 内容 | 完了基準 |
 |---|---|---|
-| M1 | 型定義とロジック抽出（フェーズ1〜2） | `webhookPayload`/`slackAttachment`/`slackField` が定義され、`isFailure()` への置き換え後も既存の `TestSend_ChannelRouting_*` 系が緑 |
-| M2 | ペイロード構築ロジックの再設計（フェーズ3〜4） | `buildPayload` が `webhookPayload` を返し、`text`/失敗一覧フィールドそれぞれに独立した切り詰めが適用される |
-| M3 | テスト・プレビューツールの追従（フェーズ5〜7） | `payload_test.go` の全テストが新構造に対応し緑、`make notify-preview` が新フォーマットで表示される |
-| M4 | 実運用確認とドキュメント（フェーズ8〜9） | `make notify-preview-send` による実送信確認が完了し、`package_reference.md` が更新済み |
-| M5 | 品質確認（フェーズ10） | `make fmt && make test && make lint && make deadcode` が全て成功 |
+| M1 (PR-1) | ペイロード型・ロジックの再設計（フェーズ1〜6） | `webhookPayload`/`slackAttachment`/`slackField` が定義され、`isFailure()` への置き換え後も既存の `TestSend_ChannelRouting_*` 系が緑。`buildPayload` が `webhookPayload` を返し、`text`/失敗一覧フィールドそれぞれに独立した切り詰めが適用される。`payload_test.go` の全テストが新構造に対応し緑 |
+| M2 (PR-2) | プレビューツールの追従と実送信確認（フェーズ7〜8） | `make notify-preview` が新フォーマットで表示され、`make notify-preview-send` による実送信確認が完了する |
+| M3 (PR-3) | ドキュメントと品質確認（フェーズ9〜10） | `package_reference.md` が更新済み、`make fmt && make test && make lint && make deadcode` が全て成功 |
+
+### 3.2 PR 構成
+
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | フェーズ1 / フェーズ2 / フェーズ3 / フェーズ4 / フェーズ5 / フェーズ6 | `webhookPayload`/`slackAttachment`/`slackField` 型の追加、`isFailure()` の抽出、`buildPayload()` の再設計（絵文字・常時色付き attachment・失敗一覧フィールド）、`text`/フィールド値への独立した切り詰め適用、`BuildPayloadPreview` の戻り値型追従、`payload_test.go` の全面更新 |
+| PR-2 | フェーズ7 / フェーズ8 | `notifypreview` の `printScenarios()` を新ペイロード構造の人間可読な整形表示に対応させ、`make notify-preview-send` による実 Slack チャンネルへの送信確認を行う |
+| PR-3 | フェーズ9 / フェーズ10 | `package_reference.md` の `internal/notify` 説明を更新し、`make fmt && make test && make lint && make deadcode` によるリポジトリ全体の最終品質確認を行う |
 
 ## 4. テスト戦略
 
@@ -172,16 +222,9 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] フェーズ1: ペイロード型の追加
-- [ ] フェーズ2: `isFailure()` の抽出
-- [ ] フェーズ3: `buildPayload()` の再設計
-- [ ] フェーズ4: 切り詰めヘルパーの抽出と適用
-- [ ] フェーズ5: `BuildPayloadPreview` の戻り値型追従
-- [ ] フェーズ6: `payload_test.go` の更新
-- [ ] フェーズ7: `notifypreview` の表示整形
-- [ ] フェーズ8: `make notify-preview-send` による実送信確認
-- [ ] フェーズ9: ドキュメント更新
-- [ ] フェーズ10: 品質確認
+- [ ] PR-1 マージ済み（対象ステップ: フェーズ1 / フェーズ2 / フェーズ3 / フェーズ4 / フェーズ5 / フェーズ6）
+- [ ] PR-2 マージ済み（対象ステップ: フェーズ7 / フェーズ8）
+- [ ] PR-3 マージ済み（対象ステップ: フェーズ9 / フェーズ10）
 
 ## 7. 受け入れ基準検証（Acceptance Criteria Verification）
 
