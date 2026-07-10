@@ -42,7 +42,7 @@ Work in the following order.
    For each PR group, in order (PR-1, PR-2, …):
    - Identify the exact anchor: the last line of the group's last step section, and the heading that immediately follows it in the current document (either the next step's heading, the next `### フェーズ` heading, or end-of-document if this is the final group).
    - Insert the `### PR-N 作成ポイント` block as new text between that last line and that following heading — i.e. the marker must sit strictly before the next step/phase heading, never after it and never deferred to a later position in the document.
-   - Use the Edit tool with `old_string` spanning from the last step's final line through the following heading line (so the match is unique and the insertion point is unambiguous), and `new_string` containing the same text plus the inserted marker in between.
+   - Use the Edit tool with `old_string` spanning from the last step's final line through the following heading line (or through the end of the document for the final group) so the match is unique and the insertion point is unambiguous, and `new_string` containing the same text plus the inserted marker in between.
    - After inserting, re-read that section of the file to confirm the marker landed directly after the intended step and directly before the intended next heading — not before the group's last step, and not pushed down past subsequent phases.
 
    Use the following format exactly for each marker:
