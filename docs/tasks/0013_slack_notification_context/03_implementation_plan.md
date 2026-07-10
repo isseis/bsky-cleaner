@@ -421,7 +421,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 - [x] PR-6 マージ済み（対象ステップ: フェーズ11）
 - [x] PR-7 マージ済み（対象ステップ: フェーズ12）
 - [x] `make lint` が成功することを確認する
-- [ ] 4節の Acceptance Criteria Verification 表の全項目が緑であることを確認する
+- [x] 4節の Acceptance Criteria Verification 表の全項目が緑であることを確認する
 
 ## 9. 完了基準
 
