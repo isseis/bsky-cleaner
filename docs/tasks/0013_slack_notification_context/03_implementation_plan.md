@@ -173,8 +173,8 @@
 
 対応: アーキテクチャ設計書 3.5節・5.3節（Mattermost 互換性の早期確認）。
 
-- [ ] `internal/notify/notifypreview/fixtures.go` の `scenarios()`（43-83行目）内、5シナリオすべての `notify.Outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する（`success-empty`・`success-apply`・`partial-failure`・`run-error`・`truncation` の5箇所すべて。フェーズ8で `Elapsed` を追加するまでは統計フィールドは表示されない）。
-- [ ] `make notify-preview` を実行し、全5シナリオの出力に `Host`/`Account` フィールドが表示されることを目視確認する。
+- [x] `internal/notify/notifypreview/fixtures.go` の `scenarios()`（43-83行目）内、5シナリオすべての `notify.Outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する（`success-empty`・`success-apply`・`partial-failure`・`run-error`・`truncation` の5箇所すべて。フェーズ8で `Elapsed` を追加するまでは統計フィールドは表示されない）。
+- [x] `make notify-preview` を実行し、全5シナリオの出力に `Host`/`Account` フィールドが表示されることを目視確認する。
 - [ ] `make notify-preview-send` を実行し、Mattermost を含む実際の Slack Incoming Webhook 互換クライアントに送信し、完全成功シナリオ（`Fields` が2件、danger色ではない attachment）が可視のブロックとして描画されることを確認する（アーキテクチャ設計書 5.3節）。
   - [ ] 描画に問題がある場合、アーキテクチャ設計書 5.3節のフォールバック（成功時に `Color: "good"` を設定する）を適用し、3.3節手順5・付録「決定履歴」の更新が必要になる旨をこの計画書のコメント欄に記録した上で、アーキテクチャ設計書自体の改訂を先に行う（フェーズ順序を崩さない。フォールバックが不要だった場合は、実装完了時にこの注記を「対象外」であったと明示する）。
 
@@ -186,7 +186,7 @@
 
 **レビュー観点**: PR-2 で `buildPayload` が完全成功時にも常に attachment を生成するようになった設計判断が、Mattermost を含む実際の Incoming Webhook 互換クライアントで意図通り描画されることを実送信結果から確認できるか（0012 で発生した「空 attachment 不可視化」問題の再発が無いこと） / 描画に問題があった場合のフォールバック適用有無とその根拠が明記されているか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
@@ -405,7 +405,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 ## 8. 実装チェックリスト
 
 - [x] PR-1 マージ済み（対象ステップ: フェーズ1）
-- [ ] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3 — コードは実装済みだが未マージ、`issei/0013-slack-notification-context-05`）
+- [x] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3）
 - [ ] PR-3 マージ済み（対象ステップ: フェーズ4）
 - [ ] PR-4 マージ済み（対象ステップ: フェーズ5 / フェーズ6）
 - [ ] PR-5 マージ済み（対象ステップ: フェーズ7 / フェーズ8 / フェーズ9 / フェーズ10）
