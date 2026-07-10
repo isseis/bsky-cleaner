@@ -25,6 +25,7 @@ Read by `internal/config.Load(path)`. It operates with the following policies.
 | `schedule` | string | optional | `""` (when key omitted) | A cron-like schedule string. Only used by the `print-schedule` subcommand during Docker distribution (see [0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md)), so not required when running directly or registering in crontab without Docker. This package itself only handles the presence or absence of the value; validation of the cron syntax is the responsibility of the `print-schedule` side |
 | `execution_timeout_seconds` | integer | required | none | Specified in seconds. An integer in the range `1` to `86400` (24 hours). Values `0` or below, or exceeding `86400`, cause startup failure |
 | `slack_allowed_host` | string | required if either `BSKY_SLACK_WEBHOOK_URL_SUCCESS` or `BSKY_SLACK_WEBHOOK_URL_FAILURE` is set | not set | The value allowed as the host part of the Slack Webhook URL (e.g., `hooks.slack.com`). If the host part (excluding port number, case-insensitive) of the configured Webhook URL does not match this value, startup fails (fail-closed). If both Webhook URLs are unset, startup does not fail even if this item is not set (see [0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005) |
+| `hostname` | string | optional | Falls back to the result of `os.Hostname()` when the TOML key is omitted | Identifies the machine running bsky-cleaner in Slack notifications (see [0013_slack_notification_context](../tasks/0013_slack_notification_context/01_requirements.md)). If not explicitly set in TOML, falls back to `os.Hostname()` |
 
 ### Example
 
@@ -33,6 +34,7 @@ retention_days = 30
 schedule = "0 3 * * *"
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
+hostname = "worker-1"
 ```
 
 ### Notes on Setting `execution_timeout_seconds`
