@@ -246,6 +246,9 @@ Running `crontab -e` opens an editor; add the line above and save.
 - **Sensitive information masking** — app passwords and webhook URLs are
   displayed as `[REDACTED]` in logs and error messages
 - **Pinned posts are excluded from deletion targets**
+- **No at-least-once delivery guarantee for Slack notifications** — if notification
+  sending fails for any reason (including a process crash), the run's result,
+  especially an already-completed deletion, may never be reported
 
 See [Security Design](docs/design/security.md) for details.
 
