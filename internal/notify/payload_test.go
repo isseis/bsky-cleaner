@@ -30,9 +30,9 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 	assert.Contains(t, got.Text, emojiSuccess)
 	assert.Contains(t, got.Text, "2")
 	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
-	// Always one attachment with Host/Account fields, no color on success.
+	// Always one attachment with Host/Account fields, colored good on success.
 	assert.Len(t, got.Attachments, 1)
-	assert.Equal(t, "", got.Attachments[0].Color)
+	assert.Equal(t, colorGood, got.Attachments[0].Color)
 	assert.Equal(t, "worker-1", findField(t, got.Attachments[0].Fields, "Host").Value)
 	assert.Equal(t, "alice.bsky.social", findField(t, got.Attachments[0].Fields, "Account").Value)
 }
@@ -253,6 +253,9 @@ func TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker
 func TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields(t *testing.T) {
 	got := buildPayload(Outcome{})
 	assert.Len(t, got.Attachments, 1)
+	// isFailure() reports this defensive case as a failure (see doc comment
+	// above), so the attachment is colored danger, not good.
+	assert.Equal(t, colorDanger, got.Attachments[0].Color)
 	assert.Equal(t, []slackField{
 		{Title: "Host", Value: ""},
 		{Title: "Account", Value: ""},

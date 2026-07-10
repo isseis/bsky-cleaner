@@ -54,8 +54,8 @@ const truncatedMarker = "...(truncated)"
 // detail; attachments always holds exactly one block whose fields begin
 // with Host and Account (present on every run, success included), followed
 // by a failure detail field (Error or Failed posts) when
-// isFailure(outcome) is true. The block is color-coded (colorDanger) only
-// on failure; on success it carries no color.
+// isFailure(outcome) is true. The block is always color-coded: colorDanger
+// on failure, colorGood on success.
 // Uses Slack's legacy attachments API (color + fields) rather than Block
 // Kit -- still documented and supported by Slack's Incoming Webhooks, and
 // sufficient for the success/failure summary this tool needs.
@@ -90,10 +90,16 @@ const emojiSuccess = "✅"
 // outcome or partial delete failures).
 const emojiFailure = "❌"
 
-// colorDanger is the Slack legacy attachment color for a failed run. There
-// is no "good" counterpart: a successful run has no attachment at all (see
-// webhookPayload), so no color constant is needed for that case.
+// colorDanger is the Slack legacy attachment color for a failed run.
 const colorDanger = "danger"
+
+// colorGood is the Slack legacy attachment color for a successful run.
+// Originally the success attachment carried no color (see 0013 Appendix:
+// Decision History), but real-send verification (make notify-preview-send)
+// found that a color-less attachment was not rendered as a visible block by
+// some Incoming Webhook-compatible clients, so an explicit color is now set
+// on success too, symmetric with colorDanger.
+const colorGood = "good"
 
 // isFailure reports whether outcome represents a failed run: an error that
 // aborted the run before completion, or a completed run with at least one
@@ -162,8 +168,8 @@ func truncationCutPoint(text string) int {
 // short, fixed-shape, emoji-prefixed sentence with numeric counts.
 // Exactly one attachment is always generated whose fields always begin with
 // Host and Account, followed by an Error or Failed posts field when the
-// run failed. The attachment's Color is colorDanger on failure and unset
-// (no colored bar) on success.
+// run failed. The attachment's Color is colorDanger on failure and
+// colorGood on success.
 func buildPayload(outcome Outcome) webhookPayload {
 	var text string
 	switch {
@@ -207,9 +213,9 @@ func buildPayload(outcome Outcome) webhookPayload {
 		}
 	}
 
-	// Generate exactly one attachment. Color is danger on failure, empty on
-	// success (omitempty removes it from JSON).
-	var color string
+	// Generate exactly one attachment. Color is danger on failure, good on
+	// success.
+	color := colorGood
 	if isFailure(outcome) {
 		color = colorDanger
 	}
