@@ -290,9 +290,9 @@
 
 **推奨タイトル**: `feat(0013): wire elapsed time, host, and account into cmd runtime`
 
-**レビュー観点**: 処理時間の計測区間が `runner.Run()` 呼び出しの直前・直後のみに限定され、設定読み込みや DID/PDS 解決の時間を含んでいないか（AC-11） / Host/Account が TOML `hostname`・`BSKY_HANDLE` の実際の値から正しく供給されており、両者の取り違えが無いか（`TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` で検証） / `config.ResolveHostname` が返すエラーを握りつぶさず `slog.Warn` で警告ログを出しつつ、通知処理自体は空文字列のホストで継続しているか（AC-17） / `make test`・`make notify-preview-send` の両方が全シナリオで green であることを確認したうえで次フェーズ（ドキュメント更新）に進んでいるか
+**レビュー観点**: 処理時間の計測区間が `runner.Run()` 呼び出しの直前・直後のみに限定され、設定読み込みや DID/PDS 解決の時間を含んでいないか（AC-11） / Host/Account が TOML `hostname`・`BSKY_HANDLE` の実際の値から正しく供給されており、両者の取り違えが無いか（`TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` で検証） / `config.ResolveHostname` が返すエラーを握りつぶさず `slog.Warn` で警告ログを出しつつ、通知処理自体は空文字列のホストで継続しているか（AC-17） / `make test`・`make notify-preview-send` の両方が全シナリオで green であることを確認したうえで次フェーズ（ドキュメント更新）に進んでいるか / フェーズ10の実送信確認で追加された `slackField.Short` が Host/Account/Targets/Deleted/Duration の5フィールドにのみ設定され、長文の Error/Failed posts には設定されていないか（テストで両方向とも検証済み）
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
