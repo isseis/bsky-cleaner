@@ -66,8 +66,7 @@
 
 ## 3. 実装ステップ
 
-### 3.2 PR 構成
-
+### 3.1 PR 構成
 | PR | 対象ステップ | 主な変更内容 |
 |---|---|---|
 | PR-1 | フェーズ1 | `internal/config` へのホスト名解決（`Config.Hostname`/`ResolveHostname`）追加 |
