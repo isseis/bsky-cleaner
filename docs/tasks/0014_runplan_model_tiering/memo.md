@@ -49,3 +49,10 @@
 | フェーズ8-10（notifypreview Elapsed 追加・テスト総仕上げ・実送信確認） | Sonnet（実装・discovery review）／Haiku（fix後のverification review） | 中〜高（実送信確認は0012/フェーズ4でも設計変更を要した実績があり、判定が難しい） | 初回discovery review: 0/0/0（コード自体は問題なし）だが、テストカバレッジの抜け2件（`Short: true`/`false` を検証するアサーション不足）を検出。fix後のverification reviewは0/0/0 | あり（フェーズ10の実送信確認で「5フィールドが縦に並び視認性が悪い」という新たな描画課題が判明し、`slackField.Short` を追加する設計変更が発生。ただしこれは事前の難易度判定の誤りというより、実送信確認という性質上の後知恵情報であり、モデル選択とは無関係） | discovery reviewの指摘（テストカバレッジの抜け）はコード自体の欠陥ではなく「このバグを防ぐテストが無い」という指摘であり、Sonnetでもすり抜けた。**Model tiering procedureの想定通り、fix後のverification passはHaiku（cheaper tier）に投げて正しく完了できた**——「すでに特定された2件の修正が正しく適用されたか」という狭い確認作業はHaikuでも十分に機能した。verification passを軽量モデルに委譲するという `_lib/review-subagent-pattern.md` の Model tiering 節の設計は、今回の実データでも有効だと確認できた。
 
 （各フェーズの実施後、上表に行を追加していく）
+
+## PR-5 レビューコメントで判明した見落とし（フェーズ7/8-10 discovery review 双方の盲点）
+
+PR #133（フェーズ7〜10）に対する人間レビュアーのコメントで、`cmd/main_test.go` の `slackAttachmentFields` が「hooks.slack.com 宛リクエストが1件であることをアサートせず、最初にマッチしたリクエストを黙って返す」というバグを指摘された（複数の Slack リクエストが送られる回帰や、誤ったペイロードを検証してしまう回帰を検出できなくなる）。
+
+- **重要な事実**: このバグはフェーズ7のSonnetによる discovery review（`review-subagent-pattern.md` の初回パス）でも、フェーズ8-10のSonnet discovery review・Haiku verification review でも検出されなかった。3回のAIレビューをすべてすり抜け、人間のレビュアーが指摘するまで気づかれなかった。
+- **示唆**: 今回のモデル階層化実験は「実装フェーズにどのモデルを割り当てるか」「verification passを軽量モデルに委譲できるか」を検証してきたが、**discovery review自体の再現率（recall）はモデルの選択と独立に上限がある**ことを示す実例になった。`review-subagent-pattern.md` が明記する通り、discovery reviewはコストを削ってはいけない（recallが命）というルールだが、Sonnetでもこの種の「ヘルパー関数の暗黙の前提（複数マッチしうるのに1件だけ返す）」は見逃しうる。モデル階層化の効果測定とは別に、レビュー観点リスト自体に「テストヘルパーが暗黙に前提とする一意性・網羅性」を明示的に含めることを今後検討する価値がある。
