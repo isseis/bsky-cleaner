@@ -37,8 +37,11 @@ type Config struct {
 	Hostname string
 }
 
-// rawConfig mirrors the TOML file structure with pointer fields, so a
-// missing key (nil) can be distinguished from an explicit zero value.
+// rawConfig mirrors the TOML file structure. Most fields use pointer
+// types so a missing key (nil) can be distinguished from an explicit
+// zero value; the exceptions are SlackAllowedHost and Hostname, which
+// are plain strings because for those fields an absent and an empty
+// key are treated identically.
 type rawConfig struct {
 	RetentionDays           *int    `toml:"retention_days"`
 	Schedule                *string `toml:"schedule"`

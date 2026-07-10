@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,9 +15,13 @@ func TestResolveHostname_TOMLValueSet_ReturnsTOMLValue(t *testing.T) {
 }
 
 func TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname(t *testing.T) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Skipf("os.Hostname() failed: %v", err)
+	}
 	cfg := Config{Hostname: ""}
 	got := ResolveHostname(cfg)
-	assert.NotEmpty(t, got)
+	assert.Equal(t, hostname, got)
 }
 
 func TestLoad_HostnameField_ParsesOptionalTOMLKey(t *testing.T) {
