@@ -108,6 +108,11 @@ Execution results are notified via Slack.
 - The Webhook URLs for normal and error notifications are assumed to match the host part (domain) of the allowed host specified in the configuration file (e.g., `hooks.slack.com`)
 - If the host part does not match, the system is fail-closed. That is, if a mismatch is detected, the tool does not proceed with sending the notification; instead, it treats the mismatch as a configuration error and fails to start (see [Slack Notification Security Design](design/slack_notification_security.md) for details)
 
+Notification delivery is best-effort and does not guarantee at-least-once
+delivery. If notification sending fails for any reason (including a process
+crash after runner.Run() completes), the run's result -- in particular an
+already-completed deletion -- may never be reported via Slack.
+
 ### Information Leakage Protection in Slack Notifications
 
 Measures are taken to prevent sensitive information from inadvertently being included in Slack notifications. For specific implementation details, see the [Slack Notification Security Design](design/slack_notification_security.md).

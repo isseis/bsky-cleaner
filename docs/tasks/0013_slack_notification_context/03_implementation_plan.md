@@ -318,33 +318,33 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/134）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ12: ドキュメント更新（配信保証の限界の明記、F-004）
 
 対応: F-004（AC-15, AC-16）。設計: アーキテクチャ設計書 5.4節。
 
-- [ ] `README.md` の「Safety」節（241-250行目）の箇条書きに、既存の4項目（243-248行目）と同じ **太字見出し + em dash** の書式で次の1項目を追加する。
+- [x] `README.md` の「Safety」節（241-250行目）の箇条書きに、既存の4項目（243-248行目）と同じ **太字見出し + em dash** の書式で次の1項目を追加する。
   ```
   - **No at-least-once delivery guarantee for Slack notifications** — if notification
     sending fails for any reason (including a process crash), the run's result,
     especially an already-completed deletion, may never be reported
   ```
-- [ ] `README.ja.md` の「安全性」節（236-244行目）に、既存4項目（238-243行目）と同じ書式で次の対訳を追加する。
+- [x] `README.ja.md` の「安全性」節（236-244行目）に、既存4項目（238-243行目）と同じ書式で次の対訳を追加する。
   ```
   - **Slack 通知は at-least-once 配信を保証しない** — 何らかの理由（プロセスクラッシュを含む）で
     通知の送信に失敗した場合、実行結果、特に完了済みの削除結果が通知されないまま
     失われることがある
   ```
-- [ ] `docs/overview.md` の「Execution Result Notification」節（103-109行目）の末尾に、次の1段落を追加する。
+- [x] `docs/overview.md` の「Execution Result Notification」節（103-109行目）の末尾に、次の1段落を追加する。
   ```
   Notification delivery is best-effort and does not guarantee at-least-once
   delivery. If notification sending fails for any reason (including a process
   crash after runner.Run() completes), the run's result -- in particular an
   already-completed deletion -- may never be reported via Slack.
   ```
-- [ ] `docs/overview.ja.md` の「実行結果の通知」節（103-109行目付近）の末尾に、次の対訳を追加する。
+- [x] `docs/overview.ja.md` の「実行結果の通知」節（103-109行目付近）の末尾に、次の対訳を追加する。
   ```
   通知の送信はベストエフォートであり、at-least-once の配信を保証しない。runner.Run() の
   完了後、何らかの理由（プロセスクラッシュを含む）で通知の送信が失敗した場合、実行結果、
@@ -359,8 +359,8 @@
 
 **レビュー観点**: README/overview の英日対訳の文言が一致しているか / at-least-once 配信を保証しないという記述が、誇張・過小表現なく正確に事実（0006 由来の既知の制限であること）を反映しているか / AC-15・AC-16 の静的検証コマンドが検索するリテラル文字列と、実際に追加した本文が一字一句一致しているか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/135）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
