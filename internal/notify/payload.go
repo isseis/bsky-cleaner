@@ -51,10 +51,11 @@ const maxPayloadLength = 4000
 const truncatedMarker = "...(truncated)"
 
 // webhookPayload is the Slack Incoming Webhook request body. text carries
-// an emoji-prefixed one-line summary, kept separate from the failure
-// detail; attachments always holds exactly one block whose fields begin
-// with Host and Account (present on every run, success included), followed
-// by a failure detail field (Error or Failed posts) when
+// an emoji-prefixed one-line summary with no numeric counts, kept separate
+// from the failure detail; attachments always holds exactly one block whose
+// fields begin with Host and Account (present on every run, success
+// included), followed by Targets/Deleted/Duration when outcome.Result !=
+// nil, followed by a failure detail field (Error or Failed posts) when
 // isFailure(outcome) is true. The block is always color-coded: colorDanger
 // on failure, colorGood on success.
 // Uses Slack's legacy attachments API (color + fields) rather than Block
@@ -67,7 +68,8 @@ type webhookPayload struct {
 
 // slackAttachment is the single block always present in webhookPayload
 // (see webhookPayload). Its fields begin with Host and Account, followed by
-// a failure detail field (the aborting error's category for a run-ending
+// Targets/Deleted/Duration when the run produced a Result, followed by a
+// failure detail field (the aborting error's category for a run-ending
 // error, or every failed post's rkey and error category for partial delete
 // failures) when the run failed.
 type slackAttachment struct {
@@ -170,7 +172,8 @@ func truncationCutPoint(text string) int {
 // short, fixed-shape, emoji-prefixed sentence with no numeric counts (counts
 // live in the attachment's structured fields instead).
 // Exactly one attachment is always generated whose fields always begin with
-// Host and Account, followed by an Error or Failed posts field when the
+// Host and Account, followed by Targets/Deleted/Duration when
+// outcome.Result != nil, followed by an Error or Failed posts field when the
 // run failed. The attachment's Color is colorDanger on failure and
 // colorGood on success.
 func buildPayload(outcome Outcome) webhookPayload {
