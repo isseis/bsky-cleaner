@@ -557,14 +557,19 @@ func assertOnlySlackRequestURL(t *testing.T, mock *atprototestutil.MockHTTPDoer,
 	assert.Equal(t, []string{wantURL}, slackURLs)
 }
 
+// slackField mirrors internal/notify's unexported slackField JSON shape,
+// letting cmd's tests decode a sent Slack payload without depending on
+// internal/notify's unexported types.
+type slackField struct {
+	Title string `json:"title"`
+	Value string `json:"value"`
+}
+
 // slackAttachmentFields decodes the body of the single request sent to
 // hooks.slack.com and returns its first attachment's fields, so tests can
 // assert on individual Title/Value pairs without depending on internal/notify's
 // unexported payload types.
-func slackAttachmentFields(t *testing.T, mock *atprototestutil.MockHTTPDoer) []struct {
-	Title string `json:"title"`
-	Value string `json:"value"`
-} {
+func slackAttachmentFields(t *testing.T, mock *atprototestutil.MockHTTPDoer) []slackField {
 	t.Helper()
 	const slackBaseURL = "https://hooks.slack.com/"
 	for _, req := range mock.Requests() {
@@ -573,10 +578,7 @@ func slackAttachmentFields(t *testing.T, mock *atprototestutil.MockHTTPDoer) []s
 		}
 		var payload struct {
 			Attachments []struct {
-				Fields []struct {
-					Title string `json:"title"`
-					Value string `json:"value"`
-				} `json:"fields"`
+				Fields []slackField `json:"fields"`
 			} `json:"attachments"`
 		}
 		require.NoError(t, json.Unmarshal(req.Body, &payload))
@@ -589,11 +591,7 @@ func slackAttachmentFields(t *testing.T, mock *atprototestutil.MockHTTPDoer) []s
 
 // findSlackField returns the Value of the field with the given title,
 // failing the test if no such field is present.
-func findSlackField(t *testing.T, fields []struct {
-	Title string `json:"title"`
-	Value string `json:"value"`
-}, title string,
-) string {
+func findSlackField(t *testing.T, fields []slackField, title string) string {
 	t.Helper()
 	for _, f := range fields {
 		if f.Title == title {
