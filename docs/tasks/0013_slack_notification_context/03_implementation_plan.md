@@ -81,14 +81,18 @@
 
 対応: F-001（AC-03, AC-04, AC-05）。設計: アーキテクチャ設計書 3.1節。
 
-- [ ] `internal/config/config.go` の `Config` 構造体に `Hostname string` フィールドを追加する。コメントは3.1節のコード例（186-190行目）に準じ、英語で記述する。
-- [ ] `internal/config/config.go` の `rawConfig` 構造体に `` Hostname string `toml:"hostname"` `` を追加する（`SlackAllowedHost string` と同じ非ポインタパターン、`config.go:40` 相当の位置）。
-- [ ] `internal/config/validate.go` の `validateConfig`（19-58行目）の戻り値構築（52-57行目）に `Hostname: raw.Hostname,` を1行追加する。
-- [ ] `internal/config/hostname.go` を新規作成し、`ResolveHostname(cfg Config) string` を実装する。`cfg.Hostname` が空でなければそれを返す（AC-03）。空なら `os.Hostname()` を呼び、成功すればその値を返す（AC-04）。`os.Hostname()` がエラーを返す場合は空文字列を返す（AC-05、エラーを外に伝播しない）。関数コメントはアーキテクチャ設計書 3.1節のコード例（196-200行目）に準じる。
-- [ ] `internal/config/hostname_test.go` を新規作成し、次の3テストケースを実装する（テストヘルパーは既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）を再利用する）。
-  - [ ] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `Config{Hostname: "worker-1"}` を渡すと `"worker-1"` が返ることを確認する（AC-03）。
-  - [ ] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `Config{Hostname: ""}` を渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
-  - [ ] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
+- [x] `internal/config/config.go` の `Config` 構造体に `Hostname string` フィールドを追加する。コメントは3.1節のコード例（186-190行目）に準じ、英語で記述する。
+- [x] `internal/config/config.go` の `rawConfig` 構造体に `` Hostname string `toml:"hostname"` `` を追加する（`SlackAllowedHost string` と同じ非ポインタパターン、`config.go:40` 相当の位置）。
+- [x] `internal/config/validate.go` の `validateConfig`（19-58行目）の戻り値構築（52-57行目）に `Hostname: raw.Hostname,` を1行追加する。
+- [x] `internal/config/hostname.go` を新規作成し、`ResolveHostname(cfg Config) string` を実装する。`cfg.Hostname` が空でなければそれを返す（AC-03）。空なら `os.Hostname()` を呼び、成功すればその値を返す（AC-04）。`os.Hostname()` がエラーを返す場合は空文字列を返す（AC-05、エラーを外に伝播しない）。関数コメントはアーキテクチャ設計書 3.1節のコード例（196-200行目）に準じる。
+- [x] `internal/config/hostname_test.go` を新規作成し、次の3テストケースを実装する（テストヘルパーは既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）を再利用する）。
+  - [x] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `Config{Hostname: "worker-1"}` を渡すと `"worker-1"` が返ることを確認する（AC-03）。
+  - [x] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `Config{Hostname: ""}` を渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
+  - [x] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-1 作成ポイント: internal/config hostname resolution
 
