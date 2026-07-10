@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/isseis/bsky-cleaner/internal/atproto"
@@ -17,7 +18,7 @@ func TestEscapeSlackMarkup_EscapesAmpersandLtGt(t *testing.T) {
 	assert.Equal(t, "a &amp; b &lt; c &gt; d", got)
 }
 
-func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) {
+func TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount(t *testing.T) {
 	outcome := Outcome{
 		Result: &report.Result{
 			Mode:    report.ModeApply,
@@ -28,7 +29,7 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 	}
 	got := buildPayload(outcome)
 	assert.Contains(t, got.Text, emojiSuccess)
-	assert.Contains(t, got.Text, "2")
+	assert.NotContains(t, got.Text, "2")
 	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
 	// Always one attachment with Host/Account fields, colored good on success.
 	assert.Len(t, got.Attachments, 1)
@@ -80,6 +81,42 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=429")
 }
 
+func TestBuildPayload_PartialFailure_TextHasNoFailureCount(t *testing.T) {
+	err1 := &atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, Err: errors.New("boom")}
+	err2 := &atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 429, Err: errors.New("rate limited")}
+	outcome := Outcome{
+		Result: &report.Result{
+			Mode: report.ModeApply,
+			Failed: []report.DeleteFailure{
+				{Post: atproto.Post{RKey: "rkey1"}, Err: err1},
+				{Post: atproto.Post{RKey: "rkey2"}, Err: err2},
+			},
+		},
+	}
+	got := buildPayload(outcome)
+	assert.NotContains(t, got.Text, "2")
+}
+
+func TestBuildPayload_TextRetainsEmojiForSuccessAndFailure(t *testing.T) {
+	successOutcome := Outcome{
+		Result: &report.Result{Mode: report.ModeApply, Deleted: []atproto.Post{{RKey: "a"}}},
+	}
+	partialFailureOutcome := Outcome{
+		Result: &report.Result{
+			Mode:   report.ModeApply,
+			Failed: []report.DeleteFailure{{Post: atproto.Post{RKey: "rkey1"}, Err: errors.New("boom")}},
+		},
+	}
+	runErrorOutcome := Outcome{
+		Result: nil,
+		Err:    &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")},
+	}
+
+	assert.Contains(t, buildPayload(successOutcome).Text, emojiSuccess)
+	assert.Contains(t, buildPayload(partialFailureOutcome).Text, emojiFailure)
+	assert.Contains(t, buildPayload(runErrorOutcome).Text, emojiFailure)
+}
+
 func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T) {
 	err := &atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, Err: errors.New("boom")}
 	outcome := Outcome{
@@ -92,11 +129,11 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	// Phase 3: Host/Account/Failed posts = 3 fields (statistics fields added in Phase 5).
-	require.Len(t, got.Attachments[0].Fields, 3)
+	// Host/Account/Targets/Deleted/Duration/Failed posts = 6 fields.
+	require.Len(t, got.Attachments[0].Fields, 6)
 	// full equality on the Failed posts field ensures no extra fields leak in
-	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[2].Title)
-	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[2].Value)
+	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[5].Title)
+	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[5].Value)
 }
 
 func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
@@ -295,6 +332,34 @@ func TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields(t *testing.T) {
 	assert.Equal(t, "worker-1", findField(t, got.Attachments[0].Fields, "Host").Value)
 	assert.Equal(t, "alice.bsky.social", findField(t, got.Attachments[0].Fields, "Account").Value)
 	assert.Contains(t, findField(t, got.Attachments[0].Fields, "Error").Value, "atproto http error")
+}
+
+func TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields(t *testing.T) {
+	outcome := Outcome{
+		Result: &report.Result{
+			Mode:    report.ModeApply,
+			Targets: []atproto.Post{{RKey: "a"}, {RKey: "b"}, {RKey: "c"}},
+			Deleted: []atproto.Post{{RKey: "a"}, {RKey: "b"}},
+		},
+		Elapsed: 2 * time.Second,
+	}
+	got := buildPayload(outcome)
+	require.Len(t, got.Attachments, 1)
+	assert.Equal(t, "3", findField(t, got.Attachments[0].Fields, "Targets").Value)
+	assert.Equal(t, "2", findField(t, got.Attachments[0].Fields, "Deleted").Value)
+	assert.Equal(t, "2s", findField(t, got.Attachments[0].Fields, "Duration").Value)
+}
+
+func TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields(t *testing.T) {
+	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
+	outcome := Outcome{Result: nil, Err: someErr}
+	got := buildPayload(outcome)
+	require.Len(t, got.Attachments, 1)
+	for _, title := range []string{"Targets", "Deleted", "Duration"} {
+		for _, field := range got.Attachments[0].Fields {
+			assert.NotEqual(t, title, field.Title)
+		}
+	}
 }
 
 func TestIsFailure_FourOutcomePatterns(t *testing.T) {

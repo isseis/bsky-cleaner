@@ -194,35 +194,36 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ5: `buildPayload` への統計フィールド追加
 
 対応: F-002（AC-07, AC-08, AC-09, AC-10）。設計: アーキテクチャ設計書 3.3節手順3。
 
-- [ ] `internal/notify/payload.go` の `import` に `"strconv"` を追加する。
-- [ ] `buildPayload` の `fields` 構築（フェーズ3で追加した Host/Account の直後）に、`outcome.Result != nil` の場合のみ次の3フィールドを追加する分岐を実装する。
-  - [ ] `slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`
-  - [ ] `slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`
-  - [ ] `slackField{Title: "Duration", Value: outcome.Elapsed.String()}`
-- [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` を追加する。`outcome.Result` に `Targets`（3件）・`Deleted`（2件）を設定し、`outcome.Elapsed` に `2*time.Second` 相当を設定して、`Fields` に `Title: "Targets", Value: "3"`・`Title: "Deleted", Value: "2"`・`Title: "Duration", Value: "2s"` が含まれることを検証する（AC-07, AC-08, AC-09）。
-- [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields` を追加する。`outcome.Result == nil`（`outcome.Err` にログイン失敗相当のエラーを設定）のケースで、`Fields` のいずれの `Title` も `"Targets"`・`"Deleted"`・`"Duration"` と一致しないことを検証する（AC-10）。
-- [ ] `internal/notify/payload_test.go` の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（フェーズ3で更新済み）を再度更新する。このテストの `outcome.Result` は `Failed` のみを持ち `Targets`/`Deleted` を明示的に設定していないため、本フェーズの変更後は `Fields` が6件（Host, Account, Targets（値 `"0"`）, Deleted（値 `"0"`）, Duration（値 `outcome.Elapsed.String()`、ゼロ値なら `"0s"`）, Failed posts）になる。`require.Len(t, got.Attachments[0].Fields, 3)` を `require.Len(t, got.Attachments[0].Fields, 6)` に、`Fields[2]` への完全一致アサーションを `Fields[5]` への完全一致アサーションに更新する（既存コード調査結果・フェーズ3参照。このテストのみ `findField` に書き換えず、総件数検証という本来の目的を維持する）。
+- [x] `internal/notify/payload.go` の `import` に `"strconv"` を追加する。
+- [x] `buildPayload` の `fields` 構築（フェーズ3で追加した Host/Account の直後）に、`outcome.Result != nil` の場合のみ次の3フィールドを追加する分岐を実装する。
+  - [x] `slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`
+  - [x] `slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`
+  - [x] `slackField{Title: "Duration", Value: outcome.Elapsed.String()}`
+- [x] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` を追加する。`outcome.Result` に `Targets`（3件）・`Deleted`（2件）を設定し、`outcome.Elapsed` に `2*time.Second` 相当を設定して、`Fields` に `Title: "Targets", Value: "3"`・`Title: "Deleted", Value: "2"`・`Title: "Duration", Value: "2s"` が含まれることを検証する（AC-07, AC-08, AC-09）。
+- [x] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields` を追加する。`outcome.Result == nil`（`outcome.Err` にログイン失敗相当のエラーを設定）のケースで、`Fields` のいずれの `Title` も `"Targets"`・`"Deleted"`・`"Duration"` と一致しないことを検証する（AC-10）。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（フェーズ3で更新済み）を再度更新する。このテストの `outcome.Result` は `Failed` のみを持ち `Targets`/`Deleted` を明示的に設定していないため、本フェーズの変更後は `Fields` が6件（Host, Account, Targets（値 `"0"`）, Deleted（値 `"0"`）, Duration（値 `outcome.Elapsed.String()`、ゼロ値なら `"0s"`）, Failed posts）になる。`require.Len(t, got.Attachments[0].Fields, 3)` を `require.Len(t, got.Attachments[0].Fields, 6)` に、`Fields[2]` への完全一致アサーションを `Fields[5]` への完全一致アサーションに更新する（既存コード調査結果・フェーズ3参照。このテストのみ `findField` に書き換えず、総件数検証という本来の目的を維持する）。
 
 ### フェーズ6: `text` からの件数表現の除去
 
 対応: F-003（AC-12, AC-13, AC-14）。設計: アーキテクチャ設計書 3.3節手順1・3.4節。
 
-- [ ] `internal/notify/payload.go` の `buildPayload` 内、`text` を構築する `switch`（158-172行目）を次のように変更する。
-  - [ ] `default` 節（164-171行目）の完全成功時の文言を `fmt.Sprintf("%s bsky-cleaner run succeeded: deleted %d post(s).", emojiSuccess, deleted)` から `fmt.Sprintf("%s bsky-cleaner run succeeded.", emojiSuccess)` に変更する（件数プレースホルダ `%d`・`deleted` 変数参照を削除)。
-  - [ ] 同じく `default` 節の部分失敗時の文言を `fmt.Sprintf("%s bsky-cleaner run completed with failures: deleted %d post(s), %d failure(s).", emojiFailure, deleted, failedCount)` から `fmt.Sprintf("%s bsky-cleaner run completed with failures.", emojiFailure)` に変更する。
-  - [ ] `deleted := len(outcome.Result.Deleted)` の変数宣言（165行目）を、`failedCount == 0` の分岐判定にのみ必要な形に整理する（`deleted` 変数はもはや文言に使われないため、`failedCount := len(outcome.Result.Failed)` の判定のみ残し、未使用変数エラーを避ける）。
-  - [ ] `outcome.Err != nil`（160-161行目）・`outcome.Result == nil`（162-163行目）の2分岐は既存要件どおり変更しない（件数を含んでいないため）。
-- [ ] `internal/notify/payload_test.go` の `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` から `assert.Contains(t, got.Text, "2")`（29行目）を削除する（削除件数が `text` に含まれなくなったため。AC-12）。
-- [ ] `internal/notify/payload_test.go` のテスト名 `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` を `TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount` に変更する（実態に合わせる）。
-- [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_PartialFailure_TextHasNoFailureCount` を追加する。部分失敗の `outcome`（`TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` と同様の fixture）に対し、`got.Text` に失敗件数を示す数値（例えば `"2"`）が含まれないことを検証する（AC-13）。
-- [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_TextRetainsEmojiForSuccessAndFailure` を追加する。完全成功・部分失敗・実行エラーの3ケースそれぞれで、`got.Text` に `emojiSuccess`（成功時のみ）または `emojiFailure`（それ以外）が含まれることを再確認する（AC-14。0012 AC-01/AC-02 の絵文字判別要件が後退していないことの明示的な回帰テスト）。
+- [x] `internal/notify/payload.go` の `buildPayload` 内、`text` を構築する `switch`（158-172行目）を次のように変更する。
+  - [x] `default` 節（164-171行目）の完全成功時の文言を `fmt.Sprintf("%s bsky-cleaner run succeeded: deleted %d post(s).", emojiSuccess, deleted)` から `fmt.Sprintf("%s bsky-cleaner run succeeded.", emojiSuccess)` に変更する（件数プレースホルダ `%d`・`deleted` 変数参照を削除)。
+  - [x] 同じく `default` 節の部分失敗時の文言を `fmt.Sprintf("%s bsky-cleaner run completed with failures: deleted %d post(s), %d failure(s).", emojiFailure, deleted, failedCount)` から `fmt.Sprintf("%s bsky-cleaner run completed with failures.", emojiFailure)` に変更する。
+  - [x] `deleted := len(outcome.Result.Deleted)` の変数宣言（165行目）を、`failedCount == 0` の分岐判定にのみ必要な形に整理する（`deleted` 変数はもはや文言に使われないため、`failedCount := len(outcome.Result.Failed)` の判定のみ残し、未使用変数エラーを避ける）。
+  - [x] `outcome.Err != nil`（160-161行目）・`outcome.Result == nil`（162-163行目）の2分岐は既存要件どおり変更しない（件数を含んでいないため）。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` から `assert.Contains(t, got.Text, "2")`（29行目）を削除する（削除件数が `text` に含まれなくなったため。AC-12）。実装時は削除ではなく `assert.NotContains(t, got.Text, "2")` に置き換え、件数不在を積極的に検証する形にした（AC-12 の意図はより明確に満たされる）。
+- [x] `internal/notify/payload_test.go` のテスト名 `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` を `TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount` に変更する（実態に合わせる）。
+- [x] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_PartialFailure_TextHasNoFailureCount` を追加する。部分失敗の `outcome`（`TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` と同様の fixture）に対し、`got.Text` に失敗件数を示す数値（例えば `"2"`）が含まれないことを検証する（AC-13）。
+- [x] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_TextRetainsEmojiForSuccessAndFailure` を追加する。完全成功・部分失敗・実行エラーの3ケースそれぞれで、`got.Text` に `emojiSuccess`（成功時のみ）または `emojiFailure`（それ以外）が含まれることを再確認する（AC-14。0012 AC-01/AC-02 の絵文字判別要件が後退していないことの明示的な回帰テスト）。
+- [x] `internal/notify/notify_test.go` の `TestSend_Success_PostsToSelectedWebhook`（本フェーズの実装計画には無い派生影響。`text` の固定リテラル文言 `"bsky-cleaner run succeeded: deleted 0 post(s)."` を検証していたため、件数除去後の新しい固定文言 `"bsky-cleaner run succeeded."` に更新した）。
 
 ### PR-4 作成ポイント: statistics fields and text simplification
 
@@ -232,8 +233,8 @@
 
 **レビュー観点**: `Targets`/`Deleted`/`Duration` フィールドが `outcome.Result != nil` の場合のみ追加されているか（AC-07〜AC-10） / `text` から件数表現が完全に除去されつつ、絵文字による正常系/異常系判別（0012 由来の保証）が後退していないか（AC-12〜AC-14） / フェーズ3で更新済みの `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` がフィールド追加後の6件構成に正しく再更新されているか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/132）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 

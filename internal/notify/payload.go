@@ -2,6 +2,7 @@ package notify
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -50,12 +51,16 @@ const maxPayloadLength = 4000
 const truncatedMarker = "...(truncated)"
 
 // webhookPayload is the Slack Incoming Webhook request body. text carries
-// an emoji-prefixed one-line summary, kept separate from the failure
-// detail; attachments always holds exactly one block whose fields begin
-// with Host and Account (present on every run, success included), followed
-// by a failure detail field (Error or Failed posts) when
-// isFailure(outcome) is true. The block is always color-coded: colorDanger
-// on failure, colorGood on success.
+// an emoji-prefixed one-line summary with no numeric counts, kept separate
+// from the failure detail; attachments always holds exactly one block whose
+// fields begin with Host and Account (present on every run, success
+// included), followed by Targets/Deleted/Duration when outcome.Result !=
+// nil, followed by a failure detail field (Error or Failed posts) when
+// isFailure(outcome) is true and the outcome produced a run error or
+// per-post failures. The unknown-error path (outcome.Result == nil &&
+// outcome.Err == nil) has no failure-detail field, only Host/Account.
+// The block is always color-coded: colorDanger on failure, colorGood on
+// success.
 // Uses Slack's legacy attachments API (color + fields) rather than Block
 // Kit -- still documented and supported by Slack's Incoming Webhooks, and
 // sufficient for the success/failure summary this tool needs.
@@ -66,7 +71,8 @@ type webhookPayload struct {
 
 // slackAttachment is the single block always present in webhookPayload
 // (see webhookPayload). Its fields begin with Host and Account, followed by
-// a failure detail field (the aborting error's category for a run-ending
+// Targets/Deleted/Duration when the run produced a Result, followed by a
+// failure detail field (the aborting error's category for a run-ending
 // error, or every failed post's rkey and error category for partial delete
 // failures) when the run failed.
 type slackAttachment struct {
@@ -166,11 +172,15 @@ func truncationCutPoint(text string) int {
 }
 
 // buildPayload renders outcome as a Slack webhookPayload. text is always a
-// short, fixed-shape, emoji-prefixed sentence with numeric counts.
+// short, fixed-shape, emoji-prefixed sentence with no numeric counts (counts
+// live in the attachment's structured fields instead).
 // Exactly one attachment is always generated whose fields always begin with
-// Host and Account, followed by an Error or Failed posts field when the
-// run failed. The attachment's Color is colorDanger on failure and
-// colorGood on success.
+// Host and Account, followed by Targets/Deleted/Duration when
+// outcome.Result != nil, followed by an Error or Failed posts field when the
+// run failed and the outcome produced a run error or per-post failures. The
+// unknown-error path (outcome.Result == nil && outcome.Err == nil) has no
+// failure-detail field, only Host/Account. The attachment's Color is
+// colorDanger on failure and colorGood on success.
 func buildPayload(outcome Outcome) webhookPayload {
 	var text string
 	switch {
@@ -179,12 +189,11 @@ func buildPayload(outcome Outcome) webhookPayload {
 	case outcome.Result == nil:
 		text = fmt.Sprintf("%s bsky-cleaner run failed: unknown error.", emojiFailure)
 	default:
-		deleted := len(outcome.Result.Deleted)
 		failedCount := len(outcome.Result.Failed)
 		if failedCount == 0 {
-			text = fmt.Sprintf("%s bsky-cleaner run succeeded: deleted %d post(s).", emojiSuccess, deleted)
+			text = fmt.Sprintf("%s bsky-cleaner run succeeded.", emojiSuccess)
 		} else {
-			text = fmt.Sprintf("%s bsky-cleaner run completed with failures: deleted %d post(s), %d failure(s).", emojiFailure, deleted, failedCount)
+			text = fmt.Sprintf("%s bsky-cleaner run completed with failures.", emojiFailure)
 		}
 	}
 	text = truncate(text)
@@ -193,6 +202,17 @@ func buildPayload(outcome Outcome) webhookPayload {
 	fields := []slackField{
 		{Title: "Host", Value: truncate(sanitizeForPayload(outcome.Host))},
 		{Title: "Account", Value: truncate(sanitizeForPayload(outcome.Account))},
+	}
+
+	// Add delete statistics only when the run reached the point of producing
+	// a Result; a run that aborted before that (e.g. login failure) has
+	// nothing to report here.
+	if outcome.Result != nil {
+		fields = append(fields,
+			slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))},
+			slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))},
+			slackField{Title: "Duration", Value: outcome.Elapsed.String()},
+		)
 	}
 
 	// Append failure detail fields (Error or Failed posts) if the run failed.
