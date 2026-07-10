@@ -90,12 +90,12 @@
   - [x] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `ResolveHostname` に `Config{Hostname: ""}` を直接渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
   - [x] `TestLoad_HostnameField_ParsesOptionalTOMLKey`: 既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）と `Load()` を使い、`config_test.go` の `TestLoad_SlackAllowedHostField_ParsesOptionalTOMLKey` と同型の「キー在り/キー無し」2パターンで、TOML `hostname` キーが `rawConfig`/`validateConfig` を経て `Config.Hostname` に正しく届くことを確認する（AC-03/AC-04 のTOML読み込み経路。上記2件は `ResolveHostname` のフォールバック順序のみを検証し `Load()` を経由しないため、この経路のテストが別途必要）。
   - [x] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
-- [ ] **（AC-17 追加分、要件定義書 2026-07-10 追記）** `internal/config/hostname.go` の `ResolveHostname` のシグネチャを `ResolveHostname(cfg Config) string` から `ResolveHostname(cfg Config) (string, error)` に変更する。`cfg.Hostname` が空でない場合、または `os.Hostname()` が成功した場合は `(値, nil)` を返す（AC-03/AC-04 の挙動は変更しない）。`os.Hostname()` がエラーを返す場合は `("", err)` を返す（AC-05: 通知フィールドには引き続き空文字列を使う best-effort 方針は維持しつつ、失敗した事実自体は呼び出し元に伝播できるようにする）。関数コメントを新しいシグネチャに合わせて更新する。
-- [ ] **（AC-17 追加分）** `internal/config/hostname_test.go` の `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`・`TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` を新しい2値シグネチャに追従させる（`got, err := ResolveHostname(cfg)` に変更し、いずれも `require.NoError(t, err)` を追加。TOML優先/`os.Hostname()`成功時はエラーが無いことを確認するのが目的）。`os.Hostname()` 失敗時のエラー伝播（`("", err)`）自体は既存の方針どおり関数差し替え不可のため自動テスト対象外とし、コードレビューで確認する（フェーズ1既存の注記を継続）。
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
-- [ ] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] **（AC-17 追加分、要件定義書 2026-07-10 追記）** `internal/config/hostname.go` の `ResolveHostname` のシグネチャを `ResolveHostname(cfg Config) string` から `ResolveHostname(cfg Config) (string, error)` に変更する。`cfg.Hostname` が空でない場合、または `os.Hostname()` が成功した場合は `(値, nil)` を返す（AC-03/AC-04 の挙動は変更しない）。`os.Hostname()` がエラーを返す場合は `("", err)` を返す（AC-05: 通知フィールドには引き続き空文字列を使う best-effort 方針は維持しつつ、失敗した事実自体は呼び出し元に伝播できるようにする）。関数コメントを新しいシグネチャに合わせて更新する。
+- [x] **（AC-17 追加分）** `internal/config/hostname_test.go` の `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`・`TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` を新しい2値シグネチャに追従させる（`got, err := ResolveHostname(cfg)` に変更し、いずれも `require.NoError(t, err)` を追加。TOML優先/`os.Hostname()`成功時はエラーが無いことを確認するのが目的）。`os.Hostname()` 失敗時のエラー伝播（`("", err)`）自体は既存の方針どおり関数差し替え不可のため自動テスト対象外とし、コードレビューで確認する（フェーズ1既存の注記を継続）。
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
+- [x] PR を作成した
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-1 作成ポイント: internal/config hostname resolution
 
@@ -105,10 +105,10 @@
 
 **レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか（`TestLoad_HostnameField_ParsesOptionalTOMLKey`）、かつ `ResolveHostname` のフォールバック順序単体の検証（`writeTempTOML`/`Load()` を経由しない直接呼び出し2件）とTOML読み込み経路の検証が両方揃っているか / `ResolveHostname` の戻り値を `(string, error)` に変更した AC-17 追加分が、AC-03〜AC-05 の既存挙動（TOML優先・`os.Hostname()`フォールバック・空文字列の best-effort 方針）を後退させていないか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ2: `Outcome` 型への `Host`/`Account`/`Elapsed` フィールド追加
 
@@ -404,7 +404,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 
 ## 8. 実装チェックリスト
 
-- [ ] PR-1 マージ済み（対象ステップ: フェーズ1）
+- [x] PR-1 マージ済み（対象ステップ: フェーズ1）
 - [ ] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3）
 - [ ] PR-3 マージ済み（対象ステップ: フェーズ4）
 - [ ] PR-4 マージ済み（対象ステップ: フェーズ5 / フェーズ6）
