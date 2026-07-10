@@ -242,24 +242,24 @@
 
 対応: F-001・F-002 の実行時の値供給（AC-11）・AC-17（要件定義書 2026-07-10 追記分）。設計: アーキテクチャ設計書 3.6節。
 
-- [ ] `internal/config/hostname.go`（フェーズ1）が確定した `ResolveHostname` を `cmd/main.go` から呼び出せるよう、`cmd/main.go` の `import` は既存の `"github.com/isseis/bsky-cleaner/internal/config"` をそのまま使う(追加不要)。`"log/slog"` の `import` を新規追加する（AC-17、`cmd/main.go` にとって新規パターンだが `internal/config/secret.go` 等ですでに `log/slog` は採用済み）。
-- [ ] `cmd/main.go` の `run()`（334-384行目）を変更する。
-  - [ ] 355行目 `result, runErr := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)` の直前に `start := time.Now()` を追加する。
-  - [ ] 同行の直後に `elapsed := time.Since(start)` を追加する。
-  - [ ] 366-369行目のコメントの直後、370行目の `if apply {` の直前で、`host, hostErr := config.ResolveHostname(cfg.Config)` を呼び出す（AC-17: フェーズ1で `(string, error)` に変更済みの新シグネチャ）。`hostErr != nil` の場合、`slog.Warn("failed to resolve hostname, using empty value", "error", hostErr)` で警告ログを出力する（AC-17。`host` は `hostErr != nil` でも空文字列のまま利用し、AC-05 の best-effort 方針どおり通知処理自体は継続する。Slack への警告ポストは行わない — 要件定義書 Comments 欄参照）。続けて `outcome := notify.Outcome{Result: result, Err: runErr, Host: host, Account: cfg.Handle, Elapsed: elapsed}` を構築する（アーキテクチャ設計書 3.6節: `apply` の値によらず常に構築する）。
-  - [ ] 371行目 `sendNotification(cfg, httpDoer, result, runErr)` の呼び出しを `sendNotification(cfg, httpDoer, outcome)` に変更する。
-- [ ] `cmd/main.go` の `sendNotification`（391-400行目）のシグネチャを `func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *report.Result, runErr error) error` から `func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, outcome notify.Outcome) error` に変更する。関数コメントはアーキテクチャ設計書 3.6節のコード例（283-289行目）に準じる。
-- [ ] `sendNotification` 内 399行目の `notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, notify.Outcome{Result: result, Err: runErr})` を `notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, outcome)` に変更する（`Outcome` はすでに呼び出し元 `run()` で構築済みのため、ここでは再構築しない）。
-- [ ] `report.Result` を直接参照していた `sendNotification` のシグネチャから `"github.com/isseis/bsky-cleaner/internal/report"` の import が不要にならないことを確認する（`run()` 内の `report.FormatText(*result)`（363行目）が引き続き使用するため、import 自体は残る）。
-- [ ] `cmd/main_test.go` の以下の既存テストが `run()` のシグネチャ変更を経ずにコンパイル可能であることを確認する（`sendNotification` は非公開関数であり `run()` 経由でのみ呼ばれるため、テスト自体の呼び出しコードは変更不要。次のチェックリストで内容面の追従を行う）。
-  - [ ] `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`（468-484行目）
-  - [ ] `TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures`（486-512行目）
-  - [ ] `TestRun_ApplyLoginFailure_SendsFailureNotification`（530-548行目）
-  - [ ] `TestRun_Apply_SlackNotifyFails_ExitCodeUnaffected`（550-566行目）
-  - [ ] `TestRun_Apply_SlackNotifyFails_StderrContainsMaskedFailureMessage`（568-582行目）
-  - [ ] `TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError`（584-599行目）
-- [ ] `cmd/main_test.go` に新規テスト `TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` を追加する。`validConfigPath` が生成する TOML に `hostname = "ci-runner-1"` を追記した設定ファイルを用意し（`validConfigPath`（34-39行目）の `body` 定数に倣い、テスト専用のヘルパーまたはインライン文字列で `hostname` 行を含む TOML を書く）、`setEnvCredentials`（`BSKY_HANDLE` に `publicIPLiteral` を設定）で実行後、`mock.Requests()`（`atprototestutil.MockHTTPDoer.Requests()`）から `hooks.slack.com` 宛のリクエストを特定し、その `Body` を `json.Unmarshal` してペイロードの `attachments[0].fields` に `Title: "Host", Value: "ci-runner-1"` と `Title: "Account", Value: <publicIPLiteral の値>` が含まれることを検証する。これにより Host/Account の取り違え（アーキテクチャ設計書 付録「決定履歴」で言及されているリスク）を検出できる。
-- [ ] `cmd/main_test.go` の `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`（468-484行目）に、送信された Slack payload の `attachments[0].fields` に `Title: "Duration"` が含まれ、その `Value` が `time.ParseDuration` で解釈可能な非負の値であることを検証するアサーションを追加する（AC-09・AC-11 の統合確認。`mock.Requests()` から `Body` を取得し `json.Unmarshal` する点は直前のテストと同じパターンを再利用する）。
+- [x] `internal/config/hostname.go`（フェーズ1）が確定した `ResolveHostname` を `cmd/main.go` から呼び出せるよう、`cmd/main.go` の `import` は既存の `"github.com/isseis/bsky-cleaner/internal/config"` をそのまま使う(追加不要)。`"log/slog"` の `import` を新規追加する（AC-17、`cmd/main.go` にとって新規パターンだが `internal/config/secret.go` 等ですでに `log/slog` は採用済み）。
+- [x] `cmd/main.go` の `run()`（334-384行目）を変更する。
+  - [x] 355行目 `result, runErr := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)` の直前に `start := time.Now()` を追加する。
+  - [x] 同行の直後に `elapsed := time.Since(start)` を追加する。
+  - [x] 366-369行目のコメントの直後、370行目の `if apply {` の直前で、`host, hostErr := config.ResolveHostname(cfg.Config)` を呼び出す（AC-17: フェーズ1で `(string, error)` に変更済みの新シグネチャ）。`hostErr != nil` の場合、`slog.Warn("failed to resolve hostname, using empty value", "error", hostErr)` で警告ログを出力する（AC-17。`host` は `hostErr != nil` でも空文字列のまま利用し、AC-05 の best-effort 方針どおり通知処理自体は継続する。Slack への警告ポストは行わない — 要件定義書 Comments 欄参照）。続けて `outcome := notify.Outcome{Result: result, Err: runErr, Host: host, Account: cfg.Handle, Elapsed: elapsed}` を構築する（アーキテクチャ設計書 3.6節: `apply` の値によらず常に構築する）。
+  - [x] 371行目 `sendNotification(cfg, httpDoer, result, runErr)` の呼び出しを `sendNotification(cfg, httpDoer, outcome)` に変更する。
+- [x] `cmd/main.go` の `sendNotification`（391-400行目）のシグネチャを `func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *report.Result, runErr error) error` から `func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, outcome notify.Outcome) error` に変更する。関数コメントはアーキテクチャ設計書 3.6節のコード例（283-289行目）に準じる。
+- [x] `sendNotification` 内 399行目の `notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, notify.Outcome{Result: result, Err: runErr})` を `notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, outcome)` に変更する（`Outcome` はすでに呼び出し元 `run()` で構築済みのため、ここでは再構築しない）。
+- [x] `report.Result` を直接参照していた `sendNotification` のシグネチャから `"github.com/isseis/bsky-cleaner/internal/report"` の import が不要にならないことを確認する（`run()` 内の `report.FormatText(*result)`（363行目）が引き続き使用するため、import 自体は残る）。
+- [x] `cmd/main_test.go` の以下の既存テストが `run()` のシグネチャ変更を経ずにコンパイル可能であることを確認する（`sendNotification` は非公開関数であり `run()` 経由でのみ呼ばれるため、テスト自体の呼び出しコードは変更不要。次のチェックリストで内容面の追従を行う）。
+  - [x] `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`（468-484行目）
+  - [x] `TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures`（486-512行目）
+  - [x] `TestRun_ApplyLoginFailure_SendsFailureNotification`（530-548行目）
+  - [x] `TestRun_Apply_SlackNotifyFails_ExitCodeUnaffected`（550-566行目）
+  - [x] `TestRun_Apply_SlackNotifyFails_StderrContainsMaskedFailureMessage`（568-582行目）
+  - [x] `TestRun_Apply_NoWebhookConfigured_SkipsNotifyWithoutError`（584-599行目）
+- [x] `cmd/main_test.go` に新規テスト `TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` を追加する。`validConfigPath` が生成する TOML に `hostname = "ci-runner-1"` を追記した設定ファイルを用意し（`validConfigPath`（34-39行目）の `body` 定数に倣い、テスト専用のヘルパーまたはインライン文字列で `hostname` 行を含む TOML を書く）、`setEnvCredentials`（`BSKY_HANDLE` に `publicIPLiteral` を設定）で実行後、`mock.Requests()`（`atprototestutil.MockHTTPDoer.Requests()`）から `hooks.slack.com` 宛のリクエストを特定し、その `Body` を `json.Unmarshal` してペイロードの `attachments[0].fields` に `Title: "Host", Value: "ci-runner-1"` と `Title: "Account", Value: <publicIPLiteral の値>` が含まれることを検証する。これにより Host/Account の取り違え（アーキテクチャ設計書 付録「決定履歴」で言及されているリスク）を検出できる。
+- [x] `cmd/main_test.go` の `TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult`（468-484行目）に、送信された Slack payload の `attachments[0].fields` に `Title: "Duration"` が含まれ、その `Value` が `time.ParseDuration` で解釈可能な非負の値であることを検証するアサーションを追加する（AC-09・AC-11 の統合確認。`mock.Requests()` から `Body` を取得し `json.Unmarshal` する点は直前のテストと同じパターンを再利用する）。
 
 ### フェーズ8: `notifypreview` フィクスチャへの Elapsed 追加
 
