@@ -27,7 +27,7 @@ codebase grows.
 
 **Configuration**
 
-- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. `LoadAppConfig` also validates that any configured Slack webhook URL's host matches the TOML `slack_allowed_host` allowlist, failing closed if it is missing or does not match (see docs/tasks/0006_slack_notification/01_requirements.md). It resolves the operator-facing hostname used in Slack notifications via `ResolveHostname`, preferring the TOML `hostname` field when set and falling back to `os.Hostname()` otherwise. See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
+- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. `LoadAppConfig` also validates that any configured Slack webhook URL's host matches the TOML `slack_allowed_host` allowlist, failing closed if it is missing or does not match (see docs/tasks/0006_slack_notification/01_requirements.md). It resolves the operator-facing hostname used in Slack notifications via `ResolveHostname`, preferring the TOML `hostname` field when non-empty (after trimming whitespace) and falling back to `os.Hostname()` otherwise. See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
 
 **AT Protocol Client**
 
