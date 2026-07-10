@@ -265,21 +265,24 @@
 
 対応: NF-007（`make notify-preview` の継続動作）。
 
-- [ ] `internal/notify/notifypreview/fixtures.go` の `scenarios()` のうち、`outcome.Result != nil` である4シナリオ（`success-empty`・`success-apply`・`partial-failure`・`truncation`。`run-error` は `Result == nil` のため対象外）に `Elapsed: 3 * time.Second` 相当のサンプル値を追加する。
-- [ ] `make notify-preview` を実行し、対象4シナリオの出力に `Targets`/`Deleted`/`Duration` フィールドが表示されることを目視確認する。
+- [x] `internal/notify/notifypreview/fixtures.go` の `scenarios()` のうち、`outcome.Result != nil` である4シナリオ（`success-empty`・`success-apply`・`partial-failure`・`truncation`。`run-error` は `Result == nil` のため対象外）に `Elapsed: 3 * time.Second` 相当のサンプル値を追加する。
+- [x] `make notify-preview` を実行し、対象4シナリオの出力に `Targets`/`Deleted`/`Duration` フィールドが表示されることを目視確認する。
 
 ### フェーズ9: テストの追加・更新の総仕上げ
 
 対応: 7節のテスト戦略の総括確認。
 
-- [ ] `make test` を実行し、`internal/config`・`internal/notify`・`cmd` パッケージのテストがすべて成功することを確認する。
-- [ ] `make fmt` を実行し、フェーズ1〜8で変更した全ファイルに差分が出ないことを確認する（フォーマット崩れがあれば修正する）。
+- [x] `make test` を実行し、`internal/config`・`internal/notify`・`cmd` パッケージのテストがすべて成功することを確認する。
+- [x] `make fmt` を実行し、フェーズ1〜8で変更した全ファイルに差分が出ないことを確認する（フォーマット崩れがあれば修正する）。
 
 ### フェーズ10: `make notify-preview-send` による最終実送信確認
 
 対応: アーキテクチャ設計書 7節・8節手順10。
 
-- [ ] `make notify-preview-send` を実行し、統計フィールド（Targets/Deleted/Duration）を含む全シナリオが Mattermost を含む実クライアントで問題なく描画されることを確認する。
+- [x] `make notify-preview-send` を実行し、統計フィールド（Targets/Deleted/Duration）を含む全シナリオが Mattermost を含む実クライアントで問題なく描画されることを確認する。
+  - **結果**: 描画に問題があった（attachment 自体は可視のブロックとして描画されたが、Host/Account/Targets/Deleted/Duration の5フィールドが1行ずつ縦に並び、改行が多く視認性が悪い）。
+  - [x] 描画に問題があったため、アーキテクチャ設計書 5.3節・8節手順10・付録「決定履歴」の記述を先に改訂し（`slackField` に `Short bool` を追加し、Host/Account/Targets/Deleted/Duration に `Short: true` を設定する）、続けて `internal/notify/payload.go`（`slackField.Short` 追加・該当5フィールドへの設定・関連する型コメントの更新）と `internal/notify/payload_test.go`（`TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields` の期待値を `Short: true` を含む形に更新）に反映した。`Error`/`Failed posts` フィールドは長文になりうるため `Short` を設定しない（デフォルト `false`）。
+  - [x] `make notify-preview` で全シナリオの出力を目視確認し、`make notify-preview-send` を再実行して、Mattermost 上で Host/Account が1行、Targets/Deleted が1行、Duration が単独で1行という2列グリッド表示になり視認性が改善したことを確認した。
 
 ### PR-5 作成ポイント: cmd wiring and final verification
 

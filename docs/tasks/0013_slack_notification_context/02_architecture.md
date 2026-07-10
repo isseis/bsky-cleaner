@@ -265,8 +265,8 @@ func buildPayload(outcome Outcome) webhookPayload
    - `outcome.Result == nil && outcome.Err == nil`（防御的なケース）: `"❌ bsky-cleaner run failed: unknown error."`（変更なし）
    - 部分失敗（`Result.Failed` が1件以上）: `"❌ bsky-cleaner run completed with failures."`（件数表現を削除）
    - 構築した `text` に対して既存の `truncate()` を適用する（変更なし。外部由来の可変長文字列を含まない固定長の定型文であるため、通常は切り詰めが発生しない）。
-2. `fields` の構築を開始する。まず `sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ...}` として、続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ...}` として追加する（AC-01, AC-02, NF-003）。空文字列であっても（`ResolveHostname` が `os.Hostname()` 失敗時に返す値、AC-05）フィールド自体は生成し、`Value` が空文字列になる。
-3. `outcome.Result != nil` の場合、`slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`・`slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`・`slackField{Title: "Duration", Value: outcome.Elapsed.String()}` を追加する（AC-07, AC-08, AC-09）。`outcome.Result == nil` の場合はこの3フィールドをいずれも追加しない（AC-10）。`Duration` の値は3.6節で述べる通り `runner.Run()` の呼び出し区間のみを計測したものであり、`atproto.NewClient`（DID/PDS 解決）や `config.LoadAppConfig` の所要時間を含まない。オンコール担当者がこの `Duration` を実行全体のレイテンシと誤読しないよう、この範囲限定はフィールド名ではなく3.6節の記述で明示する（AC-11 が求める計測区間そのものであり、意図した仕様である）。
+2. `fields` の構築を開始する。まず `sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ..., Short: true}` として、続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ..., Short: true}` として追加する（AC-01, AC-02, NF-003）。空文字列であっても（`ResolveHostname` が `os.Hostname()` 失敗時に返す値、AC-05）フィールド自体は生成し、`Value` が空文字列になる。`Short: true` の追加理由は5.3節フォールバック（実送信確認）を参照。
+3. `outcome.Result != nil` の場合、`slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets)), Short: true}`・`slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted)), Short: true}`・`slackField{Title: "Duration", Value: outcome.Elapsed.String(), Short: true}` を追加する（AC-07, AC-08, AC-09）。`outcome.Result == nil` の場合はこの3フィールドをいずれも追加しない（AC-10）。`Duration` の値は3.6節で述べる通り `runner.Run()` の呼び出し区間のみを計測したものであり、`atproto.NewClient`（DID/PDS 解決）や `config.LoadAppConfig` の所要時間を含まない。オンコール担当者がこの `Duration` を実行全体のレイテンシと誤読しないよう、この範囲限定はフィールド名ではなく3.6節の記述で明示する（AC-11 が求める計測区間そのものであり、意図した仕様である）。
 4. `isFailure(outcome)`（変更なし、[0012_slack_rich_formatting/02_architecture.md](../0012_slack_rich_formatting/02_architecture.md) 3.1節「共有化」は 0012 で完了済み）が `true` の場合、0012 で確立済みの分岐（`outcome.Err != nil` なら `"Error"` フィールド、部分失敗なら `"Failed posts"` フィールド、いずれも `sanitizeForPayload` と `truncate` を適用）をそのまま `fields` に追加する（変更なし、0012 の AC-04/AC-07 の失敗詳細表示は 0012 の挙動を継続）。
 5. `attachments = []slackAttachment{{Color: color, Fields: fields}}` を常に1件生成する。`color` は `isFailure(outcome)` が `true` なら `colorDanger`、`false` なら `colorGood`（`"good"`）とする（5.3節フォールバック適用: 実送信確認の結果、色なし attachment はクライアントの既定色（青）で描画され意図した緑色にならなかったため、成功時にも明示的な色を設定する）。
 
@@ -345,6 +345,8 @@ flowchart TD
 
 **このフォールバックの適用結果**: 実送信確認の結果、完全成功シナリオ（`Fields` が2件、`Color` 未設定の attachment）で色付きの縦線（バー）が青色で表示される事象が確認されたため、上記フォールバックを適用した。成功時の `color` を `colorGood`（`"good"`）に変更し（3.3節手順5）、成功時にも明示的な色を設定する設計に改めた（付録「決定履歴」参照）。
 
+**フェーズ10（統計フィールド追加後）の実送信確認で見つかった追加の描画課題**: フェーズ5 で `Targets`/`Deleted`/`Duration` を追加した後の `make notify-preview-send` で、Host/Account/Targets/Deleted/Duration の5フィールドすべてが Mattermost 上で1行に1フィールドずつ縦に並び、改行が多く縦に長い表示になることが判明した。いずれのフィールドも値が短い単純な key-value であり、視認性の観点から改善余地があった。Slack Incoming Webhook の attachment `fields` は要素ごとに `short`（bool）を持ち、`true` の場合はクライアントが2列グリッドで詰めて描画する仕様があり、Mattermost もこれをサポートしている。この課題への対応として `slackField` に `Short bool` フィールド（`json:"short,omitempty"`）を追加し、Host/Account/Targets/Deleted/Duration の5フィールドに `Short: true` を設定した（3.3節手順2・3）。`Error`/`Failed posts` フィールドは値が長文になりうるため `Short` を設定しない（デフォルト `false`）。再送信確認の結果、Host/Account が1行、Targets/Deleted が1行、Duration が単独で1行という2列グリッド表示になり、視認性が改善したことを確認した（付録「決定履歴」参照）。
+
 ### 5.4 運用上の既知の制限: 通知配信の保証なし（F-004）
 
 Slack 通知には at-least-once 配信の保証がない。`runner.Run()` がポストの削除を完了して `*report.Result` を返した後、`internal/notify.Send()` の呼び出しが完了する前に、何らかの理由（プロセスクラッシュ、強制終了、OOM Kill、ネットワーク障害、Slack 側の障害・タイムアウトなど）により通知の送信が失敗または未完了に終わった場合、削除自体は AT Protocol の `com.atproto.repo.deleteRecord` 呼び出し時点で既に確定しているにもかかわらず、その実行結果を伝える Slack 通知は永久に送信されない。
@@ -390,7 +392,7 @@ Slack 通知には at-least-once 配信の保証がない。`runner.Run()` が�
 7. `cmd/main.go` の `run()`/`sendNotification` を変更し、`runner.Run()` の前後の時間計測・`Outcome` の構築を行う（3.6節、AC-11）。
 8. `internal/notify/notifypreview/fixtures.go` のシナリオに Elapsed のサンプル値を追加する（Host/Account は手順4で追加済み）。
 9. `payload_test.go`・`hostname_test.go`・`main_test.go` に7節のテストケースを追加・更新する。
-10. `make notify-preview-send` による最終的な実送信確認（7節）を行い、統計フィールドを含む全シナリオの描画に問題がないことを確認する。
+10. `make notify-preview-send` による最終的な実送信確認（7節）を行い、統計フィールドを含む全シナリオの描画に問題がないことを確認する。この確認で5フィールドが縦に並び視認性が悪いことが判明した場合、`slackField` に `Short bool` を追加し Host/Account/Targets/Deleted/Duration に設定する（5.3節、付録「決定履歴」）。
 11. `docs/design/configuration.md`・`docs/dev/developer_guide/package_reference.md` を更新する。
 12. `README.md`・`README.ja.md`・`docs/overview.md`・`docs/overview.ja.md` に、Slack 通知配信が at-least-once ではない（プロセスクラッシュ時に削除完了の通知が失われうる）旨の記述を追加する（5.4節、AC-15/AC-16）。実際の文言はこのステップの実装時に確定させる。
 
@@ -409,3 +411,4 @@ Slack 通知には at-least-once 配信の保証がない。`runner.Run()` が�
 - **通知配信保証機構（outbox パターン等）を実装しない**: `runner.Run()` 完了後の通知喪失は 0006 由来の既知の制限であり、本タスクのスコープ（Host/Account/統計フィールドの追加）とは独立した別関心事である。ユーザーの判断により、機構の実装は行わず、制限の明文化（F-004、AC-15/AC-16）にとどめた（要件定義書 Out of Scope 参照）。
 - **`ResolveHostname` に `os.Hostname` の差し替え可能な抽象化を導入しない**: AC-05 の「`os.Hostname()` 失敗時に空文字列を返す」という分岐を単体テストで直接踏むには `os.Hostname` を関数変数として注入可能にする必要があるが、この分岐のためだけに抽象化を導入するのは YAGNI に反すると判断し、コードレビューでの確認にとどめた（7節）。
 - **`sendNotification` の引数を `notify.Outcome` にまとめる**: 当初案では `result *report.Result, runErr error, host string, account string, elapsed time.Duration` の5引数を個別に渡す設計を検討したが、`run()` 側で1箇所に `Outcome` を組み立ててから渡す設計のほうが呼び出しシグネチャが単純になり、`sendNotification` の責務（「与えられた `Outcome` を送信する」）も明確になるため、後者を採用した（3.6節）。
+- **`slackField` に `Short bool` を追加する（当初案から追加）**: 当初は `slackField` に `Short` を持たせず、常に1フィールド1行のレイアウトを想定していた。フェーズ10 の `make notify-preview-send` による実送信確認で、Host/Account/Targets/Deleted/Duration の5フィールドが1行ずつ縦に並び視認性が悪いことが判明したため、Slack Incoming Webhook（および Mattermost）の attachment `fields` が備える `short`（2列グリッド表示）を利用する設計に変更した。値が短い定型フィールド（Host/Account/Targets/Deleted/Duration）にのみ `Short: true` を設定し、長文になりうる `Error`/`Failed posts` は対象外とした（5.3節）。

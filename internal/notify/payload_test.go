@@ -294,8 +294,8 @@ func TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields(t *test
 	// above), so the attachment is colored danger, not good.
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
 	assert.Equal(t, []slackField{
-		{Title: "Host", Value: ""},
-		{Title: "Account", Value: ""},
+		{Title: "Host", Value: "", Short: true},
+		{Title: "Account", Value: "", Short: true},
 	}, got.Attachments[0].Fields)
 }
 
