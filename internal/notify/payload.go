@@ -167,7 +167,8 @@ func truncationCutPoint(text string) int {
 }
 
 // buildPayload renders outcome as a Slack webhookPayload. text is always a
-// short, fixed-shape, emoji-prefixed sentence with numeric counts.
+// short, fixed-shape, emoji-prefixed sentence with no numeric counts (counts
+// live in the attachment's structured fields instead).
 // Exactly one attachment is always generated whose fields always begin with
 // Host and Account, followed by an Error or Failed posts field when the
 // run failed. The attachment's Color is colorDanger on failure and
@@ -180,12 +181,11 @@ func buildPayload(outcome Outcome) webhookPayload {
 	case outcome.Result == nil:
 		text = fmt.Sprintf("%s bsky-cleaner run failed: unknown error.", emojiFailure)
 	default:
-		deleted := len(outcome.Result.Deleted)
 		failedCount := len(outcome.Result.Failed)
 		if failedCount == 0 {
-			text = fmt.Sprintf("%s bsky-cleaner run succeeded: deleted %d post(s).", emojiSuccess, deleted)
+			text = fmt.Sprintf("%s bsky-cleaner run succeeded.", emojiSuccess)
 		} else {
-			text = fmt.Sprintf("%s bsky-cleaner run completed with failures: deleted %d post(s), %d failure(s).", emojiFailure, deleted, failedCount)
+			text = fmt.Sprintf("%s bsky-cleaner run completed with failures.", emojiFailure)
 		}
 	}
 	text = truncate(text)

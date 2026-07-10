@@ -18,7 +18,7 @@ func TestEscapeSlackMarkup_EscapesAmpersandLtGt(t *testing.T) {
 	assert.Equal(t, "a &amp; b &lt; c &gt; d", got)
 }
 
-func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) {
+func TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount(t *testing.T) {
 	outcome := Outcome{
 		Result: &report.Result{
 			Mode:    report.ModeApply,
@@ -29,7 +29,7 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 	}
 	got := buildPayload(outcome)
 	assert.Contains(t, got.Text, emojiSuccess)
-	assert.Contains(t, got.Text, "2")
+	assert.NotContains(t, got.Text, "2")
 	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
 	// Always one attachment with Host/Account fields, colored good on success.
 	assert.Len(t, got.Attachments, 1)
@@ -79,6 +79,42 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=500")
 	assert.Contains(t, val, "rkey2")
 	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=429")
+}
+
+func TestBuildPayload_PartialFailure_TextHasNoFailureCount(t *testing.T) {
+	err1 := &atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, Err: errors.New("boom")}
+	err2 := &atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 429, Err: errors.New("rate limited")}
+	outcome := Outcome{
+		Result: &report.Result{
+			Mode: report.ModeApply,
+			Failed: []report.DeleteFailure{
+				{Post: atproto.Post{RKey: "rkey1"}, Err: err1},
+				{Post: atproto.Post{RKey: "rkey2"}, Err: err2},
+			},
+		},
+	}
+	got := buildPayload(outcome)
+	assert.NotContains(t, got.Text, "2")
+}
+
+func TestBuildPayload_TextRetainsEmojiForSuccessAndFailure(t *testing.T) {
+	successOutcome := Outcome{
+		Result: &report.Result{Mode: report.ModeApply, Deleted: []atproto.Post{{RKey: "a"}}},
+	}
+	partialFailureOutcome := Outcome{
+		Result: &report.Result{
+			Mode:   report.ModeApply,
+			Failed: []report.DeleteFailure{{Post: atproto.Post{RKey: "rkey1"}, Err: errors.New("boom")}},
+		},
+	}
+	runErrorOutcome := Outcome{
+		Result: nil,
+		Err:    &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")},
+	}
+
+	assert.Contains(t, buildPayload(successOutcome).Text, emojiSuccess)
+	assert.Contains(t, buildPayload(partialFailureOutcome).Text, emojiFailure)
+	assert.Contains(t, buildPayload(runErrorOutcome).Text, emojiFailure)
 }
 
 func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T) {
