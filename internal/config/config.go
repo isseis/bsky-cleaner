@@ -29,15 +29,25 @@ type Config struct {
 	// key are both treated as "not configured" -- there is no need to
 	// distinguish them here.
 	SlackAllowedHost string
+
+	// Hostname is the operator-specified identifier for the machine
+	// running bsky-cleaner (TOML key "hostname", optional). Empty means
+	// "not configured"; ResolveHostname falls back to os.Hostname() in
+	// that case.
+	Hostname string
 }
 
-// rawConfig mirrors the TOML file structure with pointer fields, so a
-// missing key (nil) can be distinguished from an explicit zero value.
+// rawConfig mirrors the TOML file structure. Most fields use pointer
+// types so a missing key (nil) can be distinguished from an explicit
+// zero value; the exceptions are SlackAllowedHost and Hostname, which
+// are plain strings because for those fields an absent and an empty
+// key are treated identically.
 type rawConfig struct {
 	RetentionDays           *int    `toml:"retention_days"`
 	Schedule                *string `toml:"schedule"`
 	ExecutionTimeoutSeconds *int    `toml:"execution_timeout_seconds"`
 	SlackAllowedHost        string  `toml:"slack_allowed_host"`
+	Hostname                string  `toml:"hostname"`
 }
 
 // Load reads and validates the TOML file at path and returns the

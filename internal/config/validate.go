@@ -54,6 +54,7 @@ func validateConfig(raw rawConfig) (Config, error) {
 		Schedule:         schedule,
 		ExecutionTimeout: time.Duration(timeoutSeconds) * time.Second,
 		SlackAllowedHost: raw.SlackAllowedHost,
+		Hostname:         raw.Hostname,
 	}, nil
 }
 

@@ -81,14 +81,21 @@
 
 対応: F-001（AC-03, AC-04, AC-05）。設計: アーキテクチャ設計書 3.1節。
 
-- [ ] `internal/config/config.go` の `Config` 構造体に `Hostname string` フィールドを追加する。コメントは3.1節のコード例（186-190行目）に準じ、英語で記述する。
-- [ ] `internal/config/config.go` の `rawConfig` 構造体に `` Hostname string `toml:"hostname"` `` を追加する（`SlackAllowedHost string` と同じ非ポインタパターン、`config.go:40` 相当の位置）。
-- [ ] `internal/config/validate.go` の `validateConfig`（19-58行目）の戻り値構築（52-57行目）に `Hostname: raw.Hostname,` を1行追加する。
-- [ ] `internal/config/hostname.go` を新規作成し、`ResolveHostname(cfg Config) string` を実装する。`cfg.Hostname` が空でなければそれを返す（AC-03）。空なら `os.Hostname()` を呼び、成功すればその値を返す（AC-04）。`os.Hostname()` がエラーを返す場合は空文字列を返す（AC-05、エラーを外に伝播しない）。関数コメントはアーキテクチャ設計書 3.1節のコード例（196-200行目）に準じる。
-- [ ] `internal/config/hostname_test.go` を新規作成し、次の3テストケースを実装する（テストヘルパーは既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）を再利用する）。
-  - [ ] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `Config{Hostname: "worker-1"}` を渡すと `"worker-1"` が返ることを確認する（AC-03）。
-  - [ ] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `Config{Hostname: ""}` を渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
-  - [ ] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
+- [x] `internal/config/config.go` の `Config` 構造体に `Hostname string` フィールドを追加する。コメントは3.1節のコード例（186-190行目）に準じ、英語で記述する。
+- [x] `internal/config/config.go` の `rawConfig` 構造体に `` Hostname string `toml:"hostname"` `` を追加する（`SlackAllowedHost string` と同じ非ポインタパターン、`config.go:40` 相当の位置）。
+- [x] `internal/config/validate.go` の `validateConfig`（19-58行目）の戻り値構築（52-57行目）に `Hostname: raw.Hostname,` を1行追加する。
+- [x] `internal/config/hostname.go` を新規作成し、`ResolveHostname(cfg Config) string` を実装する。`cfg.Hostname` が空でなければそれを返す（AC-03）。空なら `os.Hostname()` を呼び、成功すればその値を返す（AC-04）。`os.Hostname()` がエラーを返す場合は空文字列を返す（AC-05、エラーを外に伝播しない）。関数コメントはアーキテクチャ設計書 3.1節のコード例（196-200行目）に準じる。
+- [x] `internal/config/hostname_test.go` を新規作成し、次の4テストケースを実装する。
+  - [x] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `ResolveHostname` に `Config{Hostname: "worker-1"}` を直接渡すと `"worker-1"` が返ることを確認する（AC-03、`ResolveHostname` 単体のフォールバック順序の検証）。
+  - [x] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `ResolveHostname` に `Config{Hostname: ""}` を直接渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
+  - [x] `TestLoad_HostnameField_ParsesOptionalTOMLKey`: 既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）と `Load()` を使い、`config_test.go` の `TestLoad_SlackAllowedHostField_ParsesOptionalTOMLKey` と同型の「キー在り/キー無し」2パターンで、TOML `hostname` キーが `rawConfig`/`validateConfig` を経て `Config.Hostname` に正しく届くことを確認する（AC-03/AC-04 のTOML読み込み経路。上記2件は `ResolveHostname` のフォールバック順序のみを検証し `Load()` を経由しないため、この経路のテストが別途必要）。
+  - [x] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
+- [ ] **（AC-17 追加分、要件定義書 2026-07-10 追記）** `internal/config/hostname.go` の `ResolveHostname` のシグネチャを `ResolveHostname(cfg Config) string` から `ResolveHostname(cfg Config) (string, error)` に変更する。`cfg.Hostname` が空でない場合、または `os.Hostname()` が成功した場合は `(値, nil)` を返す（AC-03/AC-04 の挙動は変更しない）。`os.Hostname()` がエラーを返す場合は `("", err)` を返す（AC-05: 通知フィールドには引き続き空文字列を使う best-effort 方針は維持しつつ、失敗した事実自体は呼び出し元に伝播できるようにする）。関数コメントを新しいシグネチャに合わせて更新する。
+- [ ] **（AC-17 追加分）** `internal/config/hostname_test.go` の `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`・`TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` を新しい2値シグネチャに追従させる（`got, err := ResolveHostname(cfg)` に変更し、いずれも `require.NoError(t, err)` を追加。TOML優先/`os.Hostname()`成功時はエラーが無いことを確認するのが目的）。`os.Hostname()` 失敗時のエラー伝播（`("", err)`）自体は既存の方針どおり関数差し替え不可のため自動テスト対象外とし、コードレビューで確認する（フェーズ1既存の注記を継続）。
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-1 作成ポイント: internal/config hostname resolution
 
@@ -96,10 +103,10 @@
 
 **推奨タイトル**: `feat(0013): add TOML hostname field and ResolveHostname`
 
-**レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか
+**レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか（`TestLoad_HostnameField_ParsesOptionalTOMLKey`）、かつ `ResolveHostname` のフォールバック順序単体の検証（`writeTempTOML`/`Load()` を経由しない直接呼び出し2件）とTOML読み込み経路の検証が両方揃っているか / `ResolveHostname` の戻り値を `(string, error)` に変更した AC-17 追加分が、AC-03〜AC-05 の既存挙動（TOML優先・`os.Hostname()`フォールバック・空文字列の best-effort 方針）を後退させていないか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -226,13 +233,13 @@
 
 ### フェーズ7: `cmd/main.go` の時間計測・`Outcome` 構築
 
-対応: F-001・F-002 の実行時の値供給（AC-11）。設計: アーキテクチャ設計書 3.6節。
+対応: F-001・F-002 の実行時の値供給（AC-11）・AC-17（要件定義書 2026-07-10 追記分）。設計: アーキテクチャ設計書 3.6節。
 
-- [ ] `internal/config/hostname.go`（フェーズ1）が確定した `ResolveHostname` を `cmd/main.go` から呼び出せるよう、`cmd/main.go` の `import` は既存の `"github.com/isseis/bsky-cleaner/internal/config"` をそのまま使う(追加不要)。
+- [ ] `internal/config/hostname.go`（フェーズ1）が確定した `ResolveHostname` を `cmd/main.go` から呼び出せるよう、`cmd/main.go` の `import` は既存の `"github.com/isseis/bsky-cleaner/internal/config"` をそのまま使う(追加不要)。`"log/slog"` の `import` を新規追加する（AC-17、`cmd/main.go` にとって新規パターンだが `internal/config/secret.go` 等ですでに `log/slog` は採用済み）。
 - [ ] `cmd/main.go` の `run()`（334-384行目）を変更する。
   - [ ] 355行目 `result, runErr := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)` の直前に `start := time.Now()` を追加する。
   - [ ] 同行の直後に `elapsed := time.Since(start)` を追加する。
-  - [ ] 366-369行目のコメントの直後、370行目の `if apply {` の直前で `outcome := notify.Outcome{Result: result, Err: runErr, Host: config.ResolveHostname(cfg.Config), Account: cfg.Handle, Elapsed: elapsed}` を構築する（アーキテクチャ設計書 3.6節: `apply` の値によらず常に構築する）。
+  - [ ] 366-369行目のコメントの直後、370行目の `if apply {` の直前で、`host, hostErr := config.ResolveHostname(cfg.Config)` を呼び出す（AC-17: フェーズ1で `(string, error)` に変更済みの新シグネチャ）。`hostErr != nil` の場合、`slog.Warn("failed to resolve hostname, using empty value", "error", hostErr)` で警告ログを出力する（AC-17。`host` は `hostErr != nil` でも空文字列のまま利用し、AC-05 の best-effort 方針どおり通知処理自体は継続する。Slack への警告ポストは行わない — 要件定義書 Comments 欄参照）。続けて `outcome := notify.Outcome{Result: result, Err: runErr, Host: host, Account: cfg.Handle, Elapsed: elapsed}` を構築する（アーキテクチャ設計書 3.6節: `apply` の値によらず常に構築する）。
   - [ ] 371行目 `sendNotification(cfg, httpDoer, result, runErr)` の呼び出しを `sendNotification(cfg, httpDoer, outcome)` に変更する。
 - [ ] `cmd/main.go` の `sendNotification`（391-400行目）のシグネチャを `func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *report.Result, runErr error) error` から `func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, outcome notify.Outcome) error` に変更する。関数コメントはアーキテクチャ設計書 3.6節のコード例（283-289行目）に準じる。
 - [ ] `sendNotification` 内 399行目の `notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, notify.Outcome{Result: result, Err: runErr})` を `notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, outcome)` に変更する（`Outcome` はすでに呼び出し元 `run()` で構築済みのため、ここでは再構築しない）。
@@ -273,7 +280,7 @@
 
 **推奨タイトル**: `feat(0013): wire elapsed time, host, and account into cmd runtime`
 
-**レビュー観点**: 処理時間の計測区間が `runner.Run()` 呼び出しの直前・直後のみに限定され、設定読み込みや DID/PDS 解決の時間を含んでいないか（AC-11） / Host/Account が TOML `hostname`・`BSKY_HANDLE` の実際の値から正しく供給されており、両者の取り違えが無いか（`TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` で検証） / `make test`・`make notify-preview-send` の両方が全シナリオで green であることを確認したうえで次フェーズ（ドキュメント更新）に進んでいるか
+**レビュー観点**: 処理時間の計測区間が `runner.Run()` 呼び出しの直前・直後のみに限定され、設定読み込みや DID/PDS 解決の時間を含んでいないか（AC-11） / Host/Account が TOML `hostname`・`BSKY_HANDLE` の実際の値から正しく供給されており、両者の取り違えが無いか（`TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` で検証） / `config.ResolveHostname` が返すエラーを握りつぶさず `slog.Warn` で警告ログを出しつつ、通知処理自体は空文字列のホストで継続しているか（AC-17） / `make test`・`make notify-preview-send` の両方が全シナリオで green であることを確認したうえで次フェーズ（ドキュメント更新）に進んでいるか
 
 - [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
@@ -353,8 +360,8 @@
 |---|---|---|---|
 | AC-01 | 正常/異常終了いずれも `fields` に Host フィールドを含む | test | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount`（正常系）・`internal/notify/payload_test.go::TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields`（異常系） |
 | AC-02 | 正常/異常終了いずれも `fields` に Account フィールドを含む | test | 同上2テスト（Host と同一テスト内でアサーション） |
-| AC-03 | TOML `hostname` 指定時はその値を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueSet_ReturnsTOMLValue` |
-| AC-04 | TOML `hostname` 未指定時は `os.Hostname()` を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` |
+| AC-03 | TOML `hostname` 指定時はその値を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`（`ResolveHostname` 単体のフォールバック順序）・`internal/config/hostname_test.go::TestLoad_HostnameField_ParsesOptionalTOMLKey`（TOML読み込み経路） |
+| AC-04 | TOML `hostname` 未指定時は `os.Hostname()` を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`（`ResolveHostname` 単体のフォールバック順序）・`internal/config/hostname_test.go::TestLoad_HostnameField_ParsesOptionalTOMLKey`（TOML読み込み経路、キー無し時に空文字列がそのまま `Config.Hostname` へ届くことの確認） |
 | AC-05 | `os.Hostname()` 失敗時も通知送信自体は失敗しない | static, manual | static: `rg -n "^func ResolveHostname\(cfg Config\) string \{$" internal/config/hostname.go` を実行し、1件マッチすること（関数がエラーを返さないシグネチャであること自体が「エラーを外へ伝播しない」設計を型で強制していることの確認）。manual: `os.Hostname()` のエラーを空文字列にフォールバックしていることをコードレビューで確認する（`os.Hostname()` 失敗分岐自体はアーキテクチャ設計書7節の判断により自動テスト対象外） |
 | AC-06 | 完全成功時にも attachment を生成する | test | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount`（`assert.Len(t, got.Attachments, 1)` のアサーション） |
 | AC-07 | `Result != nil` の場合、削除対象件数フィールドを含む | test | `internal/notify/payload_test.go::TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` |
@@ -367,6 +374,7 @@
 | AC-14 | `text` は引き続き絵文字と短い状態文言を含む | test | `internal/notify/payload_test.go::TestBuildPayload_TextRetainsEmojiForSuccessAndFailure` |
 | AC-15 | README(.ja).md Safety 節に配信保証なしの記述がある | static | `rg -n "No at-least-once delivery guarantee for Slack notifications" README.md` が1件マッチすること、かつ `rg -n "Slack 通知は at-least-once 配信を保証しない" README.ja.md` が1件マッチすること（フェーズ12で確定した文言そのものを検索するため、英語ファイルと日本語ファイルを別々のコマンドで検証する） |
 | AC-16 | overview(.ja).md Execution Result Notification 節に配信保証なしの記述がある | static | `rg -n "does not guarantee at-least-once" docs/overview.md` が1件マッチすること、かつ `rg -n "at-least-once の配信を保証しない" docs/overview.ja.md` が1件マッチすること（フェーズ12で確定した文言そのものを検索するため、英語ファイルと日本語ファイルを別々のコマンドで検証する） |
+| AC-17 | `os.Hostname()` 失敗時に `slog` で警告ログを出力する | static, manual | static: `rg -n 'slog\.Warn\(' cmd/main.go` が1件以上マッチすること。manual: `hostErr != nil` の場合にのみ `slog.Warn` が呼ばれ、`host`（フィールド値）は引き続き空文字列で通知処理が継続すること（AC-05 の best-effort 方針を後退させないこと）をコードレビューで確認する（`os.Hostname()` 失敗分岐自体はフェーズ1既存の判断により自動テスト対象外） |
 
 NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下記実装チェックリストの `make lint`/`make test` 実行タスクで検証する。NF-002（ネットワーク通信なしの単体テスト）はフェーズ1・3・5・6で追加する全テストがモック/フィクスチャのみで完結することで満たされる（新規ネットワーク呼び出しを追加しない）。NF-003（Host/Account のサニタイズ）は `internal/notify/payload_test.go::TestBuildPayload_SanitizesMentionSyntaxAndControlCharsInHostAndAccount` で検証する。NF-004（秘密情報の非混入）は `Outcome`/`webhookPayload` のいずれのフィールドにも `config.SecretString` 型の値を代入していないことをコードレビューで確認する（フェーズ2・7の型変更が `SecretString` を一切参照しないことは `internal/notify/payload.go`・`cmd/main.go` の diff で確認できる）。NF-005（投稿本文の非含有）は既存の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（フェーズ3で更新済み）が継続して検証する。NF-006（Go 1.26.2 以上）は `go.mod` を変更しないため対象外。NF-007（`make notify-preview` の継続動作）はフェーズ4・8で確認する。
 
