@@ -249,10 +249,11 @@ type Outcome struct {
 // Appendix: Decision History, "黄色（警告）を採用しない", which this task
 // initially extended to "success also does not need a distinct color"): the
 // 5.3節 fallback confirmation (make notify-preview-send against Mattermost
-// and other Incoming Webhook-compatible clients) found the color-less
-// success attachment was not rendered as a visible block, so an explicit
-// success color is now required (see 付録「決定履歴」for the updated
-// rationale).
+// and other Incoming Webhook-compatible clients) found that a color-less
+// success attachment rendered with the client's default (blue) bar instead
+// of no bar at all, which reads as neither success nor failure, so an
+// explicit success color is now required (see 付録「決定履歴」for the
+// updated rationale).
 func buildPayload(outcome Outcome) webhookPayload
 ```
 
@@ -267,7 +268,7 @@ func buildPayload(outcome Outcome) webhookPayload
 2. `fields` の構築を開始する。まず `sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ...}` として、続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ...}` として追加する（AC-01, AC-02, NF-003）。空文字列であっても（`ResolveHostname` が `os.Hostname()` 失敗時に返す値、AC-05）フィールド自体は生成し、`Value` が空文字列になる。
 3. `outcome.Result != nil` の場合、`slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`・`slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`・`slackField{Title: "Duration", Value: outcome.Elapsed.String()}` を追加する（AC-07, AC-08, AC-09）。`outcome.Result == nil` の場合はこの3フィールドをいずれも追加しない（AC-10）。`Duration` の値は3.6節で述べる通り `runner.Run()` の呼び出し区間のみを計測したものであり、`atproto.NewClient`（DID/PDS 解決）や `config.LoadAppConfig` の所要時間を含まない。オンコール担当者がこの `Duration` を実行全体のレイテンシと誤読しないよう、この範囲限定はフィールド名ではなく3.6節の記述で明示する（AC-11 が求める計測区間そのものであり、意図した仕様である）。
 4. `isFailure(outcome)`（変更なし、[0012_slack_rich_formatting/02_architecture.md](../0012_slack_rich_formatting/02_architecture.md) 3.1節「共有化」は 0012 で完了済み）が `true` の場合、0012 で確立済みの分岐（`outcome.Err != nil` なら `"Error"` フィールド、部分失敗なら `"Failed posts"` フィールド、いずれも `sanitizeForPayload` と `truncate` を適用）をそのまま `fields` に追加する（変更なし、0012 の AC-04/AC-07 の失敗詳細表示は 0012 の挙動を継続）。
-5. `attachments = []slackAttachment{{Color: color, Fields: fields}}` を常に1件生成する。`color` は `isFailure(outcome)` が `true` なら `colorDanger`、`false` なら `colorGood`（`"good"`）とする（5.3節フォールバック適用: 実送信確認の結果、色なし attachment が可視のブロックとして描画されないクライアントが存在したため、成功時にも明示的な色を設定する）。
+5. `attachments = []slackAttachment{{Color: color, Fields: fields}}` を常に1件生成する。`color` は `isFailure(outcome)` が `true` なら `colorDanger`、`false` なら `colorGood`（`"good"`）とする（5.3節フォールバック適用: 実送信確認の結果、色なし attachment はクライアントの既定色（青）で描画され意図した緑色にならなかったため、成功時にも明示的な色を設定する）。
 
 Host/Account に `truncate()` を適用しない理由: `truncate()` は PDS のレスポンスボディ由来で長さに上限のない `errorKind()` の出力（3.4節、0012 で導入済み）に対する防御であり、Host/Account はいずれも運用者が TOML/環境変数で設定する値（`hostname` フィールド・`BSKY_HANDLE`）であって、攻撃者が制御できる外部入力ではない。長さを制限する必要のない値に切り詰め処理を適用しないことで、この関数を単純に保つ（YAGNI）。
 
@@ -342,7 +343,7 @@ flowchart TD
 
 **この確認が失敗した場合のフォールバック**: 万一 Mattermost（またはその他確認対象クライアント）で、`Fields` が2件（Host/Account）のみの danger色ではない attachment が依然として描画されない場合、0012 のフェーズ8で最終的に不採用となった「attachment 本体の `Text` フィールドに内容を複製する」対応は再度不採用とする。代わりに、成功時のみ `Color: colorGood`（`"good"`）等の明示的な色を設定する対応を優先する（`Fields` が空でないことではなく `Color` の明示的な設定が可視化に必要という新しい仮説の検証になる）。この場合 3.3節手順5・付録「決定履歴」を合わせて更新する。実装優先順位（8節）ではこの確認をテスト・ドキュメント更新より前に前倒しし、フォールバックが必要になった場合の手戻りを最小化する。
 
-**このフォールバックの適用結果**: 実送信確認の結果、完全成功シナリオ（`Fields` が2件、`Color` 未設定の attachment）で色付きの縦線（バー）が表示されない事象が確認されたため、上記フォールバックを適用した。成功時の `color` を `colorGood`（`"good"`）に変更し（3.3節手順5）、成功時にも明示的な色を設定する設計に改めた（付録「決定履歴」参照）。
+**このフォールバックの適用結果**: 実送信確認の結果、完全成功シナリオ（`Fields` が2件、`Color` 未設定の attachment）で色付きの縦線（バー）が青色で表示される事象が確認されたため、上記フォールバックを適用した。成功時の `color` を `colorGood`（`"good"`）に変更し（3.3節手順5）、成功時にも明示的な色を設定する設計に改めた（付録「決定履歴」参照）。
 
 ### 5.4 運用上の既知の制限: 通知配信の保証なし（F-004）
 
@@ -404,7 +405,7 @@ Slack 通知には at-least-once 配信の保証がない。`runner.Run()` が�
 ## 付録: 決定履歴（Decision History）
 
 - **Host/Account に `truncate()` を適用しない**: 3.3節で述べた通り、`truncate()` は PDS レスポンス由来で長さに上限のない `errorKind()` の出力に対する防御であり、運用者が設定する Host/Account には同種のリスクがないため、この防御を新たに適用対象に加えなかった（YAGNI）。
-- **成功時の attachment に色を付けない（撤回）**: 当初は F-001〜F-003 のいずれの要件も成功時の色分けを求めておらず、0012 の「黄色（中間状態）は採用しない」という判断（要件定義書 Out of Scope に本タスクでも継続と明記）と同じ理由（2値の結果表現で足りる）から、成功時用の新しい色定数（例: `colorGood`）を導入しない方針とした。しかし5.3節の実送信確認（`make notify-preview-send`、Mattermost 含む）で、`Color` 未設定の attachment が色付きの縦線（バー）を伴う可視のブロックとして描画されない事象を確認したため、この判断を撤回した。**成功時に `colorGood`（`"good"`）を設定する**: `Fields` が空でないこと自体は 0012 で問題になった不可視化を防がず、`Color` の明示的な設定が可視化に必要という新しい知見に基づき、失敗時（`colorDanger`）と対称的に成功時にも明示的な色を設定する設計に改めた（3.3節手順5・5.3節）。
+- **成功時の attachment に色を付けない（撤回）**: 当初は F-001〜F-003 のいずれの要件も成功時の色分けを求めておらず、0012 の「黄色（中間状態）は採用しない」という判断（要件定義書 Out of Scope に本タスクでも継続と明記）と同じ理由（2値の結果表現で足りる）から、成功時用の新しい色定数（例: `colorGood`）を導入しない方針とした。しかし5.3節の実送信確認（`make notify-preview-send`、Mattermost 含む）で、`Color` 未設定の attachment が青色の縦線（バー）を伴う可視のブロックとして描画される事象を確認したため、この判断を撤回した。**成功時に `colorGood`（`"good"`）を設定する**: `Fields` が空でないこと自体は 0012 で問題になった不可視化を防がず、`Color` の明示的な設定が可視化に必要という新しい知見に基づき、失敗時（`colorDanger`）と対称的に成功時にも明示的な色を設定する設計に改めた（3.3節手順5・5.3節）。
 - **通知配信保証機構（outbox パターン等）を実装しない**: `runner.Run()` 完了後の通知喪失は 0006 由来の既知の制限であり、本タスクのスコープ（Host/Account/統計フィールドの追加）とは独立した別関心事である。ユーザーの判断により、機構の実装は行わず、制限の明文化（F-004、AC-15/AC-16）にとどめた（要件定義書 Out of Scope 参照）。
 - **`ResolveHostname` に `os.Hostname` の差し替え可能な抽象化を導入しない**: AC-05 の「`os.Hostname()` 失敗時に空文字列を返す」という分岐を単体テストで直接踏むには `os.Hostname` を関数変数として注入可能にする必要があるが、この分岐のためだけに抽象化を導入するのは YAGNI に反すると判断し、コードレビューでの確認にとどめた（7節）。
 - **`sendNotification` の引数を `notify.Outcome` にまとめる**: 当初案では `result *report.Result, runErr error, host string, account string, elapsed time.Duration` の5引数を個別に渡す設計を検討したが、`run()` 側で1箇所に `Outcome` を組み立ててから渡す設計のほうが呼び出しシグネチャが単純になり、`sendNotification` の責務（「与えられた `Outcome` を送信する」）も明確になるため、後者を採用した（3.6節）。

@@ -176,7 +176,7 @@
 - [x] `internal/notify/notifypreview/fixtures.go` の `scenarios()`（43-83行目）内、5シナリオすべての `notify.Outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する（`success-empty`・`success-apply`・`partial-failure`・`run-error`・`truncation` の5箇所すべて。フェーズ8で `Elapsed` を追加するまでは統計フィールドは表示されない）。
 - [x] `make notify-preview` を実行し、全5シナリオの出力に `Host`/`Account` フィールドが表示されることを目視確認する。
 - [x] `make notify-preview-send` を実行し、Mattermost を含む実際の Slack Incoming Webhook 互換クライアントに送信し、完全成功シナリオ（`Fields` が2件、danger色ではない attachment）が可視のブロックとして描画されることを確認する（アーキテクチャ設計書 5.3節）。
-  - **結果**: 描画に問題があった（詳細を囲むボックスの色が緑ではない = 色付きバーが表示されない）。
+  - **結果**: 描画に問題があった（attachment 自体は可視のブロックとして描画されたが、`Color` 未設定のため詳細を囲むボックスの縦線が既定の青色で表示され、意図した緑色にならない）。
   - [x] 描画に問題がある場合、アーキテクチャ設計書 5.3節のフォールバック（成功時に `Color: "good"` を設定する）を適用し、3.3節手順5・付録「決定履歴」の更新が必要になる旨をこの計画書のコメント欄に記録した上で、アーキテクチャ設計書自体の改訂を先に行う（フェーズ順序を崩さない。フォールバックが不要だった場合は、実装完了時にこの注記を「対象外」であったと明示する）。
     - **コメント欄**: 上記確認結果を受け、アーキテクチャ設計書の 3.3節手順5・5.3節・付録「決定履歴」を改訂し（`color` を成功時 `colorGood`（`"good"`）に変更）、続けて `internal/notify/payload.go`（`colorGood` 定数追加・`buildPayload` の色選択ロジック変更）と `internal/notify/payload_test.go`（`Color` の期待値を `""` から `colorGood` に更新）に反映する。フェーズ順序（設計書改訂 → 実装）を維持する。
 - [x] `internal/notify/payload.go` に `colorGood = "good"` 定数を追加し（`colorDanger` と対で定義）、`buildPayload` の色選択ロジックを `color := colorDanger; if !isFailure(outcome) { color = colorGood }` 相当に変更する（アーキテクチャ設計書 3.3節手順5フォールバック）。

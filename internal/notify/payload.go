@@ -96,9 +96,10 @@ const colorDanger = "danger"
 // colorGood is the Slack legacy attachment color for a successful run.
 // Originally the success attachment carried no color (see 0013 Appendix:
 // Decision History), but real-send verification (make notify-preview-send)
-// found that a color-less attachment was not rendered as a visible block by
-// some Incoming Webhook-compatible clients, so an explicit color is now set
-// on success too, symmetric with colorDanger.
+// found that a color-less attachment rendered with the client's default
+// (blue) bar instead of no bar at all, reading as neither success nor
+// failure, so an explicit color is now set on success too, symmetric with
+// colorDanger.
 const colorGood = "good"
 
 // isFailure reports whether outcome represents a failed run: an error that
