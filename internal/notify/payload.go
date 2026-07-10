@@ -22,7 +22,8 @@ type Outcome struct {
 // field (text or attachment field Value), guarding against unbounded
 // payload growth on a run with a very large number of delete failures or a
 // long errorKind string. It is not derived from a verified Slack platform
-// limit; see the architecture doc section 3.3 for rationale.
+// limit; see docs/tasks/0006_slack_notification/02_architecture.md §3.3
+// for rationale.
 const maxPayloadLength = 4000
 
 // truncatedMarker is appended when truncate's output exceeds
@@ -34,8 +35,9 @@ const truncatedMarker = "...(truncated)"
 // holds exactly one color-coded block (AC-06/AC-07), whose fields entry
 // carries the failure detail only when outcome has at least one delete
 // failure to report (AC-04/AC-05). Uses Slack's legacy attachments API
-// (color + fields), not Block Kit (see architecture doc section 5.3 for the
-// compatibility rationale and section 9 for why Block Kit is deferred).
+// (color + fields), not Block Kit (see
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md §5.3 for the
+// compatibility rationale and §9 for why Block Kit is deferred).
 type webhookPayload struct {
 	Text        string            `json:"text"`
 	Attachments []slackAttachment `json:"attachments,omitempty"`
@@ -84,8 +86,8 @@ func isFailure(outcome Outcome) bool {
 
 // colorFor maps isFailure's result to a Slack legacy attachment color:
 // "good" (green) for a fully successful run, "danger" (red) for any
-// failure. No intermediate "warning" tier (see architecture doc appendix
-// decision history).
+// failure. No intermediate "warning" tier (see
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md 付録 決定履歴).
 func colorFor(failed bool) string {
 	if failed {
 		return colorDanger
@@ -106,11 +108,11 @@ func escapeSlackMarkup(s string) string {
 	return s
 }
 
-// sanitizeForPayload applies the two-stage sanitization the architecture
-// doc section 3.3 describes for any externally-sourced text (post rkeys, error
-// category text) included in a Slack payload: Sanitize (strip control
-// characters/newlines) first, then escapeSlackMarkup (neutralize mrkdwn
-// mention syntax).
+// sanitizeForPayload applies the two-stage sanitization described in
+// docs/tasks/0006_slack_notification/02_architecture.md §3.3 for any
+// externally-sourced text (post rkeys, error category text) included in a
+// Slack payload: Sanitize (strip control characters/newlines) first, then
+// escapeSlackMarkup (neutralize mrkdwn mention syntax).
 func sanitizeForPayload(s string) string {
 	return escapeSlackMarkup(Sanitize(s))
 }
@@ -157,10 +159,10 @@ func truncationCutPoint(text string) int {
 // before producing one, e.g. a login failure); this never panics, treating
 // the delete count as 0 and rendering only outcome.Err's category. Both
 // text and the failure-list field value are independently length-bounded
-// (architecture doc 3.4節): unlike the pre-task version, text is not a
-// fixed-length sentence -- the outcome.Err != nil branch embeds
-// errorKind(outcome.Err), which can carry externally-sourced text of
-// unbounded length.
+// (see docs/tasks/0012_slack_rich_formatting/02_architecture.md §3.4):
+// unlike the pre-task version, text is not a fixed-length sentence -- the
+// outcome.Err != nil branch embeds errorKind(outcome.Err), which can carry
+// externally-sourced text of unbounded length.
 func buildPayload(outcome Outcome) webhookPayload {
 	failed := isFailure(outcome)
 
