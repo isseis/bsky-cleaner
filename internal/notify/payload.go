@@ -53,8 +53,7 @@ const truncatedMarker = "...(truncated)"
 // an emoji-prefixed one-line summary, kept separate from the failure
 // detail; attachments always holds exactly one block whose fields begin
 // with Host and Account (present on every run, success included), followed
-// by statistics fields (Targets/Deleted/Duration) when outcome.Result !=
-// nil, followed by a failure detail field (Error or Failed posts) when
+// by a failure detail field (Error or Failed posts) when
 // isFailure(outcome) is true. The block is color-coded (colorDanger) only
 // on failure; on success it carries no color.
 // Uses Slack's legacy attachments API (color + fields) rather than Block
@@ -67,10 +66,9 @@ type webhookPayload struct {
 
 // slackAttachment is the single block always present in webhookPayload
 // (see webhookPayload). Its fields begin with Host and Account, followed by
-// statistics fields when outcome.Result != nil, followed by a failure
-// detail field (the aborting error's category for a run-ending error, or
-// every failed post's rkey and error category for partial delete failures)
-// when the run failed.
+// a failure detail field (the aborting error's category for a run-ending
+// error, or every failed post's rkey and error category for partial delete
+// failures) when the run failed.
 type slackAttachment struct {
 	Color  string       `json:"color,omitempty"`
 	Fields []slackField `json:"fields,omitempty"`
@@ -161,12 +159,11 @@ func truncationCutPoint(text string) int {
 }
 
 // buildPayload renders outcome as a Slack webhookPayload. text is always a
-// short, fixed-shape, emoji-prefixed sentence with no numeric counts.
+// short, fixed-shape, emoji-prefixed sentence with numeric counts.
 // Exactly one attachment is always generated whose fields always begin with
-// Host and Account, followed by Targets/Deleted/Duration when
-// outcome.Result != nil, followed by an Error or Failed posts field when
-// the run failed. The attachment's Color is colorDanger on failure and
-// unset (no colored bar) on success.
+// Host and Account, followed by an Error or Failed posts field when the
+// run failed. The attachment's Color is colorDanger on failure and unset
+// (no colored bar) on success.
 func buildPayload(outcome Outcome) webhookPayload {
 	var text string
 	switch {
@@ -187,8 +184,8 @@ func buildPayload(outcome Outcome) webhookPayload {
 
 	// Always build one attachment with Host and Account fields.
 	fields := []slackField{
-		{Title: "Host", Value: sanitizeForPayload(outcome.Host)},
-		{Title: "Account", Value: sanitizeForPayload(outcome.Account)},
+		{Title: "Host", Value: truncate(sanitizeForPayload(outcome.Host))},
+		{Title: "Account", Value: truncate(sanitizeForPayload(outcome.Account))},
 	}
 
 	// Append failure detail fields (Error or Failed posts) if the run failed.
