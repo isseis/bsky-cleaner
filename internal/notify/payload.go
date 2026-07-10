@@ -2,6 +2,7 @@ package notify
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -193,6 +194,17 @@ func buildPayload(outcome Outcome) webhookPayload {
 	fields := []slackField{
 		{Title: "Host", Value: truncate(sanitizeForPayload(outcome.Host))},
 		{Title: "Account", Value: truncate(sanitizeForPayload(outcome.Account))},
+	}
+
+	// Add delete statistics only when the run reached the point of producing
+	// a Result; a run that aborted before that (e.g. login failure) has
+	// nothing to report here.
+	if outcome.Result != nil {
+		fields = append(fields,
+			slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))},
+			slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))},
+			slackField{Title: "Duration", Value: outcome.Elapsed.String()},
+		)
 	}
 
 	// Append failure detail fields (Error or Failed posts) if the run failed.

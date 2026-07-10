@@ -201,14 +201,14 @@
 
 対応: F-002（AC-07, AC-08, AC-09, AC-10）。設計: アーキテクチャ設計書 3.3節手順3。
 
-- [ ] `internal/notify/payload.go` の `import` に `"strconv"` を追加する。
-- [ ] `buildPayload` の `fields` 構築（フェーズ3で追加した Host/Account の直後）に、`outcome.Result != nil` の場合のみ次の3フィールドを追加する分岐を実装する。
-  - [ ] `slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`
-  - [ ] `slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`
-  - [ ] `slackField{Title: "Duration", Value: outcome.Elapsed.String()}`
-- [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` を追加する。`outcome.Result` に `Targets`（3件）・`Deleted`（2件）を設定し、`outcome.Elapsed` に `2*time.Second` 相当を設定して、`Fields` に `Title: "Targets", Value: "3"`・`Title: "Deleted", Value: "2"`・`Title: "Duration", Value: "2s"` が含まれることを検証する（AC-07, AC-08, AC-09）。
-- [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields` を追加する。`outcome.Result == nil`（`outcome.Err` にログイン失敗相当のエラーを設定）のケースで、`Fields` のいずれの `Title` も `"Targets"`・`"Deleted"`・`"Duration"` と一致しないことを検証する（AC-10）。
-- [ ] `internal/notify/payload_test.go` の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（フェーズ3で更新済み）を再度更新する。このテストの `outcome.Result` は `Failed` のみを持ち `Targets`/`Deleted` を明示的に設定していないため、本フェーズの変更後は `Fields` が6件（Host, Account, Targets（値 `"0"`）, Deleted（値 `"0"`）, Duration（値 `outcome.Elapsed.String()`、ゼロ値なら `"0s"`）, Failed posts）になる。`require.Len(t, got.Attachments[0].Fields, 3)` を `require.Len(t, got.Attachments[0].Fields, 6)` に、`Fields[2]` への完全一致アサーションを `Fields[5]` への完全一致アサーションに更新する（既存コード調査結果・フェーズ3参照。このテストのみ `findField` に書き換えず、総件数検証という本来の目的を維持する）。
+- [x] `internal/notify/payload.go` の `import` に `"strconv"` を追加する。
+- [x] `buildPayload` の `fields` 構築（フェーズ3で追加した Host/Account の直後）に、`outcome.Result != nil` の場合のみ次の3フィールドを追加する分岐を実装する。
+  - [x] `slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`
+  - [x] `slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`
+  - [x] `slackField{Title: "Duration", Value: outcome.Elapsed.String()}`
+- [x] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` を追加する。`outcome.Result` に `Targets`（3件）・`Deleted`（2件）を設定し、`outcome.Elapsed` に `2*time.Second` 相当を設定して、`Fields` に `Title: "Targets", Value: "3"`・`Title: "Deleted", Value: "2"`・`Title: "Duration", Value: "2s"` が含まれることを検証する（AC-07, AC-08, AC-09）。
+- [x] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields` を追加する。`outcome.Result == nil`（`outcome.Err` にログイン失敗相当のエラーを設定）のケースで、`Fields` のいずれの `Title` も `"Targets"`・`"Deleted"`・`"Duration"` と一致しないことを検証する（AC-10）。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（フェーズ3で更新済み）を再度更新する。このテストの `outcome.Result` は `Failed` のみを持ち `Targets`/`Deleted` を明示的に設定していないため、本フェーズの変更後は `Fields` が6件（Host, Account, Targets（値 `"0"`）, Deleted（値 `"0"`）, Duration（値 `outcome.Elapsed.String()`、ゼロ値なら `"0s"`）, Failed posts）になる。`require.Len(t, got.Attachments[0].Fields, 3)` を `require.Len(t, got.Attachments[0].Fields, 6)` に、`Fields[2]` への完全一致アサーションを `Fields[5]` への完全一致アサーションに更新する（既存コード調査結果・フェーズ3参照。このテストのみ `findField` に書き換えず、総件数検証という本来の目的を維持する）。
 
 ### フェーズ6: `text` からの件数表現の除去
 

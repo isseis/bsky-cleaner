@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/isseis/bsky-cleaner/internal/atproto"
@@ -92,11 +93,11 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	// Phase 3: Host/Account/Failed posts = 3 fields (statistics fields added in Phase 5).
-	require.Len(t, got.Attachments[0].Fields, 3)
+	// Host/Account/Targets/Deleted/Duration/Failed posts = 6 fields.
+	require.Len(t, got.Attachments[0].Fields, 6)
 	// full equality on the Failed posts field ensures no extra fields leak in
-	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[2].Title)
-	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[2].Value)
+	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[5].Title)
+	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[5].Value)
 }
 
 func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
@@ -295,6 +296,34 @@ func TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields(t *testing.T) {
 	assert.Equal(t, "worker-1", findField(t, got.Attachments[0].Fields, "Host").Value)
 	assert.Equal(t, "alice.bsky.social", findField(t, got.Attachments[0].Fields, "Account").Value)
 	assert.Contains(t, findField(t, got.Attachments[0].Fields, "Error").Value, "atproto http error")
+}
+
+func TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields(t *testing.T) {
+	outcome := Outcome{
+		Result: &report.Result{
+			Mode:    report.ModeApply,
+			Targets: []atproto.Post{{RKey: "a"}, {RKey: "b"}, {RKey: "c"}},
+			Deleted: []atproto.Post{{RKey: "a"}, {RKey: "b"}},
+		},
+		Elapsed: 2 * time.Second,
+	}
+	got := buildPayload(outcome)
+	require.Len(t, got.Attachments, 1)
+	assert.Equal(t, "3", findField(t, got.Attachments[0].Fields, "Targets").Value)
+	assert.Equal(t, "2", findField(t, got.Attachments[0].Fields, "Deleted").Value)
+	assert.Equal(t, "2s", findField(t, got.Attachments[0].Fields, "Duration").Value)
+}
+
+func TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields(t *testing.T) {
+	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
+	outcome := Outcome{Result: nil, Err: someErr}
+	got := buildPayload(outcome)
+	require.Len(t, got.Attachments, 1)
+	for _, title := range []string{"Targets", "Deleted", "Duration"} {
+		for _, field := range got.Attachments[0].Fields {
+			assert.NotEqual(t, title, field.Title)
+		}
+	}
 }
 
 func TestIsFailure_FourOutcomePatterns(t *testing.T) {
