@@ -21,9 +21,10 @@ type Outcome struct {
 // maxPayloadLength is a conservative upper bound on a single Slack text
 // field (text or attachment field Value), guarding against unbounded
 // payload growth on a run with a very large number of delete failures or a
-// long errorKind string. It is not derived from a verified Slack platform
-// limit; see docs/tasks/0006_slack_notification/02_architecture.md §3.3
-// for rationale.
+// long errorKind string. It is not a verified Slack platform limit -- Slack
+// has not published an authoritative character limit for these fields --
+// but a conservative default chosen to prevent unbounded payload growth;
+// revisit if Slack is observed rejecting (4xx) payloads under this size.
 const maxPayloadLength = 4000
 
 // truncatedMarker is appended when truncate's output exceeds
@@ -31,23 +32,29 @@ const maxPayloadLength = 4000
 const truncatedMarker = "...(truncated)"
 
 // webhookPayload is the Slack Incoming Webhook request body. text carries
-// the emoji-prefixed one-line summary (F-001, F-002); attachments always
-// holds exactly one color-coded block (AC-06/AC-07), whose fields entry
-// carries the failure detail only when outcome has at least one delete
-// failure to report (AC-04/AC-05). Uses Slack's legacy attachments API
-// (color + fields), not Block Kit (see
-// docs/tasks/0012_slack_rich_formatting/02_architecture.md §5.3 for the
-// compatibility rationale and §9 for why Block Kit is deferred).
+// an emoji-prefixed one-line summary that distinguishes a successful run
+// from a failed one, kept separate from the failure detail; attachments
+// always holds exactly one color-coded block, whose fields entry carries
+// the failure detail only when outcome has at least one delete failure to
+// report -- when there are no failures, Fields is left empty rather than
+// populated with an empty/placeholder entry. Uses Slack's legacy
+// attachments API (color + fields) rather than Block Kit: the "legacy"
+// attachments format is still documented and supported by Slack's
+// Incoming Webhooks, and the sibling project go-safe-cmd-runner uses the
+// same color/fields combination in production, giving confidence it
+// renders correctly across Slack's Desktop/Mobile/Web clients. A future
+// move to Block Kit would only need to change buildPayload's internals,
+// not the Send/Config/Outcome types.
 type webhookPayload struct {
 	Text        string            `json:"text"`
 	Attachments []slackAttachment `json:"attachments,omitempty"`
 }
 
 // slackAttachment is a single color-coded block. buildPayload always
-// produces exactly one (color always applies -- AC-06/AC-07 require it
-// regardless of whether there is failure detail to list); Slack's
-// attachments array supports more, but nothing in scope needs a second one
-// (YAGNI).
+// produces exactly one -- color always applies, regardless of whether
+// there is failure detail to list, so success/failure is visible even
+// when Fields is empty. Slack's attachments array supports more than one
+// block, but nothing in scope needs a second one (YAGNI).
 type slackAttachment struct {
 	Color  string       `json:"color,omitempty"`
 	Fields []slackField `json:"fields,omitempty"`
@@ -77,17 +84,20 @@ const colorDanger = "danger"
 
 // isFailure reports whether outcome represents a failed run: an error that
 // aborted the run before completion, or a completed run with at least one
-// delete failure. Both notify.go's destination-webhook selection (0006
-// 3.4節) and payload.go's color/emoji selection (F-001・F-003) call this
-// single function, so the two decisions cannot diverge (AC-08).
+// delete failure. Both notify.go's destination-webhook selection (which
+// Slack webhook URL a notification is sent to) and payload.go's
+// color/emoji selection call this single function, so the two decisions
+// cannot diverge.
 func isFailure(outcome Outcome) bool {
 	return outcome.Err != nil || outcome.Result == nil || len(outcome.Result.Failed) > 0
 }
 
 // colorFor maps isFailure's result to a Slack legacy attachment color:
 // "good" (green) for a fully successful run, "danger" (red) for any
-// failure. No intermediate "warning" tier (see
-// docs/tasks/0012_slack_rich_formatting/02_architecture.md 付録 決定履歴).
+// failure. There is no intermediate "warning" tier: a bsky-cleaner run's
+// outcome is binary (fully succeeded, or failed/partially failed), unlike
+// the three-tier success/warning/error model used by the sibling project
+// go-safe-cmd-runner, so a two-color scheme is sufficient.
 func colorFor(failed bool) string {
 	if failed {
 		return colorDanger
@@ -108,11 +118,13 @@ func escapeSlackMarkup(s string) string {
 	return s
 }
 
-// sanitizeForPayload applies the two-stage sanitization described in
-// docs/tasks/0006_slack_notification/02_architecture.md §3.3 for any
+// sanitizeForPayload applies two-stage sanitization to any
 // externally-sourced text (post rkeys, error category text) included in a
-// Slack payload: Sanitize (strip control characters/newlines) first, then
-// escapeSlackMarkup (neutralize mrkdwn mention syntax).
+// Slack payload: Sanitize strips control characters and newlines first
+// (defeating ANSI escape sequences and log/message-structure injection),
+// then escapeSlackMarkup neutralizes mrkdwn mention syntax (which always
+// starts with '<', e.g. <!channel>, <!here>, <!subteam^ID>) so it renders
+// as inert text instead of triggering a notification.
 func sanitizeForPayload(s string) string {
 	return escapeSlackMarkup(Sanitize(s))
 }
@@ -149,20 +161,21 @@ func truncationCutPoint(text string) int {
 }
 
 // buildPayload renders outcome as a Slack webhookPayload: an emoji-prefixed
-// summary line (F-001, F-002) plus exactly one color-coded attachment
-// (F-003, AC-06/AC-07) whose single field lists every failed post's rkey
-// and error category, populated only when outcome has at least one delete
-// failure to report (AC-04/AC-05). It includes only the run's outcome
-// (success/failure), delete count, failed posts' rkeys, and error category
-// text (errorKind) -- never post body content, which atproto.Post has no
-// field for in the first place. outcome.Result may be nil (the run aborted
-// before producing one, e.g. a login failure); this never panics, treating
-// the delete count as 0 and rendering only outcome.Err's category. Both
-// text and the failure-list field value are independently length-bounded
-// (see docs/tasks/0012_slack_rich_formatting/02_architecture.md §3.4):
-// unlike the pre-task version, text is not a fixed-length sentence -- the
-// outcome.Err != nil branch embeds errorKind(outcome.Err), which can carry
-// externally-sourced text of unbounded length.
+// summary line plus exactly one color-coded attachment whose single field
+// lists every failed post's rkey and error category, populated only when
+// outcome has at least one delete failure to report. It includes only the
+// run's outcome (success/failure), delete count, failed posts' rkeys, and
+// error category text (errorKind) -- never post body content, which
+// atproto.Post has no field for in the first place. outcome.Result may be
+// nil (the run aborted before producing one, e.g. a login failure); this
+// never panics, treating the delete count as 0 and rendering only
+// outcome.Err's category. Both text and the failure-list field value are
+// independently length-bounded via truncate(): text is not a fixed-length
+// sentence, since the outcome.Err != nil branch embeds
+// errorKind(outcome.Err), which can carry externally-sourced text (e.g. a
+// PDS error name or DID-resolution endpoint) of unbounded length, so it
+// must be truncated on its own rather than relying only on the
+// failure-list field's truncation.
 func buildPayload(outcome Outcome) webhookPayload {
 	failed := isFailure(outcome)
 
