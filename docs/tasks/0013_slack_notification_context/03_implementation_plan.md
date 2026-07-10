@@ -234,7 +234,7 @@
 **レビュー観点**: `Targets`/`Deleted`/`Duration` フィールドが `outcome.Result != nil` の場合のみ追加されているか（AC-07〜AC-10） / `text` から件数表現が完全に除去されつつ、絵文字による正常系/異常系判別（0012 由来の保証）が後退していないか（AC-12〜AC-14） / フェーズ3で更新済みの `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` がフィールド追加後の6件構成に正しく再更新されているか
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/132）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
