@@ -317,7 +317,7 @@
 **レビュー観点**: `docs/design/configuration.md`/`.ja.md` の英日対訳が内容・書式ともに一致しているか / `package_reference.md` の `internal/notify`/`internal/config` の説明が PR-1〜PR-5 で実装した実際の挙動と乖離していないか
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/134）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
