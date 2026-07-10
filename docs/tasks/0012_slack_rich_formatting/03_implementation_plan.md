@@ -84,6 +84,8 @@
 - [x] `outcome.Result == nil` または `len(outcome.Result.Failed) == 0` の場合、`attachments[0].Fields` はゼロ値（空スライス）のままにする（設計書 3.3節手順5、AC-05）。
 - [x] `webhookPayload{Text: text, Attachments: []slackAttachment{attachment}}` を返す（この時点では `text`/`Value` への切り詰め適用はフェーズ4で行う）。
 
+**フェーズ8実施後の変更点（実装が本節の記述から乖離した箇所）**: 上記チェックリストは PR-1（フェーズ1〜6）完了時点の実装内容であり、その時点では緑（`make notify-preview-send` 未実施）だった。フェーズ8の実送信確認で「`Fields` が空の attachment はクライアント上で不可視になる」ことが判明し、`colorFor`/`colorGood` は削除、`buildPayload` は (1) 完全成功時に `attachments` を生成しない、(2) `outcome.Err != nil` の場合は `text` を固定の短い文言（`"❌ bsky-cleaner run failed."`）にとどめ `errorKind(outcome.Err)` を `slackField{Title: "Error", ...}` として attachment に格納する、という設計に変更された。現在の実装・受け入れ基準は 02_architecture.md 3.2節・3.3節・付録決定履歴、および 01_requirements.md AC-03〜AC-07 の改訂版を参照。
+
 ### フェーズ4: 切り詰めヘルパーの抽出と適用（設計書 3.4節）
 
 **対象ファイル**: `internal/notify/payload.go`
@@ -119,6 +121,8 @@
 - [x] 新規テスト `TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker` を追加する: `outcome.Err` に、`errorKind` が `atproto.HTTPError.ErrorName` を経由して極端に長い文字列（例: 5000文字の英数字列）を返すエラー値（`&atproto.HTTPError{Method: "com.atproto.repo.deleteRecord", StatusCode: 500, ErrorName: strings.Repeat("x", 5000)}`）を与え、`got.Text` が `maxPayloadLength` 以内に切り詰められ `truncatedMarker` で終わることを検証する（AC-10、設計書 3.4節1番目の適用箇所 — `text` 自体への切り詰め — の新規テスト）。
 - [x] 新規テスト `TestIsFailure_FourOutcomePatterns` を追加する: `Outcome` の4パターン（完全成功／`Err != nil`／`Result == nil` かつ `Err == nil`／部分失敗）それぞれで `isFailure()` の戻り値が `false`/`true`/`true`/`true` であることを表形式テスト（`t.Run` サブテスト）で検証する（AC-08）。`Result == nil` かつ `Err == nil` のケースにコメントを付し、`internal/runner.Run` の契約上この組み合わせは生成されない想定であるが `isFailure` は防御的に `true` を返す旨を明記する（設計書 7節、AC-08「routing/color が乖離しない」という意図に従い、`outcome.Result == nil` を失敗として扱う）。
 
+**フェーズ8実施後の変更点**: 上記チェックリストは PR-1（フェーズ1〜6）完了時点のテスト内容。フェーズ8の実送信確認を経た設計変更（フェーズ3・4の同様の注記を参照）に伴い、`TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` は「`Attachments` が空」を検証するテストに、`TestBuildPayload_RunError_IncludesErrorKind` は「`text` に `errorKind` を含まず、代わりに `Attachments[0].Fields[0]`（`Title: "Error"`）に含まれる」ことを検証するテストにそれぞれ書き換えられ、`TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker` は `TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker` に改名のうえ検証対象を `Attachments[0].Fields[0].Value` に変更した。現在のテスト一覧は 7節の AC 検証表を参照。
+
 ### PR-1 作成ポイント
 - **対象ステップ**: フェーズ1〜6 (型定義、isFailure抽出、buildPayload再設計、切り詰めヘルパー、BuildPayloadPreview追従、テスト更新)
 
@@ -142,28 +146,30 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 **対象ファイル**: `internal/notify/notifypreview/main.go`
 
-- [ ] `printScenarios()`（68行目）を、`notify.BuildPayloadPreview(s.outcome)` の戻り値（`webhookPayload`、`Text`/`Attachments` フィールドを公開型経由で参照可能）を人間可読な形に整形して出力するよう変更する。出力フォーマット例: `"=== %s ===\ntext: %s\ncolor: %s\nfields:\n  %s: %s\n"`（`fields` が空の場合は `"  (none)"` 等を表示する）。JSON マーシャルした生ペイロードをそのまま表示する案は採らない（設計書 3.5節: 改行や絵文字がエスケープされて読みにくくなるため）。
-- [ ] `sendScenarios()`（77行目）は `notify.BuildPayloadPreview`/`webhookPayload` を経由しない独立経路であるため、変更不要であることを実装時に再確認する（設計書 3.5節「`make notify-preview-send` への影響」）。
+- [x] `printScenarios()`（68行目）を、`notify.BuildPayloadPreview(s.outcome)` の戻り値（`webhookPayload`、`Text`/`Attachments` フィールドを公開型経由で参照可能）を人間可読な形に整形して出力するよう変更する。出力フォーマット例: `"=== %s ===\ntext: %s\ncolor: %s\nfields:\n  %s: %s\n"`（`fields` が空の場合は `"  (none)"` 等を表示する）。JSON マーシャルした生ペイロードをそのまま表示する案は採らない（設計書 3.5節: 改行や絵文字がエスケープされて読みにくくなるため）。**実施メモ**: この変更は実際には PR-1 のレビュー対応コミット（`fix: address PR #121 review comments`）に、`BuildPayloadPreview` の戻り値型変更に追従する形で先行して含まれていた（`printScenarios` が `%s` で構造体をそのまま出力するとフィールドが読みにくくなるため）。フェーズ8実施時に `make notify-preview` の出力を確認し、既存実装が意図通り機能していることを検証した。加えて、フェーズ8の実送信確認を経た attachment 構造の変更（`Fallback`/`Text` フィールドは導入せず、`Color`/`Fields` のみに確定。フェーズ3・4の同様の注記を参照）に伴い、`Attachments` が空の場合に `"Attachments: (none)"` を表示するよう追加調整した。
+- [x] `sendScenarios()`（77行目）は `notify.BuildPayloadPreview`/`webhookPayload` を経由しない独立経路であるため、変更不要であることを実装時に再確認する（設計書 3.5節「`make notify-preview-send` への影響」）。確認済み: 変更なし。
 
 ### フェーズ8: `make notify-preview-send` による実送信確認（設計書 3.5節・7節）
 
 **対象ファイル**: なし（手動確認のみ）
 
-- [ ] `BSKY_SLACK_WEBHOOK_URL_TEST` にテスト用 Slack チャンネルの Incoming Webhook URL を設定したうえで `make notify-preview-send` を実行し、`success-empty`/`success-apply`/`partial-failure`/`run-error`/`truncation` の5シナリオすべてが、実際の Slack クライアント（デスクトップアプリまたはブラウザのいずれか1種類）上で絵文字・色付き attachment・フィールド分離を含めて意図通りに描画されることを目視で確認する（NF-005、設計書 3.4節で指摘された「`maxPayloadLength` の新しい適用箇所の未検証リスク」の解消）。
+- [x] `BSKY_SLACK_WEBHOOK_URL_TEST` にテスト用 Slack チャンネルの Incoming Webhook URL を設定したうえで `make notify-preview-send` を実行し、`success-empty`/`success-apply`/`partial-failure`/`run-error`/`truncation` の5シナリオすべてが、実際の Slack クライアント（Mattermost、Slack Incoming Webhook 互換）上で絵文字・色付き attachment・フィールド分離を含めて意図通りに描画されることを目視で確認する（NF-005、設計書 3.4節で指摘された「`maxPayloadLength` の新しい適用箇所の未検証リスク」の解消）。**実施結果**: 初回確認で「`Color` のみで `Fields`/`Text` を持たない attachment（完全成功時、および `Result.Failed` が0件のエラー終了時）がクライアント上で不可視になる」という設計上の不備が判明した。`Fallback` フィールドの追加では解決せず（Slack API 上、非可視前提のフィールドのため）、続いてユーザーレビューにより「正常終了時は attachment 自体が不要」「異常終了時は `text` を短い定型文にとどめ詳細情報のみを attachment に構造化格納すべき」という設計変更が決定された（02_architecture.md 付録の決定履歴を参照）。この設計変更を反映したうえで再送信確認を行い、全5シナリオが意図通り（正常系は一行サマリのみ、異常系は赤い色付きブロックに構造化された詳細情報）に描画されることを確認した。
 
 ### PR-2 作成ポイント
-- **対象ステップ**: フェーズ7〜8 (notifypreview 表示整形、実送信確認)
+- **対象ステップ**: フェーズ7〜8 (notifypreview 表示整形、実送信確認、およびフェーズ8の実送信確認で判明した attachment 可視性の設計変更)
 
-**推奨タイトル**: feat(notifypreview): update preview display for rich payload format and verify with real send
+**推奨タイトル**: fix(notify): omit empty color-only attachments and move error detail into structured fields
 
 **レビュー観点**:
-- `printScenarios()` が `webhookPayload` の全フィールド（text, color, fields）を欠落なく表示しているか
+- `printScenarios()` が `webhookPayload` の全フィールド（text, color, fields, 空の場合の `(none)` 表示）を欠落なく表示しているか
 - `sendScenarios()` が変更不要であることの確認（`buildPayload` の戻り値型変更に影響されない独立経路）
 - `make notify-preview` で全5シナリオが意図通り表示されること
-- `make notify-preview-send` による実送信確認が完了していること
+- `make notify-preview-send` による実送信確認が完了していること（今回の設計変更後の構造で再確認済み）
+- 設計変更（正常終了時は attachment を生成しない、`outcome.Err != nil` 時のエラー種別は `text` ではなく attachment field に格納）が 01_requirements.md（AC-03〜AC-07）・02_architecture.md（3.2節・3.3節・付録）の双方に反映されているか
+- `colorGood`/`colorFor` の削除に伴うテスト・コメントの整合性（`make deadcode` で未使用シンボルが残っていないこと）
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
@@ -230,8 +236,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] フェーズ4: 切り詰めヘルパーの抽出と適用
 - [x] フェーズ5: `BuildPayloadPreview` の戻り値型追従
 - [x] フェーズ6: `payload_test.go` の更新
-- [ ] フェーズ7: `notifypreview` の表示整形
-- [ ] フェーズ8: `make notify-preview-send` による実送信確認
+- [x] フェーズ7: `notifypreview` の表示整形
+- [x] フェーズ8: `make notify-preview-send` による実送信確認
 - [ ] フェーズ9: ドキュメント更新
 - [ ] フェーズ10: 品質確認
 
@@ -241,14 +247,14 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 |---|---|---|---|
 | AC-01 | 正常終了時、見出しに成功絵文字（✅） | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` | test |
 | AC-02 | 異常終了時、見出しに失敗絵文字（❌） | `internal/notify/payload_test.go::TestBuildPayload_RunError_IncludesErrorKind` | test |
-| AC-03 | `text` に失敗投稿ごとの個別詳細を含まない | `internal/notify/payload_test.go::TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` | test |
-| AC-04 | 失敗投稿の rkey・エラー種別が `fields` に構造化格納 | `internal/notify/payload_test.go::TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`、`internal/notify/payload_test.go::TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` | test |
-| AC-05 | 完全成功時、詳細 attachment の `fields` が空 | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` | test |
-| AC-06 | 正常終了時、`color` が `good` | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` | test |
-| AC-07 | 異常終了時（部分失敗含む）、`color` が `danger` | `internal/notify/payload_test.go::TestBuildPayload_RunError_IncludesErrorKind`、`internal/notify/payload_test.go::TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` | test |
-| AC-08 | 色分けとチャンネル振り分けが同一の判定式（`isFailure`）を使う | `internal/notify/payload_test.go::TestIsFailure_FourOutcomePatterns`（4パターンの真偽値を検証）に加え、`internal/notify/notify_test.go::TestSend_ChannelRouting_AllSucceeded_UsesSuccessURL`・`TestSend_ChannelRouting_RunError_UsesFailureURL`・`TestSend_ChannelRouting_PartialFailure_UsesFailureURL`（`send()` が `isFailure()` 呼び出しに置き換わった後も同じ送信先を選ぶことを確認）。静的確認として `rg -n "outcome\.Err != nil \|\| \(outcome\.Result" internal/notify/notify.go` を実行し、`notify.go` にインライン判定式が残っていない（0件）ことを確認する | test + static |
-| AC-09 | `fields` の rkey・エラー種別に `sanitizeForPayload` が適用される | `internal/notify/payload_test.go::TestBuildPayload_EscapesMentionSyntaxInFailedRKey`、`TestBuildPayload_SanitizesANSIEscapeInFailedRKey`、`TestBuildPayload_SanitizesNewlineInFailedRKey` | test |
-| AC-10 | `text`・失敗一覧フィールド `Value` それぞれが独立に切り詰められ、マーカーが付与される | `internal/notify/payload_test.go::TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（`text` 側、新規）、`TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（フィールド側、既存改名）、`TestBuildPayload_TruncationIsUTF8Safe`（UTF-8安全性） | test |
+| AC-03 | `text` に失敗投稿ごとの個別詳細・`errorKind` を含まない | `internal/notify/payload_test.go::TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`、`internal/notify/payload_test.go::TestBuildPayload_RunError_IncludesErrorKind` | test |
+| AC-04 | 失敗投稿の rkey・エラー種別、またはランを中断させたエラーの種別が `fields` に構造化格納 | `internal/notify/payload_test.go::TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`、`internal/notify/payload_test.go::TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`、`internal/notify/payload_test.go::TestBuildPayload_RunError_IncludesErrorKind` | test |
+| AC-05 | 完全成功時、attachment 自体が生成されない | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（`Attachments` が空であることを検証） | test |
+| AC-06 | 正常終了時、attachment は生成されない（AC-05 の再掲） | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` | test |
+| AC-07 | 異常終了時（部分失敗、またはランを中断させたエラーを含む）、`color` が `danger` | `internal/notify/payload_test.go::TestBuildPayload_RunError_IncludesErrorKind`、`internal/notify/payload_test.go::TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` | test |
+| AC-08 | attachment の生成有無・色分けとチャンネル振り分けが同一の判定式（`isFailure`）を使う | `internal/notify/payload_test.go::TestIsFailure_FourOutcomePatterns`（4パターンの真偽値を検証）に加え、`internal/notify/notify_test.go::TestSend_ChannelRouting_AllSucceeded_UsesSuccessURL`・`TestSend_ChannelRouting_RunError_UsesFailureURL`・`TestSend_ChannelRouting_PartialFailure_UsesFailureURL`（`send()` が `isFailure()` 呼び出しに置き換わった後も同じ送信先を選ぶことを確認）。静的確認として `rg -n "outcome\.Err != nil \|\| \(outcome\.Result" internal/notify/notify.go` を実行し、`notify.go` にインライン判定式が残っていない（0件）ことを確認する | test + static |
+| AC-09 | `fields` の rkey・エラー種別に `sanitizeForPayload` が適用される | `internal/notify/payload_test.go::TestBuildPayload_EscapesMentionSyntaxInFailedRKey`、`TestBuildPayload_SanitizesANSIEscapeInFailedRKey`、`TestBuildPayload_SanitizesNewlineInFailedRKey`、`TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint` | test |
+| AC-10 | `text`・attachment field `Value` それぞれが独立に切り詰められ、マーカーが付与される | `internal/notify/payload_test.go::TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（"Error" フィールド側）、`TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（"Failed posts" フィールド側）、`TestBuildPayload_TruncationIsUTF8Safe`（UTF-8安全性） | test |
 | AC-11 | 秘密情報（app パスワード・セッション JWT・`Authorization`・Webhook URL）がペイロードに含まれない | `internal/notify/notify_test.go::TestSendError_Error_NeverContainsWebhookURL`、`TestSend_RetryLog_UsesRedactedURL_NotRawWebhookURL`（Send経路全体での非露出を確認）に加え、静的確認として `rg -n "cfg\.(SuccessWebhookURL|FailureWebhookURL)|SecretString" internal/notify/payload.go` を実行し、`payload.go`（`buildPayload`/`webhookPayload` の構築経路）が `Config`/`SecretString`型を一切参照していない（0件）ことを確認する | test + static |
 | AC-12 | 投稿本文がペイロードのいずれのフィールドにも含まれない | `internal/notify/payload_test.go::TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（`slackField` の完全一致検証）に加え、静的確認として `rg -n "type Post struct" -A 6 internal/atproto/posts.go` を実行し、`Post` 構造体に `Body` 相当のフィールドが存在しない（`RKey`/`Type`/`CreatedAt`/`Pinned` の4フィールドのみ）ことを確認する | test + static |
 
