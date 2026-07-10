@@ -66,6 +66,18 @@
 
 ## 3. 実装ステップ
 
+### 3.2 PR 構成
+
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | フェーズ1 | `internal/config` へのホスト名解決（`Config.Hostname`/`ResolveHostname`）追加 |
+| PR-2 | フェーズ2 / フェーズ3 | `Outcome` への `Host`/`Account`/`Elapsed` 追加、`buildPayload` が常に Host/Account を含む attachment を生成するよう変更 |
+| PR-3 | フェーズ4 | `notifypreview` フィクスチャへの Host/Account 追加と、Mattermost を含む実クライアントでの早期の実送信描画確認 |
+| PR-4 | フェーズ5 / フェーズ6 | `buildPayload` への統計フィールド（Targets/Deleted/Duration）追加、`text` からの件数表現除去 |
+| PR-5 | フェーズ7 / フェーズ8 / フェーズ9 / フェーズ10 | `cmd/main.go` の時間計測・`Outcome` 構築、`notifypreview` の Elapsed 追加、全体テスト実行、最終実送信確認 |
+| PR-6 | フェーズ11 | `docs/design/configuration.md`/`.ja.md`・`docs/dev/developer_guide/package_reference.md` の更新 |
+| PR-7 | フェーズ12 | `README.md`/`.ja.md`・`docs/overview.md`/`.ja.md` への配信保証の限界（F-004）の明記 |
+
 ### フェーズ1: `internal/config` へのホスト名解決の追加
 
 対応: F-001（AC-03, AC-04, AC-05）。設計: アーキテクチャ設計書 3.1節。
@@ -78,6 +90,19 @@
   - [ ] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `Config{Hostname: "worker-1"}` を渡すと `"worker-1"` が返ることを確認する（AC-03）。
   - [ ] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `Config{Hostname: ""}` を渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
   - [ ] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
+
+### PR-1 作成ポイント: internal/config hostname resolution
+
+**対象ステップ**: フェーズ1
+
+**推奨タイトル**: `feat(0013): add TOML hostname field and ResolveHostname`
+
+**レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ2: `Outcome` 型への `Host`/`Account`/`Elapsed` フィールド追加
 
@@ -125,6 +150,19 @@
 - [ ] `internal/notify/payload_test.go` に、正常終了時・異常終了時の双方で `Fields` に `Title: "Host"`・`Title: "Account"` が含まれることを確認する新規テスト `TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields` を追加する（AC-01, AC-02 の異常系側。`TestBuildPayload_RunError_IncludesErrorKind` の `outcome` に `Host`/`Account` を追加した派生ケース）。
 - [ ] `make notify-preview` を実行し、コンパイルが通ることを確認する（`notifypreview` の `Outcome` フィールドはまだ未設定だが、`buildPayload` は空文字列の `Host`/`Account` でもパニックしないため、この時点でも実行は成功するはずである）。
 
+### PR-2 作成ポイント: always-attachment host/account fields
+
+**対象ステップ**: フェーズ2 / フェーズ3
+
+**推奨タイトル**: `feat(0013): always include host/account fields in Slack attachment`
+
+**レビュー観点**: 完全成功時にも attachment を常時生成する変更が、0012 で確立した「`Fields` が空の attachment は一部クライアントで不可視になる」問題を再発させる懸念に対し、コードレベルでどう説明できるか（実際のクライアント描画確認は PR-3 のフェーズ4で行うため、このPRの時点では設計上の妥当性のみをレビューする） / Host/Account が `sanitizeForPayload` を経由してから格納されているか（NF-003） / 12件の既存テスト更新（`findField` へ書き換えた9件、期待値そのものを更新した3件）が漏れなく行われているか（既存コード調査結果参照）
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### フェーズ4: `notifypreview` フィクスチャへの Host/Account 追加と実送信確認
 
 対応: アーキテクチャ設計書 3.5節・5.3節（Mattermost 互換性の早期確認）。
@@ -133,6 +171,19 @@
 - [ ] `make notify-preview` を実行し、全5シナリオの出力に `Host`/`Account` フィールドが表示されることを目視確認する。
 - [ ] `make notify-preview-send` を実行し、Mattermost を含む実際の Slack Incoming Webhook 互換クライアントに送信し、完全成功シナリオ（`Fields` が2件、danger色ではない attachment）が可視のブロックとして描画されることを確認する（アーキテクチャ設計書 5.3節）。
   - [ ] 描画に問題がある場合、アーキテクチャ設計書 5.3節のフォールバック（成功時に `Color: "good"` を設定する）を適用し、3.3節手順5・付録「決定履歴」の更新が必要になる旨をこの計画書のコメント欄に記録した上で、アーキテクチャ設計書自体の改訂を先に行う（フェーズ順序を崩さない。フォールバックが不要だった場合は、実装完了時にこの注記を「対象外」であったと明示する）。
+
+### PR-3 作成ポイント: notifypreview host/account fixtures and real-send verification
+
+**対象ステップ**: フェーズ4
+
+**推奨タイトル**: `chore(0013): verify Slack attachment rendering with host/account fields`
+
+**レビュー観点**: PR-2 で `buildPayload` が完全成功時にも常に attachment を生成するようになった設計判断が、Mattermost を含む実際の Incoming Webhook 互換クライアントで意図通り描画されることを実送信結果から確認できるか（0012 で発生した「空 attachment 不可視化」問題の再発が無いこと） / 描画に問題があった場合のフォールバック適用有無とその根拠が明記されているか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ5: `buildPayload` への統計フィールド追加
 
@@ -160,6 +211,19 @@
 - [ ] `internal/notify/payload_test.go` のテスト名 `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus` を `TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount` に変更する（実態に合わせる）。
 - [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_PartialFailure_TextHasNoFailureCount` を追加する。部分失敗の `outcome`（`TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind` と同様の fixture）に対し、`got.Text` に失敗件数を示す数値（例えば `"2"`）が含まれないことを検証する（AC-13）。
 - [ ] `internal/notify/payload_test.go` に新規テスト `TestBuildPayload_TextRetainsEmojiForSuccessAndFailure` を追加する。完全成功・部分失敗・実行エラーの3ケースそれぞれで、`got.Text` に `emojiSuccess`（成功時のみ）または `emojiFailure`（それ以外）が含まれることを再確認する（AC-14。0012 AC-01/AC-02 の絵文字判別要件が後退していないことの明示的な回帰テスト）。
+
+### PR-4 作成ポイント: statistics fields and text simplification
+
+**対象ステップ**: フェーズ5 / フェーズ6
+
+**推奨タイトル**: `feat(0013): add delete statistics fields and simplify text summary`
+
+**レビュー観点**: `Targets`/`Deleted`/`Duration` フィールドが `outcome.Result != nil` の場合のみ追加されているか（AC-07〜AC-10） / `text` から件数表現が完全に除去されつつ、絵文字による正常系/異常系判別（0012 由来の保証）が後退していないか（AC-12〜AC-14） / フェーズ3で更新済みの `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields` がフィールド追加後の6件構成に正しく再更新されているか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ7: `cmd/main.go` の時間計測・`Outcome` 構築
 
@@ -204,6 +268,19 @@
 
 - [ ] `make notify-preview-send` を実行し、統計フィールド（Targets/Deleted/Duration）を含む全シナリオが Mattermost を含む実クライアントで問題なく描画されることを確認する。
 
+### PR-5 作成ポイント: cmd wiring and final verification
+
+**対象ステップ**: フェーズ7 / フェーズ8 / フェーズ9 / フェーズ10
+
+**推奨タイトル**: `feat(0013): wire elapsed time, host, and account into cmd runtime`
+
+**レビュー観点**: 処理時間の計測区間が `runner.Run()` 呼び出しの直前・直後のみに限定され、設定読み込みや DID/PDS 解決の時間を含んでいないか（AC-11） / Host/Account が TOML `hostname`・`BSKY_HANDLE` の実際の値から正しく供給されており、両者の取り違えが無いか（`TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials` で検証） / `make test`・`make notify-preview-send` の両方が全シナリオで green であることを確認したうえで次フェーズ（ドキュメント更新）に進んでいるか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ### フェーズ11: ドキュメント更新（設定リファレンス・パッケージリファレンス）
 
 対応: NF-007 に付随するドキュメント整合。AC番号に直接紐づく要件ではないが、既存コード調査結果で述べた通り翻訳対訳の維持のため実施する。
@@ -214,6 +291,19 @@
 - [ ] `docs/dev/developer_guide/package_reference.md` の `internal/notify` の説明（54行目）を、「`text` 一行サマリ + 失敗時のみの `attachments`」という記述から、「`text` 一行サマリ（件数を含まない） + 常に生成される `attachments`（実行ホスト名・アカウントハンドル、削除処理に到達した実行では対象件数・削除件数・処理時間を含む）」に更新する。
 - [ ] `docs/dev/developer_guide/package_reference.md` の `internal/config` の説明（30行目）に、`ResolveHostname`（TOML `hostname` フィールド優先、未設定時は `os.Hostname()` にフォールバックしてホスト名を解決する）についての一文を追記する。
 - [ ] 上記4件の記述内容がフェーズ1・3・5で実装した実際の挙動（`hostname` が任意項目であること、`ResolveHostname` のフォールバック順序、`buildPayload` が常に attachment を生成し統計フィールドを条件付きで含めること）と一致していることを、担当者自身が実装コードと本文を突き合わせてレビューする（実装コードを正とする整合性レビュー）。静的確認として `rg -n "hostname" docs/design/configuration.md docs/design/configuration.ja.md` を実行し、両ファイルに追加した `hostname` 行・コード例がそれぞれ1件以上マッチすることを確認する。`package_reference.md` の更新は単なる説明文の書き換えでありユニークな検索語を持たないため、この静的確認の対象外とし、上記のコードとの突き合わせレビューのみで担保する。
+
+### PR-6 作成ポイント: configuration and package reference docs
+
+**対象ステップ**: フェーズ11
+
+**推奨タイトル**: `docs(0013): document hostname config field and package reference`
+
+**レビュー観点**: `docs/design/configuration.md`/`.ja.md` の英日対訳が内容・書式ともに一致しているか / `package_reference.md` の `internal/notify`/`internal/config` の説明が PR-1〜PR-5 で実装した実際の挙動と乖離していないか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ12: ドキュメント更新（配信保証の限界の明記、F-004）
 
@@ -245,6 +335,19 @@
   特に完了済みの削除結果が Slack に通知されないまま失われることがある。
   ```
 
+### PR-7 作成ポイント: delivery guarantee documentation
+
+**対象ステップ**: フェーズ12
+
+**推奨タイトル**: `docs(0013): document Slack notification delivery guarantee limits`
+
+**レビュー観点**: README/overview の英日対訳の文言が一致しているか / at-least-once 配信を保証しないという記述が、誇張・過小表現なく正確に事実（0006 由来の既知の制限であること）を反映しているか / AC-15・AC-16 の静的検証コマンドが検索するリテラル文字列と、実際に追加した本文が一字一句一致しているか
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
 ## 4. Acceptance Criteria Verification
 
 | AC | 内容概要 | 種別 | 検証方法 |
@@ -272,13 +375,13 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 
 アーキテクチャ設計書 8節の実装優先順位に対応する。フェーズ番号は本計画書独自の番号だが、順序と依存関係は8節と一致させている。
 
-1. **マイルストーン A（フェーズ1）**: `internal/config` にホスト名解決ロジックが追加され、単体で完結してテスト可能になる。他フェーズと独立して着手できる。
-2. **マイルストーン B（フェーズ2〜3）**: `Outcome` 型が拡張され、`buildPayload` が常に Host/Account を含む attachment を生成するようになる。この時点で既存テスト9件（既存コード調査結果参照）が破壊され、更新される。
-3. **マイルストーン C（フェーズ4）**: Mattermost を含む実クライアントでの描画確認が完了し、5.3節のリスクが早期に解消される（後続フェーズより先に手戻りリスクを潰す）。
-4. **マイルストーン D（フェーズ5〜6）**: 統計フィールドの追加、`text` からの件数除去が完了し、F-002・F-003 のコア実装が完了する。
-5. **マイルストーン E（フェーズ7〜8）**: `cmd/main.go` が実際の処理時間・ホスト名・アカウントハンドルを計測・供給するようになり、`notifypreview` のフィクスチャが全フィールドを網羅する。
-6. **マイルストーン F（フェーズ9〜10）**: 全テスト・実送信確認が完了し、機能実装が完了する。
-7. **マイルストーン G（フェーズ11〜12）**: ドキュメント更新が完了し、AC-15/AC-16 を含む全 AC が満たされる。
+1. **マイルストーン A（フェーズ1 / PR-1）**: `internal/config` にホスト名解決ロジックが追加され、単体で完結してテスト可能になる。他フェーズと独立して着手できる。
+2. **マイルストーン B（フェーズ2〜3 / PR-2）**: `Outcome` 型が拡張され、`buildPayload` が常に Host/Account を含む attachment を生成するようになる。この時点で既存テスト12件（既存コード調査結果参照）が破壊され、更新される。
+3. **マイルストーン C（フェーズ4 / PR-3）**: Mattermost を含む実クライアントでの描画確認が完了し、5.3節のリスクが早期に解消される（後続フェーズより先に手戻りリスクを潰す）。
+4. **マイルストーン D（フェーズ5〜6 / PR-4）**: 統計フィールドの追加、`text` からの件数除去が完了し、F-002・F-003 のコア実装が完了する。
+5. **マイルストーン E（フェーズ7〜8 / PR-5）**: `cmd/main.go` が実際の処理時間・ホスト名・アカウントハンドルを計測・供給するようになり、`notifypreview` のフィクスチャが全フィールドを網羅する。
+6. **マイルストーン F（フェーズ9〜10 / PR-5）**: 全テスト・実送信確認が完了し、機能実装が完了する。
+7. **マイルストーン G（フェーズ11〜12 / PR-6・PR-7）**: ドキュメント更新が完了し、AC-15/AC-16 を含む全 AC が満たされる。
 
 ## 6. テスト戦略
 
@@ -294,18 +397,13 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 
 ## 8. 実装チェックリスト
 
-- [ ] フェーズ1: `internal/config` へのホスト名解決の追加
-- [ ] フェーズ2: `Outcome` 型への `Host`/`Account`/`Elapsed` フィールド追加
-- [ ] フェーズ3: `buildPayload` に Host/Account フィールドを追加し、常に attachment を生成する
-- [ ] フェーズ4: `notifypreview` フィクスチャへの Host/Account 追加と実送信確認
-- [ ] フェーズ5: `buildPayload` への統計フィールド追加
-- [ ] フェーズ6: `text` からの件数表現の除去
-- [ ] フェーズ7: `cmd/main.go` の時間計測・`Outcome` 構築
-- [ ] フェーズ8: `notifypreview` フィクスチャへの Elapsed 追加
-- [ ] フェーズ9: テストの追加・更新の総仕上げ（`make test`・`make fmt`）
-- [ ] フェーズ10: `make notify-preview-send` による最終実送信確認
-- [ ] フェーズ11: ドキュメント更新（設定リファレンス・パッケージリファレンス）
-- [ ] フェーズ12: ドキュメント更新（配信保証の限界の明記、F-004）
+- [ ] PR-1 マージ済み（対象ステップ: フェーズ1）
+- [ ] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3）
+- [ ] PR-3 マージ済み（対象ステップ: フェーズ4）
+- [ ] PR-4 マージ済み（対象ステップ: フェーズ5 / フェーズ6）
+- [ ] PR-5 マージ済み（対象ステップ: フェーズ7 / フェーズ8 / フェーズ9 / フェーズ10）
+- [ ] PR-6 マージ済み（対象ステップ: フェーズ11）
+- [ ] PR-7 マージ済み（対象ステップ: フェーズ12）
 - [ ] `make lint` が成功することを確認する
 - [ ] 4節の Acceptance Criteria Verification 表の全項目が緑であることを確認する
 
