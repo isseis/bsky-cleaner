@@ -72,7 +72,7 @@ Slack メッセージの先頭（`text` フィールド）に、実行結果に�
 **Acceptance Criteria**:
 - **AC-06**: 実行が正常終了した場合、attachment は生成されない（AC-05 の再掲。緑色の attachment は生成しない設計とした）
 - **AC-07**: 実行が異常終了した場合（部分失敗、またはランを中断させたエラーを含む）、attachment の `color` に赤系の値（`danger`）が設定される
-- **AC-08**: attachment の生成有無は、0006 の AC-05〜AC-08 で確定した通知先チャンネル振り分け（`isFailure` 判定式）と同一の条件式を使う（色分けとチャンネル振り分けの判定基準が乖離しない）
+- **AC-08**: attachment の生成有無は、0006 の AC-05〜AC-08 で確定した通知先チャンネル振り分け（`isFailure` 判定式）を土台とするが、両者は完全に同一の条件式ではない。具体的には `isFailure(outcome) == true` は attachment 生成の必要条件だが十分条件ではなく、`outcome.Result == nil && outcome.Err == nil` という防御的なケース（`isFailure()` は `true` を返すが、表示すべき構造化された詳細情報が存在しない）では attachment を生成しない（AC-05 参照、02_architecture.md 3.3節手順5に詳細）。したがって条件式としては「`isFailure(outcome)` かつ表示すべきフィールドが存在すること」であり、色分けとチャンネル振り分けの判定基準はこの防御的なケースに限り意図的に乖離する
 
 ### F-004: 既存のサニタイズ・切り詰め・マスキングの継続適用
 
