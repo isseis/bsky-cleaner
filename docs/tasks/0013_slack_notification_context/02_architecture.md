@@ -262,7 +262,7 @@ func buildPayload(outcome Outcome) webhookPayload
    - 構築した `text` に対して既存の `truncate()` を適用する（変更なし。外部由来の可変長文字列を含まない固定長の定型文であるため、通常は切り詰めが発生しない）。
 2. `fields` の構築を開始する。まず `sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ...}` として、続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ...}` として追加する（AC-01, AC-02, NF-003）。空文字列であっても（`ResolveHostname` が `os.Hostname()` 失敗時に返す値、AC-05）フィールド自体は生成し、`Value` が空文字列になる。
 3. `outcome.Result != nil` の場合、`slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))}`・`slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))}`・`slackField{Title: "Duration", Value: outcome.Elapsed.String()}` を追加する（AC-07, AC-08, AC-09）。`outcome.Result == nil` の場合はこの3フィールドをいずれも追加しない（AC-10）。`Duration` の値は3.6節で述べる通り `runner.Run()` の呼び出し区間のみを計測したものであり、`atproto.NewClient`（DID/PDS 解決）や `config.LoadAppConfig` の所要時間を含まない。オンコール担当者がこの `Duration` を実行全体のレイテンシと誤読しないよう、この範囲限定はフィールド名ではなく3.6節の記述で明示する（AC-11 が求める計測区間そのものであり、意図した仕様である）。
-4. `isFailure(outcome)`（変更なし、3.1節「共有化」は 0012 で完了済み）が `true` の場合、0012 で確立済みの分岐（`outcome.Err != nil` なら `"Error"` フィールド、部分失敗なら `"Failed posts"` フィールド、いずれも `sanitizeForPayload` と `truncate` を適用）をそのまま `fields` に追加する（変更なし、AC-04/AC-07 の失敗詳細表示は 0012 の挙動を継続）。
+4. `isFailure(outcome)`（変更なし、[0012_slack_rich_formatting/02_architecture.md](../0012_slack_rich_formatting/02_architecture.md) 3.1節「共有化」は 0012 で完了済み）が `true` の場合、0012 で確立済みの分岐（`outcome.Err != nil` なら `"Error"` フィールド、部分失敗なら `"Failed posts"` フィールド、いずれも `sanitizeForPayload` と `truncate` を適用）をそのまま `fields` に追加する（変更なし、0012 の AC-04/AC-07 の失敗詳細表示は 0012 の挙動を継続）。
 5. `attachments = []slackAttachment{{Color: color, Fields: fields}}` を常に1件生成する。`color` は `isFailure(outcome)` が `true` なら `colorDanger`、`false` なら空文字列（`omitempty` によりJSON上は省略され、Slack上は色付きの縦線が表示されない）。
 
 Host/Account に `truncate()` を適用しない理由: `truncate()` は PDS のレスポンスボディ由来で長さに上限のない `errorKind()` の出力（3.4節、0012 で導入済み）に対する防御であり、Host/Account はいずれも運用者が TOML/環境変数で設定する値（`hostname` フィールド・`BSKY_HANDLE`）であって、攻撃者が制御できる外部入力ではない。長さを制限する必要のない値に切り詰め処理を適用しないことで、この関数を単純に保つ（YAGNI）。
@@ -340,7 +340,7 @@ flowchart TD
 
 ### 5.4 運用上の既知の制限: 通知配信の保証なし（F-004）
 
-Slack 通知には at-least-once 配信の保証がない。`runner.Run()` がポストの削除を完了して `*report.Result` を返した後、`internal/notify.Send()` の呼び出しが完了する前にプロセスがクラッシュ・強制終了・OOM Kill 等で終了した場合、削除自体は AT Protocol の `com.atproto.repo.deleteRecord` 呼び出し時点で既に確定しているにもかかわらず、その実行結果を伝える Slack 通知は永久に送信されない。
+Slack 通知には at-least-once 配信の保証がない。`runner.Run()` がポストの削除を完了して `*report.Result` を返した後、`internal/notify.Send()` の呼び出しが完了する前に、何らかの理由（プロセスクラッシュ、強制終了、OOM Kill、ネットワーク障害、Slack 側の障害・タイムアウトなど）により通知の送信が失敗または未完了に終わった場合、削除自体は AT Protocol の `com.atproto.repo.deleteRecord` 呼び出し時点で既に確定しているにもかかわらず、その実行結果を伝える Slack 通知は永久に送信されない。
 
 この制限は 0006（[0006_slack_notification](../0006_slack_notification/02_architecture.md)）で確立された既存の設計の性質であり、`internal/notify` がプロセス内のメモリ上で `Outcome` を一度限り送信するだけで、永続化された再送キューや outbox パターンを持たないことに起因する。本タスクは通知ペイロードの内容（Host/Account/統計情報）を拡張するのみであり、この配信保証の欠如を新たに生み出すものでも悪化させるものでもない。
 
