@@ -51,16 +51,12 @@ const truncatedMarker = "...(truncated)"
 
 // webhookPayload is the Slack Incoming Webhook request body. text carries
 // an emoji-prefixed one-line summary, kept separate from the failure
-// detail; attachments holds exactly one color-coded block carrying the
-// failure detail, but only when there is structured failure detail to
-// report -- isFailure() returning true is necessary but not sufficient,
-// since the defensive Outcome{Result: nil, Err: nil} case also reports as
-// a failure yet has no fields to show, so it omits attachments entirely
-// rather than emitting a color-only block (see
-// docs/tasks/0012_slack_rich_formatting/02_architecture.md's Appendix:
-// Decision History: a color-only attachment with no text/fields renders
-// as an empty, invisible block on at least one Incoming Webhook-compatible
-// client).
+// detail; attachments always holds exactly one block whose fields begin
+// with Host and Account (present on every run, success included), followed
+// by statistics fields (Targets/Deleted/Duration) when outcome.Result !=
+// nil, followed by a failure detail field (Error or Failed posts) when
+// isFailure(outcome) is true. The block is color-coded (colorDanger) only
+// on failure; on success it carries no color.
 // Uses Slack's legacy attachments API (color + fields) rather than Block
 // Kit -- still documented and supported by Slack's Incoming Webhooks, and
 // sufficient for the success/failure summary this tool needs.
@@ -69,10 +65,12 @@ type webhookPayload struct {
 	Attachments []slackAttachment `json:"attachments,omitempty"`
 }
 
-// slackAttachment is a single color-coded block, present only for a failed
-// run (see webhookPayload). Its single field holds the failure detail: the
-// aborting error's category for a run-ending error, or every failed post's
-// rkey and error category for partial delete failures.
+// slackAttachment is the single block always present in webhookPayload
+// (see webhookPayload). Its fields begin with Host and Account, followed by
+// statistics fields when outcome.Result != nil, followed by a failure
+// detail field (the aborting error's category for a run-ending error, or
+// every failed post's rkey and error category for partial delete failures)
+// when the run failed.
 type slackAttachment struct {
 	Color  string       `json:"color,omitempty"`
 	Fields []slackField `json:"fields,omitempty"`

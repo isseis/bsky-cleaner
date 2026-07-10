@@ -14,11 +14,7 @@ import (
 
 func TestEscapeSlackMarkup_EscapesAmpersandLtGt(t *testing.T) {
 	got := escapeSlackMarkup("a & b < c > d")
-	// Use string concatenation to prevent HTML entity auto-correction in the editor.
-	amp := "&" + "amp;"
-	lt := "&" + "lt;"
-	gt := "&" + "gt;"
-	assert.Equal(t, "a "+amp+" b "+lt+" c "+gt+" d", got)
+	assert.Equal(t, "a &amp; b &lt; c &gt; d", got)
 }
 
 func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) {
@@ -117,7 +113,7 @@ func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
 	require.Len(t, got.Attachments, 1)
 	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
 	assert.NotContains(t, val, "<!channel>")
-	escapedMention := "&" + "lt;!channel" + "&" + "gt;"
+	escapedMention := "&lt;!channel&gt;"
 	assert.Contains(t, val, escapedMention)
 }
 
@@ -175,7 +171,7 @@ func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testin
 	require.Len(t, got.Attachments, 1)
 	val := findField(t, got.Attachments[0].Fields, "Error").Value
 	assert.NotContains(t, val, "<!channel>")
-	escapedMention := "&" + "lt;!channel" + "&" + "gt;"
+	escapedMention := "&lt;!channel&gt;"
 	assert.Contains(t, val, escapedMention)
 }
 
@@ -273,7 +269,7 @@ func TestBuildPayload_SanitizesMentionSyntaxAndControlCharsInHostAndAccount(t *t
 	// Host should have escaped mention syntax
 	hostVal := findField(t, got.Attachments[0].Fields, "Host").Value
 	assert.NotContains(t, hostVal, "<!channel>")
-	escapedMention := "&" + "lt;!channel" + "&" + "gt;"
+	escapedMention := "&lt;!channel&gt;"
 	assert.Contains(t, hostVal, escapedMention)
 	// Account should have ANSI escape and newline stripped
 	accVal := findField(t, got.Attachments[0].Fields, "Account").Value

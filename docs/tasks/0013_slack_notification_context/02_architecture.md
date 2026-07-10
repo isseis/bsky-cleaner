@@ -110,7 +110,7 @@ graph TB
 |---|---|---|
 | `internal/config/config.go` | 変更 | `Config` に `Hostname string` を追加。`rawConfig` に `Hostname string `toml:"hostname"`` を追加（3.1節） |
 | `internal/config/validate.go` | 変更 | `validateConfig` が `raw.Hostname` を `Config.Hostname` にそのまま引き渡すよう1行追加（`SlackAllowedHost` と同じ扱い。バリデーションルールは追加しない） |
-| `internal/config/hostname.go` | 新規 | `ResolveHostname(cfg Config) string` を追加（3.1節、AC-03/AC-04/AC-05） |
+| `internal/config/hostname.go` | 新規 | `ResolveHostname(cfg Config) (string, error)` を追加（3.1節、AC-03/AC-04/AC-05/AC-17）。`os.Hostname()` 失敗時に呼び出し元へエラーを伝播できるよう、戻り値を `(string, error)` とする（AC-17、要件定義書 2026-07-10 追記分） |
 | `internal/config/hostname_test.go` | 新規 | `ResolveHostname` の3パターン（TOML指定・未指定でos.Hostname()成功・os.Hostname()失敗相当）を検証 |
 | `internal/notify/payload.go` | 変更 | `Outcome` に `Host string`/`Account string`/`Elapsed time.Duration` を追加。`buildPayload()` を変更し、常に1件の attachment を生成して Host/Account フィールドを先頭に含め、`outcome.Result != nil` の場合は統計フィールド（Targets/Deleted/Duration）を追加する（3.2節・3.3節）。`text` のテンプレートから件数表現を削除する（3.4節） |
 | `internal/notify/payload_test.go` | 変更 | `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`・`TestBuildPayload_ResultAndErrNil_HasNoAttachment` を新しい期待値に更新（3.5節）。Host/Account/統計フィールドの有無・サニタイズを検証する新規テストケースを追加 |
@@ -195,12 +195,14 @@ type Config struct {
 ```go
 // ResolveHostname returns cfg.Hostname if non-empty (AC-03), otherwise the
 // result of os.Hostname() (AC-04). If os.Hostname() also fails, it returns
-// "" rather than propagating the error (AC-05): a best-effort hostname
-// field must never cause notification delivery itself to fail.
-func ResolveHostname(cfg Config) string
+// ("", err): the notification field still falls back to "" (AC-05, a
+// best-effort hostname field must never cause notification delivery itself
+// to fail), but the error itself is now returned to the caller so it can be
+// logged (AC-17,要件定義書 2026-07-10 追記分).
+func ResolveHostname(cfg Config) (string, error)
 ```
 
-呼び出し元は `cmd/main.go` の `run()` のみであり、`LoadAppConfig` 成功後（＝ TOML 読み込み自体は失敗していない状態）にのみ呼ばれる。`os.Hostname()` の失敗は環境依存の稀なケースであり、これによって通知全体を止めない方針（AC-05）は `internal/notify.Send` の既存方針（配信失敗が CLI の終了コードに影響しない、0006 の設計）と整合する。
+呼び出し元は `cmd/main.go` の `run()` のみであり、`LoadAppConfig` 成功後（＝ TOML 読み込み自体は失敗していない状態）にのみ呼ばれる。`os.Hostname()` の失敗は環境依存の稀なケースであり、これによって通知全体を止めない方針（AC-05）は `internal/notify.Send` の既存方針（配信失敗が CLI の終了コードに影響しない、0006 の設計）と整合する。`run()` は返り値のエラーを `slog.Warn` で警告ログに出力しつつ（AC-17）、ホスト名フィールド自体は引き続き空文字列で通知処理を継続する（3.6節）。
 
 ### 3.2 `Outcome` 型の拡張（`internal/notify/payload.go`）
 
@@ -290,13 +292,13 @@ func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, outcome 
 
 `run()` は `runner.Run()` の呼び出しの直前に `start := time.Now()` を取り、戻り値を受け取った直後に `elapsed := time.Since(start)` を計算する（AC-11）。この区間には `config.LoadAppConfig`・`config.ResolveHostname`・`atproto.NewClient`（DID/PDS 解決）のいずれも含まれない。`apply` が `true`／`false` のいずれでも `runner.Run()` は1回だけ呼ばれる既存の構造（0004 で確立済み）を変えないため、計測コードは `apply` の分岐より前に置く。
 
-`outcome := notify.Outcome{Result: result, Err: runErr, Host: config.ResolveHostname(cfg.Config), Account: cfg.Handle, Elapsed: elapsed}` を構築し、`apply` が `true` の場合のみ `sendNotification(cfg, httpDoer, outcome)` を呼ぶ（既存の「通知は `--apply` 実行時のみ送る」という 0006 以来の方針は変更しない）。`ResolveHostname` の呼び出しは `apply` が `false`（dry-run）の場合には実行しても意味がないが、副作用のない軽量な呼び出しであり、`apply` の分岐で呼び出しを分けるより `Outcome` を一箇所で組み立てるほうが読みやすいため、`apply` の値によらず常に計算する（YAGNI: 分岐を増やす最適化はしない）。
+`host, hostErr := config.ResolveHostname(cfg.Config)` を呼び出し、`hostErr != nil` の場合は `slog.Warn` で警告ログを出力する（AC-17。`host` は `hostErr != nil` でも空文字列のまま使い、通知処理自体は継続する。Slack への警告ポストは行わない）。続けて `outcome := notify.Outcome{Result: result, Err: runErr, Host: host, Account: cfg.Handle, Elapsed: elapsed}` を構築し、`apply` が `true` の場合のみ `sendNotification(cfg, httpDoer, outcome)` を呼ぶ（既存の「通知は `--apply` 実行時のみ送る」という 0006 以来の方針は変更しない）。`ResolveHostname` の呼び出しは `apply` が `false`（dry-run）の場合には実行しても意味がないが、副作用のない軽量な呼び出しであり、`apply` の分岐で呼び出しを分けるより `Outcome` を一箇所で組み立てるほうが読みやすいため、`apply` の値によらず常に計算する（YAGNI: 分岐を増やす最適化はしない）。
 
 **F-001 の「正常終了・異常終了のいずれも」の範囲**: AC-01/AC-02 が指す「異常終了」は、`sendNotification` が実際に呼ばれる実行、すなわち `runner.Run()` の呼び出しに到達した実行（`runner.Run()` 自身が返すエラーを含む）を指す。`config.LoadAppConfig`（TOML/環境変数の読み込み）や `atproto.NewClient`（DID/PDS 解決、SSRF 検証を含む）が `runner.Run()` の呼び出し前に失敗した場合、`run()` はその時点で `return`し、`if apply` ブロック（`sendNotification` の唯一の呼び出し箇所）に到達しないため、Slack 通知自体が送信されない。これは 0004/0006 で確立済みの既存の構造であり、本タスクが変更するものではない。したがって Host/Account フィールドの追加は、この既存の「通知が送信されない実行パス」を新たに通知対象にするものではなく、あくまで「通知が送信される実行」における `fields` の内容を拡張するにとどまる。DID/PDS 解決失敗（SSRF 関連エラーを含む）を Slack 通知の対象に含めるかどうかは、`sendNotification` の呼び出しタイミング自体の見直しを要する別関心事であり、本タスクの Out of Scope（要件定義書2節）である F-001〜F-003 のいずれにも含まれないため、本タスクでは扱わない。
 
 ## 4. エラーハンドリング設計
 
-新規のエラー型は導入しない。`ResolveHostname` は `os.Hostname()` のエラーを吸収して空文字列を返す非エラー関数であり、エラーを一切返さない（AC-05 が要求する best-effort 方針をシグネチャ自体で表現する）。`buildPayload` は 0006/0012 と同様、失敗しない関数のままである。
+新規のエラー型は導入しない。`ResolveHostname` は `(string, error)` を返す（AC-17、要件定義書 2026-07-10 追記分）が、`os.Hostname()` のエラーをそのまま返すだけであり、通知フィールド自体は呼び出し元（`run()`）が `hostErr` の有無によらず常に空文字列にフォールバックさせる（AC-05 が要求する best-effort 方針を維持する）。`ResolveHostname` が返すエラーは `run()` が `slog.Warn` でログ出力するのみに用い、通知送信や CLI の終了コードには影響させない。`buildPayload` は 0006/0012 と同様、失敗しない関数のままである。
 
 ## 5. セキュリティ考慮事項
 
