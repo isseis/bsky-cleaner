@@ -568,25 +568,28 @@ type slackField struct {
 // slackAttachmentFields decodes the body of the single request sent to
 // hooks.slack.com and returns its first attachment's fields, so tests can
 // assert on individual Title/Value pairs without depending on internal/notify's
-// unexported payload types.
+// unexported payload types. It requires exactly one such request, failing the
+// test otherwise -- a silent "first match" here would hide a regression that
+// sends extra Slack requests or that this helper picked up the wrong one.
 func slackAttachmentFields(t *testing.T, mock *atprototestutil.MockHTTPDoer) []slackField {
 	t.Helper()
 	const slackBaseURL = "https://hooks.slack.com/"
+	var slackRequests []atprototestutil.RecordedRequest
 	for _, req := range mock.Requests() {
-		if !strings.HasPrefix(req.URL, slackBaseURL) {
-			continue
+		if strings.HasPrefix(req.URL, slackBaseURL) {
+			slackRequests = append(slackRequests, req)
 		}
-		var payload struct {
-			Attachments []struct {
-				Fields []slackField `json:"fields"`
-			} `json:"attachments"`
-		}
-		require.NoError(t, json.Unmarshal(req.Body, &payload))
-		require.Len(t, payload.Attachments, 1)
-		return payload.Attachments[0].Fields
 	}
-	t.Fatalf("no request sent to %s", slackBaseURL)
-	return nil
+	require.Len(t, slackRequests, 1, "expected exactly one request to %s", slackBaseURL)
+
+	var payload struct {
+		Attachments []struct {
+			Fields []slackField `json:"fields"`
+		} `json:"attachments"`
+	}
+	require.NoError(t, json.Unmarshal(slackRequests[0].Body, &payload))
+	require.Len(t, payload.Attachments, 1)
+	return payload.Attachments[0].Fields
 }
 
 // findSlackField returns the Value of the field with the given title,
