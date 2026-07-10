@@ -119,6 +119,10 @@ graph TB
 | `cmd/main_test.go` | 変更 | `sendNotification` 呼び出し経路のテストを新しいシグネチャに追従させる（挙動を検証している既存テストの意図は変えない） |
 | `docs/design/configuration.md` | 変更 | TOML フィールド一覧表に `hostname`（任意）の行を追加 |
 | `docs/dev/developer_guide/package_reference.md` | 変更 | `internal/notify` の説明を、`text` + `attachments`（実行コンテキスト・統計情報を含む）に更新する。`internal/config` の説明に `ResolveHostname`（ホスト名解決）を追記する |
+| `README.md` | 変更 | 「Safety」節に、Slack 通知は at-least-once 配信を保証しない旨の記述を追加（5.4節, AC-15） |
+| `README.ja.md` | 変更 | 「Safety」節に対応する日本語記述を追加（README.md との対訳、AC-15） |
+| `docs/overview.md` | 変更 | 「Execution Result Notification」節に、通知は best-effort でありプロセスクラッシュ時に削除結果の通知が失われうる旨の記述を追加（5.4節, AC-16） |
+| `docs/overview.ja.md` | 変更 | 「Execution Result Notification」節に対応する日本語記述を追加（AC-16） |
 
 `internal/report`・`internal/atproto`・`internal/retry`・`internal/runner` への変更はない。`runner.Run` のシグネチャ・契約（0004 で確立済み）は変更しない — 処理時間の計測は `cmd/main.go` 側で `runner.Run` を呼び出す前後を挟むだけで実現でき、`runner.Run` 自身に計測ロジックを持たせる必要がないため（YAGNI）。
 
@@ -270,7 +274,7 @@ Host/Account に `truncate()` を適用しない理由: `truncate()` は PDS の
 ### 3.5 既存ポリシーの例外: 完全成功時にも attachment を生成する（F-001, AC-06）
 
 - **既存ポリシーとその所在**: [0012_slack_rich_formatting/02_architecture.md](../0012_slack_rich_formatting/02_architecture.md) 3.3節・Appendix「決定履歴」は、「完全成功時は表示すべき失敗詳細が存在しないため `attachments` を生成しない」ことを明示的な設計判断としている（フェーズ8の実送信確認で、`Fields` が空の color-only attachment が一部の Incoming Webhook 互換クライアントで不可視になることが判明したため）。同ドキュメントの AC-05/AC-06 がこの挙動を要求している。
-- **本タスクが例外とする理由**: F-001（AC-01/AC-02/AC-06）は「正常系・異常系を問わず、ホスト名・アカウントハンドルを `fields` に含める」ことを求めており、これは 0012 が想定していなかった「常に非空の構造化データを持つ」という状況を作り出す。0012 が回避しようとした問題（`Fields` が空の color-only attachment が不可視になる）は、本タスクでは `Fields` が Host/Account によって常に非空になるため、そもそも発生しない。したがって 0012 の設計判断の前提（「完全成功時は表示すべきデータが無い」）が本タスクによって成立しなくなり、attachment を常に生成する設計に戻すことがこの前提の変化に対する正しい対応である。
+- **本タスクが例外とする理由**: F-001（AC-01/AC-02/AC-06）は「正常系・異常系を問わず、ホスト名・アカウントハンドルを `fields` に含める」ことを求めており、これは 0012 が想定していなかった「常に空ではない構造化データを持つ」という状況を作り出す。0012 が回避しようとした問題（`Fields` が空の color-only attachment が不可視になる）は、本タスクでは `Fields` が Host/Account によって常に空ではなくなるため、そもそも発生しない。したがって 0012 の設計判断の前提（「完全成功時は表示すべきデータが無い」）が本タスクによって成立しなくなり、attachment を常に生成する設計に戻すことがこの前提の変化に対する正しい対応である。
 - **更新が必要な既存テスト**: `internal/notify/payload_test.go` の `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（`assert.Empty(t, got.Attachments)` の箇所を、Host/Account フィールドを含む1件の attachment を期待する形に更新）と `TestBuildPayload_ResultAndErrNil_HasNoAttachment`（テスト名・アサーションとも、Host/Account フィールドを含む attachment が生成されることを期待する形に更新。テスト名も実態に合わせて変更する）。
 
 ### 3.6 `cmd/main.go` の変更
@@ -332,7 +336,15 @@ flowchart TD
 
 本タスクは attachment の構造（`color` + `fields`）そのものを変更しない — `fields` に含まれる要素の種類が増えるのみであり、0012 5.3節で確認済みの互換性根拠（Slack Desktop/Mobile/Web、および Mattermost での `color`/`fields` の描画実績）がそのまま適用できる。ただし「完全成功時にも attachment を生成する」設計変更（3.5節）は 0012 のフェーズ8確認では検証されていない新しい状態（`Fields` が2件だけの、danger色ではない attachment）であり、かつ 0012 のフェーズ8で実際に「空 attachment の不可視化」問題が再現したのは Mattermost であったため（0012 Appendix「決定履歴」参照）、8節の実装優先順位に `make notify-preview-send` による Mattermost を含む実送信確認を明示のステップとして含める。
 
-**この確認が失敗した場合のフォールバック**: 万一 Mattermost（またはその他確認対象クライアント）で、`Fields` が2件（Host/Account）のみの danger色ではない attachment が依然として描画されない場合、0012 のフェーズ8で最終的に不採用となった「attachment 本体の `Text` フィールドに内容を複製する」対応は再度不採用とする。代わりに、成功時のみ `Color: colorGood`（`"good"`）等の明示的な色を設定する対応を優先する（`Fields` の非空性ではなく `Color` の明示的な設定が可視化に必要という新しい仮説の検証になる）。この場合 3.3節手順5・付録「決定履歴」を合わせて更新する。実装優先順位（8節）ではこの確認をテスト・ドキュメント更新より前に前倒しし、フォールバックが必要になった場合の手戻りを最小化する。
+**この確認が失敗した場合のフォールバック**: 万一 Mattermost（またはその他確認対象クライアント）で、`Fields` が2件（Host/Account）のみの danger色ではない attachment が依然として描画されない場合、0012 のフェーズ8で最終的に不採用となった「attachment 本体の `Text` フィールドに内容を複製する」対応は再度不採用とする。代わりに、成功時のみ `Color: colorGood`（`"good"`）等の明示的な色を設定する対応を優先する（`Fields` が空でないことではなく `Color` の明示的な設定が可視化に必要という新しい仮説の検証になる）。この場合 3.3節手順5・付録「決定履歴」を合わせて更新する。実装優先順位（8節）ではこの確認をテスト・ドキュメント更新より前に前倒しし、フォールバックが必要になった場合の手戻りを最小化する。
+
+### 5.4 運用上の既知の制限: 通知配信の保証なし（F-004）
+
+Slack 通知には at-least-once 配信の保証がない。`runner.Run()` がポストの削除を完了して `*report.Result` を返した後、`internal/notify.Send()` の呼び出しが完了する前にプロセスがクラッシュ・強制終了・OOM Kill 等で終了した場合、削除自体は AT Protocol の `com.atproto.repo.deleteRecord` 呼び出し時点で既に確定しているにもかかわらず、その実行結果を伝える Slack 通知は永久に送信されない。
+
+この制限は 0006（[0006_slack_notification](../0006_slack_notification/02_architecture.md)）で確立された既存の設計の性質であり、`internal/notify` がプロセス内のメモリ上で `Outcome` を一度限り送信するだけで、永続化された再送キューや outbox パターンを持たないことに起因する。本タスクは通知ペイロードの内容（Host/Account/統計情報）を拡張するのみであり、この配信保証の欠如を新たに生み出すものでも悪化させるものでもない。
+
+本タスクではこの制限に対する配信保証機構（outbox パターン、永続化された再試行キュー等）を設計・実装しない（要件定義書 Out of Scope）。F-004/AC-15/AC-16 が求めるのは、この制限を運用者が認識できるようドキュメント化することのみであり、対象は README.md・README.ja.md（「Safety」節）と docs/overview.md・docs/overview.ja.md（「Execution Result Notification」節）である（実際の記述内容は2.1節のファイル一覧・8節の実装優先順位を参照）。
 
 ## 6. 処理フロー詳細
 
@@ -341,7 +353,7 @@ flowchart TD
 ## 7. テスト戦略
 
 - **ユニットテスト（`internal/config/hostname_test.go`、新規）**:
-  - `cfg.Hostname` が非空の場合、その値がそのまま返ること（AC-03）。
+  - `cfg.Hostname` が空文字ではない場合、その値がそのまま返ること（AC-03）。
   - `cfg.Hostname` が空文字列の場合、`os.Hostname()` の値が返ること（AC-04）。実際の `os.Hostname()` は環境依存のため、返り値が空でないことのみを確認する（CI環境で `os.Hostname()` が失敗するケースは通常存在しないため、AC-05 の「失敗時に空文字列を返す」分岐は関数を `os.Hostname` を差し替え可能な形にはせず、コードレビューで確認する防御的分岐として扱う。テスト容易性より実装の単純さを優先する: `os.Hostname` を関数変数として注入可能にするのはこの1分岐のためだけの抽象化であり、YAGNI に反する）。
 - **ユニットテスト（`internal/notify/payload_test.go`）**:
   - `buildPayload()`:
@@ -358,6 +370,7 @@ flowchart TD
   - `run()` が構築する `notify.Outcome` の `Host`/`Account` が、`payload_test.go` が検証する「値が正しく `fields` に反映される」ことだけでなく、実際に TOML `hostname`／`cfg.Handle` の値そのものから来ていることを検証するテストを追加する（例: TOML に既知の `hostname` 値を設定したテスト用設定ファイルで `run()` を実行し、送信された payload の Host フィールドがその値と一致することを確認する。モック `HTTPDoer` が受信したリクエストボディを検査するか、`notify.Send` を差し替え可能にする既存のテスト基盤を利用する）。これにより、Host/Account の取り違え（例: 実装時に両者を入れ替える）を `payload_test.go` 単体では検出できないという抜け穴を塞ぐ。
 - **`notifypreview` の手動確認**: `make notify-preview` を実行し、全シナリオの出力に Host/Account フィールドが含まれ、`success-apply` 等の `Result != nil` シナリオで Targets/Deleted/Duration フィールドが表示されることを目視で確認する。
 - **`make notify-preview-send` による実送信確認**: 5.3節で述べた「完全成功時に danger色ではない attachment を送る」という新しい状態が、Mattermost を含む実際の Slack Incoming Webhook 互換クライアントで意図通り描画されること（可視のブロックとして表示され、0012 のフェーズ8で発生した「空 attachment の不可視化」問題が再発しないこと）を確認する。失敗した場合は5.3節のフォールバックを適用する。
+- **ドキュメント記述の確認（AC-15, AC-16、static check）**: 通知配信保証に関するドキュメント化はテキストの存在確認のみで検証可能な純粋な文書要件であるため、単体テストは追加しない。README.md/README.ja.md の Safety 節、docs/overview.md/docs/overview.ja.md の Execution Result Notification 節に、該当する記述が存在することをコードレビュー（および必要なら grep 等の static check）で確認する。
 
 ## 8. 実装の優先順位
 
@@ -372,6 +385,7 @@ flowchart TD
 9. `payload_test.go`・`hostname_test.go`・`main_test.go` に7節のテストケースを追加・更新する。
 10. `make notify-preview-send` による最終的な実送信確認（7節）を行い、統計フィールドを含む全シナリオの描画に問題がないことを確認する。
 11. `docs/design/configuration.md`・`docs/dev/developer_guide/package_reference.md` を更新する。
+12. `README.md`・`README.ja.md`・`docs/overview.md`・`docs/overview.ja.md` に、Slack 通知配信が at-least-once ではない（プロセスクラッシュ時に削除完了の通知が失われうる）旨の記述を追加する（5.4節、AC-15/AC-16）。実際の文言はこのステップの実装時に確定させる。
 
 ## 9. 将来の拡張性
 
@@ -385,5 +399,6 @@ flowchart TD
 
 - **Host/Account に `truncate()` を適用しない**: 3.3節で述べた通り、`truncate()` は PDS レスポンス由来で長さに上限のない `errorKind()` の出力に対する防御であり、運用者が設定する Host/Account には同種のリスクがないため、この防御を新たに適用対象に加えなかった（YAGNI）。
 - **成功時の attachment に色を付けない**: F-001〜F-003 のいずれの要件も成功時の色分けを求めておらず、0012 の「黄色（中間状態）は採用しない」という判断（要件定義書 Out of Scope に本タスクでも継続と明記）と同じ理由（2値の結果表現で足りる）から、成功時用の新しい色定数（例: `colorGood`）を導入しなかった。
+- **通知配信保証機構（outbox パターン等）を実装しない**: `runner.Run()` 完了後の通知喪失は 0006 由来の既知の制限であり、本タスクのスコープ（Host/Account/統計フィールドの追加）とは独立した別関心事である。ユーザーの判断により、機構の実装は行わず、制限の明文化（F-004、AC-15/AC-16）にとどめた（要件定義書 Out of Scope 参照）。
 - **`ResolveHostname` に `os.Hostname` の差し替え可能な抽象化を導入しない**: AC-05 の「`os.Hostname()` 失敗時に空文字列を返す」という分岐を単体テストで直接踏むには `os.Hostname` を関数変数として注入可能にする必要があるが、この分岐のためだけに抽象化を導入するのは YAGNI に反すると判断し、コードレビューでの確認にとどめた（7節）。
 - **`sendNotification` の引数を `notify.Outcome` にまとめる**: 当初案では `result *report.Result, runErr error, host string, account string, elapsed time.Duration` の5引数を個別に渡す設計を検討したが、`run()` 側で1箇所に `Outcome` を組み立ててから渡す設計のほうが呼び出しシグネチャが単純になり、`sendNotification` の責務（「与えられた `Outcome` を送信する」）も明確になるため、後者を採用した（3.6節）。
