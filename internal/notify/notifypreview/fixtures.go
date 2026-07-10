@@ -48,6 +48,7 @@ func scenarios() []scenario {
 				Result:  &report.Result{Mode: report.ModeApply},
 				Host:    "worker-1",
 				Account: "alice.bsky.social",
+				Elapsed: 3 * time.Second,
 			},
 		},
 		{
@@ -59,6 +60,7 @@ func scenarios() []scenario {
 				},
 				Host:    "worker-1",
 				Account: "alice.bsky.social",
+				Elapsed: 3 * time.Second,
 			},
 		},
 		{
@@ -73,6 +75,7 @@ func scenarios() []scenario {
 				},
 				Host:    "worker-1",
 				Account: "alice.bsky.social",
+				Elapsed: 3 * time.Second,
 			},
 		},
 		{
@@ -89,6 +92,7 @@ func scenarios() []scenario {
 				Result:  truncationResult(),
 				Host:    "worker-1",
 				Account: "alice.bsky.social",
+				Elapsed: 3 * time.Second,
 			},
 		},
 	}

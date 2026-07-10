@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -352,7 +353,9 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 		return exitSetupOrRunFail
 	}
 
+	start := time.Now()
 	result, runErr := runner.Run(ctx, client, cfg.AppPassword, cfg.RetentionDays, apply, now)
+	elapsed := time.Since(start)
 	if runErr != nil {
 		_, _ = fmt.Fprintln(stderr, notify.Sanitize(runErr.Error())) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	} else {
@@ -367,8 +370,14 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 	// budget may already be nearly spent by the time runner.Run returns, and
 	// reusing it here would make notification least reliable exactly when
 	// the run itself errored (architecture doc section 3.5).
+	host, hostErr := config.ResolveHostname(cfg.Config)
+	if hostErr != nil {
+		slog.Warn("failed to resolve hostname, using empty value", "error", hostErr)
+	}
+	outcome := notify.Outcome{Result: result, Err: runErr, Host: host, Account: cfg.Handle, Elapsed: elapsed}
+
 	if apply {
-		if sendErr := sendNotification(cfg, httpDoer, result, runErr); sendErr != nil {
+		if sendErr := sendNotification(cfg, httpDoer, outcome); sendErr != nil {
 			_, _ = fmt.Fprintln(stderr, sendErr.Error()) //nolint:gosec // stderr is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 		}
 	}
@@ -385,10 +394,12 @@ func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer
 
 // sendNotification builds and sends the Slack notification for one apply
 // run, using its own timeout/context independent of run's execution-timeout
-// ctx (see the comment at its call site). A delivery failure is returned to
-// the caller for stderr reporting only -- it never influences run's exit
-// code.
-func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *report.Result, runErr error) error {
+// ctx (see the comment at its call site). outcome is fully constructed by
+// the caller (run), including Host/Account/Elapsed, so this function's only
+// responsibility remains "send a given Outcome". A delivery failure is
+// returned to the caller for stderr reporting only -- it never influences
+// run's exit code.
+func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, outcome notify.Outcome) error {
 	notifyCtx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 	defer cancel()
 
@@ -396,7 +407,7 @@ func sendNotification(cfg *config.AppConfig, httpDoer atproto.HTTPDoer, result *
 		SuccessWebhookURL: cfg.SlackSuccessWebhookURL,
 		FailureWebhookURL: cfg.SlackFailureWebhookURL,
 	}
-	return notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, notify.Outcome{Result: result, Err: runErr})
+	return notify.Send(notifyCtx, notifyCfg, httpDoer, retry.RealClock{}, outcome)
 }
 
 // parsePrintScheduleFlags parses args (excluding the "print-schedule"

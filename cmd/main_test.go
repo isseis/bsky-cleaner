@@ -481,6 +481,36 @@ func TestRun_ApplyAllSucceed_ReturnsExitCode0AndPrintsResult(t *testing.T) {
 	assert.Contains(t, stdout.String(), "Deleted 1 post(s), 0 failure(s)")
 	assert.Empty(t, stderr.String())
 	assertOnlySlackRequestURL(t, mock, "https://hooks.slack.com/services/success")
+
+	duration := findSlackField(t, slackAttachmentFields(t, mock), "Duration")
+	parsed, err := time.ParseDuration(duration)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, parsed, time.Duration(0))
+}
+
+// TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials verifies that
+// the Slack payload's Host/Account fields come from the TOML hostname field
+// and the configured Bluesky handle respectively, guarding against the two
+// being swapped.
+func TestRun_Apply_SendsHostAndAccountFromConfigAndCredentials(t *testing.T) {
+	atproto.StubPassthroughPDSDoer(t)
+	setEnvCredentials(t)
+
+	path := t.TempDir() + "/config.toml"
+	const body = "retention_days = 30\nschedule = \"0 3 * * *\"\nexecution_timeout_seconds = 3600\nslack_allowed_host = \"hooks.slack.com\"\nhostname = \"ci-runner-1\"\n"
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+
+	const rkey = "old-post"
+	postsPage := postPageResponse(rkey, "2000-01-01T00:00:00Z")
+	mock := &atprototestutil.MockHTTPDoer{Handler: slackWebhookHandler(http.StatusOK, deleteRecordHandler(t, postsPage, map[string]int{rkey: http.StatusOK}))}
+
+	var stdout, stderr bytes.Buffer
+	code := run(path, true, time.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC), mock, &stdout, &stderr)
+
+	assert.Equal(t, exitOK, code)
+	fields := slackAttachmentFields(t, mock)
+	assert.Equal(t, "ci-runner-1", findSlackField(t, fields, "Host"))
+	assert.Equal(t, publicIPLiteral, findSlackField(t, fields, "Account"))
 }
 
 func TestRun_ApplyPartialFailure_ReturnsExitCode3AndPrintsFailures(t *testing.T) {
@@ -525,6 +555,54 @@ func assertOnlySlackRequestURL(t *testing.T, mock *atprototestutil.MockHTTPDoer,
 		}
 	}
 	assert.Equal(t, []string{wantURL}, slackURLs)
+}
+
+// slackField mirrors internal/notify's unexported slackField JSON shape,
+// letting cmd's tests decode a sent Slack payload without depending on
+// internal/notify's unexported types.
+type slackField struct {
+	Title string `json:"title"`
+	Value string `json:"value"`
+}
+
+// slackAttachmentFields decodes the body of the single request sent to
+// hooks.slack.com and returns its first attachment's fields, so tests can
+// assert on individual Title/Value pairs without depending on internal/notify's
+// unexported payload types. It requires exactly one such request, failing the
+// test otherwise -- a silent "first match" here would hide a regression that
+// sends extra Slack requests or that this helper picked up the wrong one.
+func slackAttachmentFields(t *testing.T, mock *atprototestutil.MockHTTPDoer) []slackField {
+	t.Helper()
+	const slackBaseURL = "https://hooks.slack.com/"
+	var slackRequests []atprototestutil.RecordedRequest
+	for _, req := range mock.Requests() {
+		if strings.HasPrefix(req.URL, slackBaseURL) {
+			slackRequests = append(slackRequests, req)
+		}
+	}
+	require.Len(t, slackRequests, 1, "expected exactly one request to %s", slackBaseURL)
+
+	var payload struct {
+		Attachments []struct {
+			Fields []slackField `json:"fields"`
+		} `json:"attachments"`
+	}
+	require.NoError(t, json.Unmarshal(slackRequests[0].Body, &payload))
+	require.Len(t, payload.Attachments, 1)
+	return payload.Attachments[0].Fields
+}
+
+// findSlackField returns the Value of the field with the given title,
+// failing the test if no such field is present.
+func findSlackField(t *testing.T, fields []slackField, title string) string {
+	t.Helper()
+	for _, f := range fields {
+		if f.Title == title {
+			return f.Value
+		}
+	}
+	t.Fatalf("no field with title %q", title)
+	return ""
 }
 
 func TestRun_ApplyLoginFailure_SendsFailureNotification(t *testing.T) {

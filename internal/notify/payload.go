@@ -74,19 +74,28 @@ type webhookPayload struct {
 // Targets/Deleted/Duration when the run produced a Result, followed by a
 // failure detail field (the aborting error's category for a run-ending
 // error, or every failed post's rkey and error category for partial delete
-// failures) when the run failed.
+// failures) when the run failed. The compact fields (Host/Account/
+// Targets/Deleted/Duration) are marked Short so Slack/Mattermost lay them
+// out two-per-row instead of one full-width row each; the failure detail
+// field is not, since its value is long-form.
 type slackAttachment struct {
 	Color  string       `json:"color,omitempty"`
 	Fields []slackField `json:"fields,omitempty"`
 }
 
 // slackField is a single title/value pair rendered inside an attachment.
-// Short=false is always used (this design never needs Slack's two-column
-// layout), so the field is omitted from the JSON tag set rather than
-// exposed as a knob no caller varies.
 type slackField struct {
 	Title string `json:"title"`
 	Value string `json:"value"`
+
+	// Short tells Slack/Mattermost-compatible clients this field's value is
+	// short enough to lay out two-per-row alongside a neighboring short
+	// field, instead of taking a full-width row of its own. Set on the
+	// compact context/statistics fields (Host, Account, Targets, Deleted,
+	// Duration); left false (the zero value, omitted from JSON) on Error and
+	// Failed posts, whose values are long-form and would wrap awkwardly if
+	// forced into a half-width column.
+	Short bool `json:"short,omitempty"`
 }
 
 // emojiSuccess is prepended to text for a fully successful run.
@@ -198,10 +207,12 @@ func buildPayload(outcome Outcome) webhookPayload {
 	}
 	text = truncate(text)
 
-	// Always build one attachment with Host and Account fields.
+	// Always build one attachment with Host and Account fields. Short: true
+	// lets Slack/Mattermost lay these compact fields out two-per-row instead
+	// of one full-width row each.
 	fields := []slackField{
-		{Title: "Host", Value: truncate(sanitizeForPayload(outcome.Host))},
-		{Title: "Account", Value: truncate(sanitizeForPayload(outcome.Account))},
+		{Title: "Host", Value: truncate(sanitizeForPayload(outcome.Host)), Short: true},
+		{Title: "Account", Value: truncate(sanitizeForPayload(outcome.Account)), Short: true},
 	}
 
 	// Add delete statistics only when the run reached the point of producing
@@ -209,9 +220,9 @@ func buildPayload(outcome Outcome) webhookPayload {
 	// nothing to report here.
 	if outcome.Result != nil {
 		fields = append(fields,
-			slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets))},
-			slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted))},
-			slackField{Title: "Duration", Value: outcome.Elapsed.String()},
+			slackField{Title: "Targets", Value: strconv.Itoa(len(outcome.Result.Targets)), Short: true},
+			slackField{Title: "Deleted", Value: strconv.Itoa(len(outcome.Result.Deleted)), Short: true},
+			slackField{Title: "Duration", Value: outcome.Elapsed.String(), Short: true},
 		)
 	}
 
