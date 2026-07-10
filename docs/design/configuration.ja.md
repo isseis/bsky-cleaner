@@ -25,6 +25,7 @@
 | `schedule` | 文字列 | 任意 | `""`（キー省略時） | cron 相当のスケジュール文字列。Docker 配布時の `print-schedule` サブコマンド（[0007_docker_distribution](../tasks/0007_docker_distribution/01_requirements.md)）でのみ使用するため、Docker を介さず直接実行・crontab 登録する場合は不要。本パッケージ自体は値の有無のみを扱い、cron 構文としての妥当性検証は `print-schedule` 側の責務 |
 | `execution_timeout_seconds` | 整数 | 必須 | なし | 秒単位。`1`〜`86400`（24時間）の範囲の整数。`0` 以下または `86400` を超える値は起動失敗 |
 | `slack_allowed_host` | 文字列 | `BSKY_SLACK_WEBHOOK_URL_SUCCESS`/`BSKY_SLACK_WEBHOOK_URL_FAILURE` のいずれかが設定されている場合は必須 | 未設定 | Slack Webhook URL のホスト部として許可する値（例: `hooks.slack.com`）。設定されている Webhook URL のホスト部（ポート番号を除く、大文字小文字を区別しない）がこの値と一致しない場合、起動失敗（fail-closed）。Webhook URL が両方とも未設定の場合は本項目が未設定でも起動失敗しない（[0006_slack_notification](../tasks/0006_slack_notification/01_requirements.md) F-005） |
+| `hostname` | 文字列 | 任意 | TOML キーが省略された場合・空文字列が設定された場合・空白のみの文字列が設定された場合、`os.Hostname()` の実行結果にフォールバック | Slack 通知で bsky-cleaner を実行しているマシンを識別するために使用する（[0013_slack_notification_context](../tasks/0013_slack_notification_context/01_requirements.md) 参照）。キー省略時と `""` 設定時は区別されない（`slack_allowed_host` と同様）。空白のみの値（例: `"  "`）も未設定として扱う。いずれの場合も `os.Hostname()` にフォールバックする |
 
 ### 記述例
 
@@ -33,6 +34,7 @@ retention_days = 30
 schedule = "0 3 * * *"
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
+hostname = "worker-1"
 ```
 
 ### `execution_timeout_seconds` 設定時の注意点

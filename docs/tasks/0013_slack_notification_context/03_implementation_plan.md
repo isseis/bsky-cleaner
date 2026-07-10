@@ -294,19 +294,19 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/133）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ11: ドキュメント更新（設定リファレンス・パッケージリファレンス）
 
 対応: NF-007 に付随するドキュメント整合。AC番号に直接紐づく要件ではないが、既存コード調査結果で述べた通り翻訳対訳の維持のため実施する。
 
-- [ ] `docs/design/configuration.md` の TOML フィールド一覧表（22-27行目）に `hostname` の行を追加する。列は既存の `slack_allowed_host` 行（27行目）と同じ形式（Item/Type/Required-Optional/Default Value/Format-Constraints）に揃え、「required」ではなく「optional」、デフォルト値は `os.Hostname()` の結果、説明は「TOML で明示指定しない場合 `os.Hostname()` にフォールバックする」旨を記載する。
-- [ ] `docs/design/configuration.md` の Example セクション（29-36行目）の TOML コード例に `hostname = "worker-1"` の行を追加する。
-- [ ] `docs/design/configuration.ja.md` に、上記2件の対訳（日本語版のフィールド一覧表の行・Example のコード例）を追加する。
-- [ ] `docs/dev/developer_guide/package_reference.md` の `internal/notify` の説明（54行目）を、「`text` 一行サマリ + 失敗時のみの `attachments`」という記述から、「`text` 一行サマリ（件数を含まない） + 常に生成される `attachments`（実行ホスト名・アカウントハンドル、削除処理に到達した実行では対象件数・削除件数・処理時間を含む）」に更新する。
-- [ ] `docs/dev/developer_guide/package_reference.md` の `internal/config` の説明（30行目）に、`ResolveHostname`（TOML `hostname` フィールド優先、未設定時は `os.Hostname()` にフォールバックしてホスト名を解決する）についての一文を追記する。
-- [ ] 上記4件の記述内容がフェーズ1・3・5で実装した実際の挙動（`hostname` が任意項目であること、`ResolveHostname` のフォールバック順序、`buildPayload` が常に attachment を生成し統計フィールドを条件付きで含めること）と一致していることを、担当者自身が実装コードと本文を突き合わせてレビューする（実装コードを正とする整合性レビュー）。静的確認として `rg -n "hostname" docs/design/configuration.md docs/design/configuration.ja.md` を実行し、両ファイルに追加した `hostname` 行・コード例がそれぞれ1件以上マッチすることを確認する。`package_reference.md` の更新は単なる説明文の書き換えでありユニークな検索語を持たないため、この静的確認の対象外とし、上記のコードとの突き合わせレビューのみで担保する。
+- [x] `docs/design/configuration.md` の TOML フィールド一覧表（22-27行目）に `hostname` の行を追加する。列は既存の `slack_allowed_host` 行（27行目）と同じ形式（Item/Type/Required-Optional/Default Value/Format-Constraints）に揃え、「required」ではなく「optional」、デフォルト値は `os.Hostname()` の結果、説明は「TOML で明示指定しない場合 `os.Hostname()` にフォールバックする」旨を記載する。
+- [x] `docs/design/configuration.md` の Example セクション（29-36行目）の TOML コード例に `hostname = "worker-1"` の行を追加する。
+- [x] `docs/design/configuration.ja.md` に、上記2件の対訳（日本語版のフィールド一覧表の行・Example のコード例）を追加する。
+- [x] `docs/dev/developer_guide/package_reference.md` の `internal/notify` の説明（54行目）を、「`text` 一行サマリ + 失敗時のみの `attachments`」という記述から、「`text` 一行サマリ（件数を含まない） + 常に生成される `attachments`（実行ホスト名・アカウントハンドル、削除処理に到達した実行では対象件数・削除件数・処理時間を含む）」に更新する。
+- [x] `docs/dev/developer_guide/package_reference.md` の `internal/config` の説明（30行目）に、`ResolveHostname`（TOML `hostname` フィールド優先、未設定時は `os.Hostname()` にフォールバックしてホスト名を解決する）についての一文を追記する。
+- [x] 上記4件の記述内容がフェーズ1・3・5で実装した実際の挙動（`hostname` が任意項目であること、`ResolveHostname` のフォールバック順序、`buildPayload` が常に attachment を生成し統計フィールドを条件付きで含めること）と一致していることを、担当者自身が実装コードと本文を突き合わせてレビューする（実装コードを正とする整合性レビュー）。静的確認として `rg -n "hostname" docs/design/configuration.md docs/design/configuration.ja.md` を実行し、両ファイルに追加した `hostname` 行・コード例がそれぞれ1件以上マッチすることを確認する。`package_reference.md` の更新は単なる説明文の書き換えでありユニークな検索語を持たないため、この静的確認の対象外とし、上記のコードとの突き合わせレビューのみで担保する。
 
 ### PR-6 作成ポイント: configuration and package reference docs
 
@@ -316,8 +316,8 @@
 
 **レビュー観点**: `docs/design/configuration.md`/`.ja.md` の英日対訳が内容・書式ともに一致しているか / `package_reference.md` の `internal/notify`/`internal/config` の説明が PR-1〜PR-5 で実装した実際の挙動と乖離していないか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/134）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 

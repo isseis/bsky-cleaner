@@ -27,7 +27,7 @@ codebase grows.
 
 **Configuration**
 
-- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. `LoadAppConfig` also validates that any configured Slack webhook URL's host matches the TOML `slack_allowed_host` allowlist, failing closed if it is missing or does not match (see docs/tasks/0006_slack_notification/01_requirements.md). See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
+- `internal/config`: reads the TOML configuration file (`Load`) and secret credentials from the process environment (`LoadCredentials`), validates both (fail-closed on missing/out-of-range values), and combines them into `AppConfig` (`LoadAppConfig`) for callers that need both. `LoadAppConfig` also validates that any configured Slack webhook URL's host matches the TOML `slack_allowed_host` allowlist, failing closed if it is missing or does not match (see docs/tasks/0006_slack_notification/01_requirements.md). It resolves the operator-facing hostname used in Slack notifications via `ResolveHostname`, preferring the TOML `hostname` field when non-empty (after trimming whitespace) and falling back to `os.Hostname()` otherwise. See [Configuration Reference](../../design/configuration.md) for the full list of TOML fields and environment variables.
 
 **AT Protocol Client**
 
@@ -51,7 +51,7 @@ codebase grows.
 
 **Notification**
 
-- `internal/notify`: builds a Slack Incoming Webhook payload (`text` summary plus a color-coded `attachments` block for failure detail) from a `report.Result`/error outcome, routing to a success or failure webhook URL based on whether the run errored or had partial delete failures (`Send`). Sanitizes control characters/newlines and escapes Slack mrkdwn mention syntax in externally-sourced identifiers and error text before including them, and never includes post body content. Delegates HTTP timeout/retry to `internal/retry`, redacting the webhook URL from its retry/give-up logging. A delivery failure never affects the CLI's own exit code (see docs/tasks/0006_slack_notification/01_requirements.md, docs/tasks/0012_slack_rich_formatting/01_requirements.md).
+- `internal/notify`: builds a Slack Incoming Webhook payload from a `report.Result`/error outcome, routing to a success or failure webhook URL based on whether the run errored or had partial delete failures (`Send`). The payload consists of a fixed-shape `text` summary (no numeric counts) and a color-coded `attachments` block that is always generated, beginning with Host (the machine hostname) and Account (the Bluesky handle) fields; when the run produced a `report.Result`, it also includes Targets/Deleted/Duration statistics fields, and a failure-detail field (Error or Failed posts) when the run failed. Sanitizes control characters/newlines and escapes Slack mrkdwn mention syntax in externally-sourced identifiers and error text before including them, and never includes post body content. Delegates HTTP timeout/retry to `internal/retry`, redacting the webhook URL from its retry/give-up logging. A delivery failure never affects the CLI's own exit code (see docs/tasks/0006_slack_notification/01_requirements.md, docs/tasks/0012_slack_rich_formatting/01_requirements.md).
 
 ## Key Design Patterns
 
