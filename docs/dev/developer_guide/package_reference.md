@@ -51,7 +51,7 @@ codebase grows.
 
 **Notification**
 
-- `internal/notify`: builds a Slack Incoming Webhook payload (`text` field only) from a `report.Result`/error outcome, routing to a success or failure webhook URL based on whether the run errored or had partial delete failures (`Send`). Sanitizes control characters/newlines and escapes Slack mrkdwn mention syntax in externally-sourced identifiers and error text before including them, and never includes post body content. Delegates HTTP timeout/retry to `internal/retry`, redacting the webhook URL from its retry/give-up logging. A delivery failure never affects the CLI's own exit code (see docs/tasks/0006_slack_notification/01_requirements.md).
+- `internal/notify`: builds a Slack Incoming Webhook payload (`text` summary plus a color-coded `attachments` block for failure detail) from a `report.Result`/error outcome, routing to a success or failure webhook URL based on whether the run errored or had partial delete failures (`Send`). Sanitizes control characters/newlines and escapes Slack mrkdwn mention syntax in externally-sourced identifiers and error text before including them, and never includes post body content. Delegates HTTP timeout/retry to `internal/retry`, redacting the webhook URL from its retry/give-up logging. A delivery failure never affects the CLI's own exit code (see docs/tasks/0006_slack_notification/01_requirements.md, docs/tasks/0012_slack_rich_formatting/01_requirements.md).
 
 ## Key Design Patterns
 

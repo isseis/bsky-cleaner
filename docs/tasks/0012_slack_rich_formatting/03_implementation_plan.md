@@ -171,21 +171,21 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/124）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた
 
 ### フェーズ9: ドキュメント更新
 
 **対象ファイル**: `docs/dev/developer_guide/package_reference.md`
 
-- [ ] `docs/dev/developer_guide/package_reference.md:54` の `internal/notify` の説明にある `builds a Slack Incoming Webhook payload (`text` field only) from a report.Result/error outcome` を `builds a Slack Incoming Webhook payload (`text` summary plus a color-coded `attachments` block for failure detail) from a report.Result/error outcome` に変更する（変更後の文言は英語で記述する — 同ファイルはパッケージ構成の英語説明であるため、既存の文体に合わせる）。
+- [x] `docs/dev/developer_guide/package_reference.md:54` の `internal/notify` の説明にある `builds a Slack Incoming Webhook payload (`text` field only) from a report.Result/error outcome` を `builds a Slack Incoming Webhook payload (`text` summary plus a color-coded `attachments` block for failure detail) from a report.Result/error outcome` に変更する（変更後の文言は英語で記述する — 同ファイルはパッケージ構成の英語説明であるため、既存の文体に合わせる）。
 
 ### フェーズ10: 品質確認
 
-- [ ] `make fmt` を実行する。
-- [ ] `make test` を実行し、`internal/notify` パッケージおよびリポジトリ全体のテストが緑であることを確認する。
-- [ ] `make lint` を実行し、警告・エラーがないことを確認する。
-- [ ] `make deadcode` を実行し、`buildPayload`/`isFailure`/`truncate` 等の新規シンボルに到達不能コードがないことを確認する。
+- [x] `make fmt` を実行する。
+- [x] `make test` を実行し、`internal/notify` パッケージおよびリポジトリ全体のテストが緑であることを確認する。
+- [x] `make lint` を実行し、警告・エラーがないことを確認する。
+- [x] `make deadcode` を実行し、`buildPayload`/`isFailure`/`truncate` 等の新規シンボルに到達不能コードがないことを確認する。
 
 ### PR-3 作成ポイント
 - **対象ステップ**: フェーズ9〜10 (ドキュメント更新、品質確認)
@@ -198,8 +198,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - AC-01〜AC-12 が全て緑であること
 
 PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
-- [ ] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
-- [ ] PR を作成した
+- [x] グリーンゲート通過: `make fmt && make test && make lint && make deadcode`
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/126）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた
 
@@ -238,8 +238,8 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [x] フェーズ6: `payload_test.go` の更新
 - [x] フェーズ7: `notifypreview` の表示整形
 - [x] フェーズ8: `make notify-preview-send` による実送信確認
-- [ ] フェーズ9: ドキュメント更新
-- [ ] フェーズ10: 品質確認
+- [x] フェーズ9: ドキュメント更新
+- [x] フェーズ10: 品質確認
 
 ## 7. 受け入れ基準検証（Acceptance Criteria Verification）
 
