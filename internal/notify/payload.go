@@ -56,8 +56,11 @@ const truncatedMarker = "...(truncated)"
 // fields begin with Host and Account (present on every run, success
 // included), followed by Targets/Deleted/Duration when outcome.Result !=
 // nil, followed by a failure detail field (Error or Failed posts) when
-// isFailure(outcome) is true. The block is always color-coded: colorDanger
-// on failure, colorGood on success.
+// isFailure(outcome) is true and the outcome produced a run error or
+// per-post failures. The unknown-error path (outcome.Result == nil &&
+// outcome.Err == nil) has no failure-detail field, only Host/Account.
+// The block is always color-coded: colorDanger on failure, colorGood on
+// success.
 // Uses Slack's legacy attachments API (color + fields) rather than Block
 // Kit -- still documented and supported by Slack's Incoming Webhooks, and
 // sufficient for the success/failure summary this tool needs.
@@ -174,8 +177,10 @@ func truncationCutPoint(text string) int {
 // Exactly one attachment is always generated whose fields always begin with
 // Host and Account, followed by Targets/Deleted/Duration when
 // outcome.Result != nil, followed by an Error or Failed posts field when the
-// run failed. The attachment's Color is colorDanger on failure and
-// colorGood on success.
+// run failed and the outcome produced a run error or per-post failures. The
+// unknown-error path (outcome.Result == nil && outcome.Err == nil) has no
+// failure-detail field, only Host/Account. The attachment's Color is
+// colorDanger on failure and colorGood on success.
 func buildPayload(outcome Outcome) webhookPayload {
 	var text string
 	switch {
