@@ -31,22 +31,28 @@ const truncatedMarker = "...(truncated)"
 
 // webhookPayload is the Slack Incoming Webhook request body. text carries
 // an emoji-prefixed one-line summary, kept separate from the failure
-// detail; attachments always holds exactly one color-coded block, whose
-// fields entry carries the failure detail only when outcome has at least
-// one delete failure to report. Uses Slack's legacy attachments API
-// (color + fields) rather than Block Kit -- still documented and
-// supported by Slack's Incoming Webhooks, and sufficient for the
-// success/failure summary this tool needs.
+// detail; attachments holds exactly one color-coded block carrying the
+// failure detail, but only when there is structured failure detail to
+// report -- isFailure() returning true is necessary but not sufficient,
+// since the defensive Outcome{Result: nil, Err: nil} case also reports as
+// a failure yet has no fields to show, so it omits attachments entirely
+// rather than emitting a color-only block (see
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md's Appendix:
+// Decision History: a color-only attachment with no text/fields renders
+// as an empty, invisible block on at least one Incoming Webhook-compatible
+// client).
+// Uses Slack's legacy attachments API (color + fields) rather than Block
+// Kit -- still documented and supported by Slack's Incoming Webhooks, and
+// sufficient for the success/failure summary this tool needs.
 type webhookPayload struct {
 	Text        string            `json:"text"`
 	Attachments []slackAttachment `json:"attachments,omitempty"`
 }
 
-// slackAttachment is a single color-coded block. buildPayload always
-// produces exactly one -- color always applies, regardless of whether
-// there is failure detail to list, so success/failure is visible even
-// when Fields is empty. Slack's attachments array supports more than one
-// block, but nothing in scope needs a second one (YAGNI).
+// slackAttachment is a single color-coded block, present only for a failed
+// run (see webhookPayload). Its single field holds the failure detail: the
+// aborting error's category for a run-ending error, or every failed post's
+// rkey and error category for partial delete failures.
 type slackAttachment struct {
 	Color  string       `json:"color,omitempty"`
 	Fields []slackField `json:"fields,omitempty"`
@@ -68,31 +74,19 @@ const emojiSuccess = "✅"
 // outcome or partial delete failures).
 const emojiFailure = "❌"
 
-// colorGood is the Slack legacy attachment color for a successful run.
-const colorGood = "good"
-
-// colorDanger is the Slack legacy attachment color for a failed run.
+// colorDanger is the Slack legacy attachment color for a failed run. There
+// is no "good" counterpart: a successful run has no attachment at all (see
+// webhookPayload), so no color constant is needed for that case.
 const colorDanger = "danger"
 
 // isFailure reports whether outcome represents a failed run: an error that
 // aborted the run before completion, or a completed run with at least one
 // delete failure. Both notify.go's destination-webhook selection (which
 // Slack webhook URL a notification is sent to) and payload.go's
-// color/emoji selection call this single function, so the two decisions
-// cannot diverge.
+// attachment/emoji selection call this single function, so the two
+// decisions cannot diverge.
 func isFailure(outcome Outcome) bool {
 	return outcome.Err != nil || outcome.Result == nil || len(outcome.Result.Failed) > 0
-}
-
-// colorFor maps isFailure's result to a Slack legacy attachment color:
-// "good" (green) for a fully successful run, "danger" (red) for any
-// failure. No intermediate "warning" tier -- a bsky-cleaner run's outcome
-// is binary (fully succeeded, or failed/partially failed).
-func colorFor(failed bool) string {
-	if failed {
-		return colorDanger
-	}
-	return colorGood
 }
 
 // escapeSlackMarkup applies Slack's mrkdwn escaping rules so a string of
@@ -148,25 +142,25 @@ func truncationCutPoint(text string) int {
 	return cut
 }
 
-// buildPayload renders outcome as a Slack webhookPayload: an emoji-prefixed
-// summary line plus exactly one color-coded attachment whose single field
-// lists every failed post's rkey and error category, populated only when
-// outcome has at least one delete failure to report. Never includes post
-// body content -- atproto.Post has no field for it in the first place.
-// outcome.Result may be nil (the run aborted before producing one, e.g. a
-// login failure); this never panics, treating the delete count as 0 and
-// rendering only outcome.Err's category. text and the failure-list field
-// value are truncated independently, since errorKind(outcome.Err) can
-// carry externally-sourced text of unbounded length.
+// buildPayload renders outcome as a Slack webhookPayload: a short
+// emoji-prefixed one-line summary that never embeds failure detail, plus,
+// only when the run failed, exactly one color-coded attachment whose
+// single field holds that failure detail (the aborting error's category
+// for a run-ending error, or every failed post's rkey and error category
+// for partial delete failures). Never includes post body content --
+// atproto.Post has no field for it in the first place. outcome.Result may
+// be nil (the run aborted before producing one, e.g. a login failure);
+// this never panics, treating the delete count as 0. text and the
+// attachment field value are truncated independently, since
+// errorKind(outcome.Err) can carry externally-sourced text of unbounded
+// length.
 func buildPayload(outcome Outcome) webhookPayload {
-	failed := isFailure(outcome)
-
 	var text string
 	switch {
 	case outcome.Err != nil:
-		text = fmt.Sprintf("%s bsky-cleaner run failed: %s", emojiFailure, sanitizeForPayload(errorKind(outcome.Err)))
+		text = fmt.Sprintf("%s bsky-cleaner run failed.", emojiFailure)
 	case outcome.Result == nil:
-		text = fmt.Sprintf("%s bsky-cleaner run failed: unknown error", emojiFailure)
+		text = fmt.Sprintf("%s bsky-cleaner run failed: unknown error.", emojiFailure)
 	default:
 		deleted := len(outcome.Result.Deleted)
 		failedCount := len(outcome.Result.Failed)
@@ -178,21 +172,38 @@ func buildPayload(outcome Outcome) webhookPayload {
 	}
 	text = truncate(text)
 
-	attachment := slackAttachment{Color: colorFor(failed)}
-	if outcome.Result != nil && len(outcome.Result.Failed) > 0 {
-		var b strings.Builder
-		for i, failure := range outcome.Result.Failed {
-			if i > 0 {
-				b.WriteString("\n")
+	var attachments []slackAttachment
+	if isFailure(outcome) {
+		attachment := slackAttachment{Color: colorDanger}
+		switch {
+		case outcome.Err != nil:
+			attachment.Fields = []slackField{
+				{Title: "Error", Value: truncate(sanitizeForPayload(errorKind(outcome.Err)))},
 			}
-			b.WriteString(sanitizeForPayload(failure.Post.RKey))
-			b.WriteString(": ")
-			b.WriteString(sanitizeForPayload(errorKind(failure.Err)))
+		case outcome.Result != nil && len(outcome.Result.Failed) > 0:
+			var b strings.Builder
+			for i, failure := range outcome.Result.Failed {
+				if i > 0 {
+					b.WriteString("\n")
+				}
+				b.WriteString(sanitizeForPayload(failure.Post.RKey))
+				b.WriteString(": ")
+				b.WriteString(sanitizeForPayload(errorKind(failure.Err)))
+			}
+			attachment.Fields = []slackField{
+				{Title: "Failed posts", Value: truncate(b.String())},
+			}
 		}
-		attachment.Fields = []slackField{
-			{Title: "Failed posts", Value: truncate(b.String())},
+		// The defensive outcome.Result == nil && outcome.Err == nil case
+		// (isFailure() == true, but neither branch above has anything to
+		// report) falls through with attachment.Fields left empty. Skip it
+		// rather than sending a color-only attachment, which renders as an
+		// empty, invisible block (see docs/tasks/0012_slack_rich_formatting/02_architecture.md's
+		// Appendix: Decision History).
+		if len(attachment.Fields) > 0 {
+			attachments = []slackAttachment{attachment}
 		}
 	}
 
-	return webhookPayload{Text: text, Attachments: []slackAttachment{attachment}}
+	return webhookPayload{Text: text, Attachments: attachments}
 }

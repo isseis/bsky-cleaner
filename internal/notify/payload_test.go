@@ -28,20 +28,26 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 	assert.Contains(t, got.Text, emojiSuccess)
 	assert.Contains(t, got.Text, "2")
 	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
-	assert.Len(t, got.Attachments, 1)
-	assert.Equal(t, colorGood, got.Attachments[0].Color)
-	assert.Empty(t, got.Attachments[0].Fields)
+	// A fully successful run has no failure detail to show, and a
+	// color-only attachment (no text/fields) renders as an empty, invisible
+	// block on at least one Incoming Webhook-compatible client (confirmed
+	// via make notify-preview-send), so no attachment is sent at all.
+	assert.Empty(t, got.Attachments)
 }
 
 func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
 	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
 	outcome := Outcome{Result: nil, Err: someErr}
 	got := buildPayload(outcome)
+	// text carries only a short summary, not the error category detail
 	assert.Contains(t, got.Text, emojiFailure)
-	assert.Contains(t, got.Text, "atproto http error: com.atproto.server.createSession status=401")
+	assert.NotContains(t, got.Text, "atproto http error")
+	// the error category goes into a structured, danger-colored field instead
 	assert.Len(t, got.Attachments, 1)
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
-	assert.Empty(t, got.Attachments[0].Fields)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.Equal(t, "Error", got.Attachments[0].Fields[0].Title)
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.server.createSession status=401")
 }
 
 func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.T) {
@@ -57,14 +63,13 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 		},
 	}
 	got := buildPayload(outcome)
-	// AC-03: text should not contain individual failure details
+	// text should not contain individual failure details
 	assert.Contains(t, got.Text, emojiFailure)
 	assert.NotContains(t, got.Text, "rkey1")
 	assert.NotContains(t, got.Text, "rkey2")
-	// AC-07: color should be danger
 	assert.Len(t, got.Attachments, 1)
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
-	// AC-04: failure details in fields
+	// failure details go into the attachment's fields instead
 	assert.Len(t, got.Attachments[0].Fields, 1)
 	assert.Contains(t, got.Attachments[0].Fields[0].Value, "rkey1")
 	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.repo.deleteRecord status=500")
@@ -85,7 +90,7 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
 	require.Len(t, got.Attachments[0].Fields, 1)
-	// AC-04, AC-12: full equality on the field ensures no extra fields leak in
+	// full equality on the field ensures no extra fields leak in
 	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[0].Title)
 	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[0].Value)
 }
@@ -145,7 +150,9 @@ func TestBuildPayload_SanitizesNewlineInFailedRKey(t *testing.T) {
 // newline sanitization tests above do not: SSRFError.Endpoint is derived
 // from DID/PDS resolution (see internal/atproto's SSRF threat model) and so,
 // like a failed post's RKey, is externally-influenced text that must not
-// reach Slack as live mrkdwn mention syntax.
+// reach Slack as live mrkdwn mention syntax. Since the run-error errorKind
+// detail lives in the attachment's Error field (not text), that field is
+// the sanitization target here.
 func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testing.T) {
 	err := &atproto.SSRFError{
 		Endpoint: "https://evil.example.com/<!channel>",
@@ -156,8 +163,10 @@ func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testin
 
 	got := buildPayload(outcome)
 
-	assert.NotContains(t, got.Text, "<!channel>")
-	assert.Contains(t, got.Text, "&lt;!channel&gt;")
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "<!channel>")
+	assert.Contains(t, got.Attachments[0].Fields[0].Value, "&lt;!channel&gt;")
 }
 
 func TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
@@ -206,7 +215,14 @@ func TestBuildPayload_TruncationIsUTF8Safe(t *testing.T) {
 	assert.True(t, utf8.ValidString(got.Attachments[0].Fields[0].Value), "truncated field value must not split a multi-byte rune")
 }
 
-func TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
+// TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker
+// guards the run-error attachment field: errorKind(outcome.Err) can embed
+// atproto.HTTPError.ErrorName, which is PDS-response-derived and has no
+// length limit of its own (see
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md §3.4), so this
+// field must be truncated independently of the (now fixed-length) text
+// summary.
+func TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
 	outcome := Outcome{
 		Result: nil,
 		Err: &atproto.HTTPError{
@@ -216,8 +232,22 @@ func TestBuildPayload_TextTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *te
 		},
 	}
 	got := buildPayload(outcome)
-	assert.LessOrEqual(t, len(got.Text), maxPayloadLength)
-	assert.True(t, strings.HasSuffix(got.Text, truncatedMarker))
+	require.Len(t, got.Attachments, 1)
+	require.Len(t, got.Attachments[0].Fields, 1)
+	assert.LessOrEqual(t, len(got.Attachments[0].Fields[0].Value), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
+}
+
+// TestBuildPayload_ResultAndErrNil_HasNoAttachment guards the defensive
+// outcome.Result == nil && outcome.Err == nil case: isFailure() reports
+// this as a failure, but buildPayload has no failure detail to report (the
+// Error and Failed-posts branches both require a non-nil source), so it
+// must not send a color-only attachment with empty Fields -- the exact
+// invisible-block defect this task's real-send verification (phase 8)
+// found and fixed for the other cases.
+func TestBuildPayload_ResultAndErrNil_HasNoAttachment(t *testing.T) {
+	got := buildPayload(Outcome{})
+	assert.Empty(t, got.Attachments)
 }
 
 func TestIsFailure_FourOutcomePatterns(t *testing.T) {
@@ -247,8 +277,8 @@ func TestIsFailure_FourOutcomePatterns(t *testing.T) {
 			name: "result_nil_and_err_nil",
 			// internal/runner.Run's contract guarantees this combination
 			// is never produced, but isFailure defensively treats a
-			// missing Result as failure so that formatting/color/routing
-			// remain consistent if it leaks in (AC-08).
+			// missing Result as failure so that channel routing and
+			// attachment rendering remain consistent if it leaks in.
 			outcome: Outcome{
 				Result: nil,
 				Err:    nil,

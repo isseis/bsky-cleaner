@@ -70,6 +70,9 @@ func printScenarios(scenarios []scenario) {
 		p := notify.BuildPayloadPreview(s.outcome)
 		fmt.Printf("=== %s ===\n", s.name)
 		fmt.Printf("  Text: %s\n", p.Text)
+		if len(p.Attachments) == 0 {
+			fmt.Printf("  Attachments: (none)\n")
+		}
 		for i, a := range p.Attachments {
 			fmt.Printf("  Attachment[%d]:\n", i)
 			fmt.Printf("    Color: %s\n", a.Color)
