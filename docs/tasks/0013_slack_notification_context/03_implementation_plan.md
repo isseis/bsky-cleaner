@@ -85,9 +85,10 @@
 - [x] `internal/config/config.go` の `rawConfig` 構造体に `` Hostname string `toml:"hostname"` `` を追加する（`SlackAllowedHost string` と同じ非ポインタパターン、`config.go:40` 相当の位置）。
 - [x] `internal/config/validate.go` の `validateConfig`（19-58行目）の戻り値構築（52-57行目）に `Hostname: raw.Hostname,` を1行追加する。
 - [x] `internal/config/hostname.go` を新規作成し、`ResolveHostname(cfg Config) string` を実装する。`cfg.Hostname` が空でなければそれを返す（AC-03）。空なら `os.Hostname()` を呼び、成功すればその値を返す（AC-04）。`os.Hostname()` がエラーを返す場合は空文字列を返す（AC-05、エラーを外に伝播しない）。関数コメントはアーキテクチャ設計書 3.1節のコード例（196-200行目）に準じる。
-- [x] `internal/config/hostname_test.go` を新規作成し、次の3テストケースを実装する（テストヘルパーは既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）を再利用する）。
-  - [x] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `Config{Hostname: "worker-1"}` を渡すと `"worker-1"` が返ることを確認する（AC-03）。
-  - [x] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `Config{Hostname: ""}` を渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
+- [x] `internal/config/hostname_test.go` を新規作成し、次の4テストケースを実装する。
+  - [x] `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`: `ResolveHostname` に `Config{Hostname: "worker-1"}` を直接渡すと `"worker-1"` が返ることを確認する（AC-03、`ResolveHostname` 単体のフォールバック順序の検証）。
+  - [x] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `ResolveHostname` に `Config{Hostname: ""}` を直接渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
+  - [x] `TestLoad_HostnameField_ParsesOptionalTOMLKey`: 既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）と `Load()` を使い、`config_test.go` の `TestLoad_SlackAllowedHostField_ParsesOptionalTOMLKey` と同型の「キー在り/キー無し」2パターンで、TOML `hostname` キーが `rawConfig`/`validateConfig` を経て `Config.Hostname` に正しく届くことを確認する（AC-03/AC-04 のTOML読み込み経路。上記2件は `ResolveHostname` のフォールバック順序のみを検証し `Load()` を経由しないため、この経路のテストが別途必要）。
   - [x] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
@@ -100,7 +101,7 @@
 
 **推奨タイトル**: `feat(0013): add TOML hostname field and ResolveHostname`
 
-**レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか
+**レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか（`TestLoad_HostnameField_ParsesOptionalTOMLKey`）、かつ `ResolveHostname` のフォールバック順序単体の検証（`writeTempTOML`/`Load()` を経由しない直接呼び出し2件）とTOML読み込み経路の検証が両方揃っているか
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した
@@ -357,8 +358,8 @@
 |---|---|---|---|
 | AC-01 | 正常/異常終了いずれも `fields` に Host フィールドを含む | test | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount`（正常系）・`internal/notify/payload_test.go::TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields`（異常系） |
 | AC-02 | 正常/異常終了いずれも `fields` に Account フィールドを含む | test | 同上2テスト（Host と同一テスト内でアサーション） |
-| AC-03 | TOML `hostname` 指定時はその値を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueSet_ReturnsTOMLValue` |
-| AC-04 | TOML `hostname` 未指定時は `os.Hostname()` を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` |
+| AC-03 | TOML `hostname` 指定時はその値を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`（`ResolveHostname` 単体のフォールバック順序）・`internal/config/hostname_test.go::TestLoad_HostnameField_ParsesOptionalTOMLKey`（TOML読み込み経路） |
+| AC-04 | TOML `hostname` 未指定時は `os.Hostname()` を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`（`ResolveHostname` 単体のフォールバック順序）・`internal/config/hostname_test.go::TestLoad_HostnameField_ParsesOptionalTOMLKey`（TOML読み込み経路、キー無し時に空文字列がそのまま `Config.Hostname` へ届くことの確認） |
 | AC-05 | `os.Hostname()` 失敗時も通知送信自体は失敗しない | static, manual | static: `rg -n "^func ResolveHostname\(cfg Config\) string \{$" internal/config/hostname.go` を実行し、1件マッチすること（関数がエラーを返さないシグネチャであること自体が「エラーを外へ伝播しない」設計を型で強制していることの確認）。manual: `os.Hostname()` のエラーを空文字列にフォールバックしていることをコードレビューで確認する（`os.Hostname()` 失敗分岐自体はアーキテクチャ設計書7節の判断により自動テスト対象外） |
 | AC-06 | 完全成功時にも attachment を生成する | test | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount`（`assert.Len(t, got.Attachments, 1)` のアサーション） |
 | AC-07 | `Result != nil` の場合、削除対象件数フィールドを含む | test | `internal/notify/payload_test.go::TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` |
