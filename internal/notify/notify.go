@@ -63,13 +63,6 @@ var defaultRetryPolicy = retry.Policy{
 	MaxDelay:   4 * time.Second,
 }
 
-// webhookPayload is the Slack Incoming Webhook request body: the most
-// basic supported shape, a single mrkdwn "text" field. Richer Block Kit
-// elements are out of scope (see architecture doc section 3.3).
-type webhookPayload struct {
-	Text string `json:"text"`
-}
-
 // perAttemptTimeoutDoer gives every attempt its own fresh requestTimeout
 // deadline, derived from the attempt request's context. internal/retry's
 // Doer clones the same original request (and its context) for every retry
@@ -117,7 +110,7 @@ func send(
 	requestTimeout time.Duration,
 	retryPolicy retry.Policy,
 ) error {
-	failed := outcome.Err != nil || (outcome.Result != nil && len(outcome.Result.Failed) > 0)
+	failed := isFailure(outcome)
 
 	dest := cfg.SuccessWebhookURL
 	if failed {
@@ -129,7 +122,7 @@ func send(
 		return nil
 	}
 
-	body, err := json.Marshal(webhookPayload{Text: buildPayload(outcome)})
+	body, err := json.Marshal(buildPayload(outcome))
 	if err != nil {
 		return &SendError{Err: err}
 	}

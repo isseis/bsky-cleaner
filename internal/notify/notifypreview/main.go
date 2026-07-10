@@ -67,7 +67,16 @@ func selectScenarios(all []scenario, name string) ([]scenario, error) {
 // (notify.BuildPayloadPreview) and prints it to stdout.
 func printScenarios(scenarios []scenario) {
 	for _, s := range scenarios {
-		fmt.Printf("=== %s ===\n%s\n", s.name, notify.BuildPayloadPreview(s.outcome))
+		p := notify.BuildPayloadPreview(s.outcome)
+		fmt.Printf("=== %s ===\n", s.name)
+		fmt.Printf("  Text: %s\n", p.Text)
+		for i, a := range p.Attachments {
+			fmt.Printf("  Attachment[%d]:\n", i)
+			fmt.Printf("    Color: %s\n", a.Color)
+			for _, f := range a.Fields {
+				fmt.Printf("    Field: %s = %s\n", f.Title, f.Value)
+			}
+		}
 	}
 }
 
