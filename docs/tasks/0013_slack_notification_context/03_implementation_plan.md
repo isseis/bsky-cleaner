@@ -126,7 +126,7 @@
   - [x] `fields` スライスを新設し、`sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ...}` として先頭に追加する。
   - [x] 続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ...}` として追加する。
   - [x] 既存の `isFailure(outcome)` 分岐（176-206行目）が構築する `attachment.Fields`（"Error" または "Failed posts"）を、この `fields` に対する追記（`append`）に変更する。
-  - [x] `attachments` の生成条件を「`isFailure(outcome)` かつ `len(attachment.Fields) > 0`」から「常に1件生成する」に変更する。`color` は `isFailure(outcome)` が真なら `colorDanger`、偽なら空文字列（`omitempty` によりJSON上は省略）とする（アーキテクチャ設計書 3.3節手順5）。
+  - [x] `attachments` の生成条件を「`isFailure(outcome)` かつ `len(attachment.Fields) > 0`」から「常に1件生成する」に変更する。`color` は `isFailure(outcome)` が真なら `colorDanger`、偽なら空文字列（`omitempty` によりJSON上は省略）とする（アーキテクチャ設計書 3.3節手順5）。**追記（フェーズ4）**: この後の実送信確認で色なし attachment が可視化されない事象が判明したため、成功時の `color` は後続フェーズで `colorGood`（`"good"`）に変更された。詳細はフェーズ4の記述と付録「決定履歴」を参照。
   - [x] 197-202行目にある「color-only attachment を送らない」ための防御コメント・分岐を削除する（Host/Account により `fields` が常に非空になるため、この防御は不要になる。アーキテクチャ設計書 3.5節）。
 - [x] `internal/notify/payload.go` の `buildPayload` の関数コメント（145-156行目）を、「成功時は attachment を生成しない」という記述から「常に1件の attachment を生成する」という記述に更新する。
 - [x] `internal/notify/payload.go` の `webhookPayload`・`slackAttachment` の型コメント（32-59行目）を、「失敗時のみ attachment を生成する」という記述から実態（常に1件生成、`Fields` に Host/Account を含む）に合わせて更新する。
@@ -166,17 +166,23 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した
-- [ ] PR がマージされた（PR-2 は `issei/0013-slack-notification-context-05` ブランチ上に実装済みだが、未マージ）
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ4: `notifypreview` フィクスチャへの Host/Account 追加と実送信確認
 
 対応: アーキテクチャ設計書 3.5節・5.3節（Mattermost 互換性の早期確認）。
 
-- [ ] `internal/notify/notifypreview/fixtures.go` の `scenarios()`（43-83行目）内、5シナリオすべての `notify.Outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する（`success-empty`・`success-apply`・`partial-failure`・`run-error`・`truncation` の5箇所すべて。フェーズ8で `Elapsed` を追加するまでは統計フィールドは表示されない）。
-- [ ] `make notify-preview` を実行し、全5シナリオの出力に `Host`/`Account` フィールドが表示されることを目視確認する。
-- [ ] `make notify-preview-send` を実行し、Mattermost を含む実際の Slack Incoming Webhook 互換クライアントに送信し、完全成功シナリオ（`Fields` が2件、danger色ではない attachment）が可視のブロックとして描画されることを確認する（アーキテクチャ設計書 5.3節）。
-  - [ ] 描画に問題がある場合、アーキテクチャ設計書 5.3節のフォールバック（成功時に `Color: "good"` を設定する）を適用し、3.3節手順5・付録「決定履歴」の更新が必要になる旨をこの計画書のコメント欄に記録した上で、アーキテクチャ設計書自体の改訂を先に行う（フェーズ順序を崩さない。フォールバックが不要だった場合は、実装完了時にこの注記を「対象外」であったと明示する）。
+- [x] `internal/notify/notifypreview/fixtures.go` の `scenarios()`（43-83行目）内、5シナリオすべての `notify.Outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する（`success-empty`・`success-apply`・`partial-failure`・`run-error`・`truncation` の5箇所すべて。フェーズ8で `Elapsed` を追加するまでは統計フィールドは表示されない）。
+- [x] `make notify-preview` を実行し、全5シナリオの出力に `Host`/`Account` フィールドが表示されることを目視確認する。
+- [x] `make notify-preview-send` を実行し、Mattermost を含む実際の Slack Incoming Webhook 互換クライアントに送信し、完全成功シナリオ（`Fields` が2件、danger色ではない attachment）が可視のブロックとして描画されることを確認する（アーキテクチャ設計書 5.3節）。
+  - **結果**: 描画に問題があった（attachment 自体は可視のブロックとして描画されたが、`Color` 未設定のため詳細を囲むボックスの縦線が既定の青色で表示され、意図した緑色にならない）。
+  - [x] 描画に問題がある場合、アーキテクチャ設計書 5.3節のフォールバック（成功時に `Color: "good"` を設定する）を適用し、3.3節手順5・付録「決定履歴」の更新が必要になる旨をこの計画書のコメント欄に記録した上で、アーキテクチャ設計書自体の改訂を先に行う（フェーズ順序を崩さない。フォールバックが不要だった場合は、実装完了時にこの注記を「対象外」であったと明示する）。
+    - **コメント欄**: 上記確認結果を受け、アーキテクチャ設計書の 3.3節手順5・5.3節・付録「決定履歴」を改訂し（`color` を成功時 `colorGood`（`"good"`）に変更）、続けて `internal/notify/payload.go`（`colorGood` 定数追加・`buildPayload` の色選択ロジック変更）と `internal/notify/payload_test.go`（`Color` の期待値を `""` から `colorGood` に更新）に反映する。フェーズ順序（設計書改訂 → 実装）を維持する。
+- [x] `internal/notify/payload.go` に `colorGood = "good"` 定数を追加し（`colorDanger` と対で定義）、`buildPayload` の色選択ロジックを `color := colorDanger; if !isFailure(outcome) { color = colorGood }` 相当に変更する（アーキテクチャ設計書 3.3節手順5フォールバック）。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（35行目）の `assert.Equal(t, "", got.Attachments[0].Color)` を `assert.Equal(t, colorGood, got.Attachments[0].Color)` に更新する。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields`（フェーズ3で改名済み）に `Color` が `colorGood` であることのアサーションを追加する（このケースは `isFailure` が真だが Result/Err が両方 nil という防御的分岐であり、完全成功ではないため確認が必要 — 実際には `outcome.Err == nil && outcome.Result == nil` は `isFailure` が真になるため `colorDanger` のままであることを確認し、コメントで理由を明記する）。
+- [x] `make notify-preview-send` を再実行し、完全成功シナリオの attachment に緑色のバーが表示されることを確認する。
 
 ### PR-3 作成ポイント: notifypreview host/account fixtures and real-send verification
 
@@ -186,8 +192,8 @@
 
 **レビュー観点**: PR-2 で `buildPayload` が完全成功時にも常に attachment を生成するようになった設計判断が、Mattermost を含む実際の Incoming Webhook 互換クライアントで意図通り描画されることを実送信結果から確認できるか（0012 で発生した「空 attachment 不可視化」問題の再発が無いこと） / 描画に問題があった場合のフォールバック適用有無とその根拠が明記されているか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -405,7 +411,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 ## 8. 実装チェックリスト
 
 - [x] PR-1 マージ済み（対象ステップ: フェーズ1）
-- [ ] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3 — コードは実装済みだが未マージ、`issei/0013-slack-notification-context-05`）
+- [x] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3）
 - [ ] PR-3 マージ済み（対象ステップ: フェーズ4）
 - [ ] PR-4 マージ済み（対象ステップ: フェーズ5 / フェーズ6）
 - [ ] PR-5 マージ済み（対象ステップ: フェーズ7 / フェーズ8 / フェーズ9 / フェーズ10）

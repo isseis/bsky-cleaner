@@ -45,7 +45,9 @@ func scenarios() []scenario {
 		{
 			name: "success-empty",
 			outcome: notify.Outcome{
-				Result: &report.Result{Mode: report.ModeApply},
+				Result:  &report.Result{Mode: report.ModeApply},
+				Host:    "worker-1",
+				Account: "alice.bsky.social",
 			},
 		},
 		{
@@ -55,6 +57,8 @@ func scenarios() []scenario {
 					Mode:    report.ModeApply,
 					Deleted: []atproto.Post{post("post1"), post("post2"), post("post3")},
 				},
+				Host:    "worker-1",
+				Account: "alice.bsky.social",
 			},
 		},
 		{
@@ -67,17 +71,25 @@ func scenarios() []scenario {
 						{Post: post("post3"), Err: &atproto.HTTPError{Method: "POST", StatusCode: 429, ErrorName: "RateLimitExceeded"}},
 					},
 				},
+				Host:    "worker-1",
+				Account: "alice.bsky.social",
 			},
 		},
 		{
 			name: "run-error",
 			outcome: notify.Outcome{
-				Err: &atproto.SSRFError{Endpoint: "https://example.invalid/xrpc/com.atproto.repo.listRecords", Stage: atproto.SSRFStageInitialValidation},
+				Err:     &atproto.SSRFError{Endpoint: "https://example.invalid/xrpc/com.atproto.repo.listRecords", Stage: atproto.SSRFStageInitialValidation},
+				Host:    "worker-1",
+				Account: "alice.bsky.social",
 			},
 		},
 		{
-			name:    "truncation",
-			outcome: notify.Outcome{Result: truncationResult()},
+			name: "truncation",
+			outcome: notify.Outcome{
+				Result:  truncationResult(),
+				Host:    "worker-1",
+				Account: "alice.bsky.social",
+			},
 		},
 	}
 }
