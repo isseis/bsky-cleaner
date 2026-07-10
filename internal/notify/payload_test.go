@@ -14,7 +14,11 @@ import (
 
 func TestEscapeSlackMarkup_EscapesAmpersandLtGt(t *testing.T) {
 	got := escapeSlackMarkup("a & b < c > d")
-	assert.Equal(t, "a &amp; b &lt; c &gt; d", got)
+	// Use string concatenation to prevent HTML entity auto-correction in the editor.
+	amp := "&" + "amp;"
+	lt := "&" + "lt;"
+	gt := "&" + "gt;"
+	assert.Equal(t, "a "+amp+" b "+lt+" c "+gt+" d", got)
 }
 
 func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) {
@@ -23,16 +27,18 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 			Mode:    report.ModeApply,
 			Deleted: []atproto.Post{{RKey: "a"}, {RKey: "b"}},
 		},
+		Host:    "worker-1",
+		Account: "alice.bsky.social",
 	}
 	got := buildPayload(outcome)
 	assert.Contains(t, got.Text, emojiSuccess)
 	assert.Contains(t, got.Text, "2")
 	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
-	// A fully successful run has no failure detail to show, and a
-	// color-only attachment (no text/fields) renders as an empty, invisible
-	// block on at least one Incoming Webhook-compatible client (confirmed
-	// via make notify-preview-send), so no attachment is sent at all.
-	assert.Empty(t, got.Attachments)
+	// Always one attachment with Host/Account fields, no color on success.
+	assert.Len(t, got.Attachments, 1)
+	assert.Equal(t, "", got.Attachments[0].Color)
+	assert.Equal(t, "worker-1", findField(t, got.Attachments[0].Fields, "Host").Value)
+	assert.Equal(t, "alice.bsky.social", findField(t, got.Attachments[0].Fields, "Account").Value)
 }
 
 func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
@@ -45,9 +51,10 @@ func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
 	// the error category goes into a structured, danger-colored field instead
 	assert.Len(t, got.Attachments, 1)
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.Equal(t, "Error", got.Attachments[0].Fields[0].Title)
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.server.createSession status=401")
+	// Host/Account/Error = 3 fields
+	require.Len(t, got.Attachments[0].Fields, 3)
+	assert.Equal(t, "Error", findField(t, got.Attachments[0].Fields, "Error").Title)
+	assert.Contains(t, findField(t, got.Attachments[0].Fields, "Error").Value, "atproto http error: com.atproto.server.createSession status=401")
 }
 
 func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.T) {
@@ -70,11 +77,11 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 	assert.Len(t, got.Attachments, 1)
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
 	// failure details go into the attachment's fields instead
-	assert.Len(t, got.Attachments[0].Fields, 1)
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "rkey1")
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.repo.deleteRecord status=500")
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "rkey2")
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.repo.deleteRecord status=429")
+	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
+	assert.Contains(t, val, "rkey1")
+	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=500")
+	assert.Contains(t, val, "rkey2")
+	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=429")
 }
 
 func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T) {
@@ -89,10 +96,11 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	// full equality on the field ensures no extra fields leak in
-	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[0].Title)
-	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[0].Value)
+	// Phase 3: Host/Account/Failed posts = 3 fields (statistics fields added in Phase 5).
+	require.Len(t, got.Attachments[0].Fields, 3)
+	// full equality on the Failed posts field ensures no extra fields leak in
+	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[2].Title)
+	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[2].Value)
 }
 
 func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
@@ -107,9 +115,10 @@ func TestBuildPayload_EscapesMentionSyntaxInFailedRKey(t *testing.T) {
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "<!channel>")
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "&lt;!channel&gt;")
+	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
+	assert.NotContains(t, val, "<!channel>")
+	escapedMention := "&" + "lt;!channel" + "&" + "gt;"
+	assert.Contains(t, val, escapedMention)
 }
 
 func TestBuildPayload_SanitizesANSIEscapeInFailedRKey(t *testing.T) {
@@ -124,8 +133,8 @@ func TestBuildPayload_SanitizesANSIEscapeInFailedRKey(t *testing.T) {
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "\x1b")
+	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
+	assert.NotContains(t, val, "\x1b")
 }
 
 func TestBuildPayload_SanitizesNewlineInFailedRKey(t *testing.T) {
@@ -140,9 +149,9 @@ func TestBuildPayload_SanitizesNewlineInFailedRKey(t *testing.T) {
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
+	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
 	// Sanitize strips newlines, so the output must not contain a newline character
-	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "\n")
+	assert.NotContains(t, val, "\n")
 }
 
 // TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint covers
@@ -164,9 +173,10 @@ func TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint(t *testin
 	got := buildPayload(outcome)
 
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.NotContains(t, got.Attachments[0].Fields[0].Value, "<!channel>")
-	assert.Contains(t, got.Attachments[0].Fields[0].Value, "&lt;!channel&gt;")
+	val := findField(t, got.Attachments[0].Fields, "Error").Value
+	assert.NotContains(t, val, "<!channel>")
+	escapedMention := "&" + "lt;!channel" + "&" + "gt;"
+	assert.Contains(t, val, escapedMention)
 }
 
 func TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
@@ -183,9 +193,9 @@ func TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMark
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.LessOrEqual(t, len(got.Attachments[0].Fields[0].Value), maxPayloadLength)
-	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
+	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
+	assert.LessOrEqual(t, len(val), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(val, truncatedMarker))
 }
 
 // TestBuildPayload_TruncationIsUTF8Safe guards against cutting a
@@ -209,10 +219,10 @@ func TestBuildPayload_TruncationIsUTF8Safe(t *testing.T) {
 	got := buildPayload(outcome)
 
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.LessOrEqual(t, len(got.Attachments[0].Fields[0].Value), maxPayloadLength)
-	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
-	assert.True(t, utf8.ValidString(got.Attachments[0].Fields[0].Value), "truncated field value must not split a multi-byte rune")
+	val := findField(t, got.Attachments[0].Fields, "Failed posts").Value
+	assert.LessOrEqual(t, len(val), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(val, truncatedMarker))
+	assert.True(t, utf8.ValidString(val), "truncated field value must not split a multi-byte rune")
 }
 
 // TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker
@@ -233,21 +243,59 @@ func TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker
 	}
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
-	require.Len(t, got.Attachments[0].Fields, 1)
-	assert.LessOrEqual(t, len(got.Attachments[0].Fields[0].Value), maxPayloadLength)
-	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
+	val := findField(t, got.Attachments[0].Fields, "Error").Value
+	assert.LessOrEqual(t, len(val), maxPayloadLength)
+	assert.True(t, strings.HasSuffix(val, truncatedMarker))
 }
 
-// TestBuildPayload_ResultAndErrNil_HasNoAttachment guards the defensive
-// outcome.Result == nil && outcome.Err == nil case: isFailure() reports
-// this as a failure, but buildPayload has no failure detail to report (the
-// Error and Failed-posts branches both require a non-nil source), so it
-// must not send a color-only attachment with empty Fields -- the exact
-// invisible-block defect this task's real-send verification (phase 8)
-// found and fixed for the other cases.
-func TestBuildPayload_ResultAndErrNil_HasNoAttachment(t *testing.T) {
+// TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields guards the
+// defensive outcome.Result == nil && outcome.Err == nil case: isFailure()
+// reports this as a failure, but buildPayload has no failure detail to
+// report (the Error and Failed-posts branches both require a non-nil
+// source), so it must create an attachment with only the Host and Account
+// fields (empty string values) but no additional fields.
+func TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields(t *testing.T) {
 	got := buildPayload(Outcome{})
-	assert.Empty(t, got.Attachments)
+	assert.Len(t, got.Attachments, 1)
+	assert.Equal(t, []slackField{
+		{Title: "Host", Value: ""},
+		{Title: "Account", Value: ""},
+	}, got.Attachments[0].Fields)
+}
+
+func TestBuildPayload_SanitizesMentionSyntaxAndControlCharsInHostAndAccount(t *testing.T) {
+	outcome := Outcome{
+		Host:    "<!channel>",
+		Account: "evil\x1b[31mhandle\nnewline",
+	}
+	got := buildPayload(outcome)
+	require.Len(t, got.Attachments, 1)
+	// Host should have escaped mention syntax
+	hostVal := findField(t, got.Attachments[0].Fields, "Host").Value
+	assert.NotContains(t, hostVal, "<!channel>")
+	escapedMention := "&" + "lt;!channel" + "&" + "gt;"
+	assert.Contains(t, hostVal, escapedMention)
+	// Account should have ANSI escape and newline stripped
+	accVal := findField(t, got.Attachments[0].Fields, "Account").Value
+	assert.NotContains(t, accVal, "\x1b")
+	assert.NotContains(t, accVal, "\n")
+}
+
+func TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields(t *testing.T) {
+	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
+	outcome := Outcome{
+		Result:  nil,
+		Err:     someErr,
+		Host:    "worker-1",
+		Account: "alice.bsky.social",
+	}
+	got := buildPayload(outcome)
+	assert.Len(t, got.Attachments, 1)
+	assert.Equal(t, colorDanger, got.Attachments[0].Color)
+	// Verify Host and Account fields exist alongside Error field
+	assert.Equal(t, "worker-1", findField(t, got.Attachments[0].Fields, "Host").Value)
+	assert.Equal(t, "alice.bsky.social", findField(t, got.Attachments[0].Fields, "Account").Value)
+	assert.Contains(t, findField(t, got.Attachments[0].Fields, "Error").Value, "atproto http error")
 }
 
 func TestIsFailure_FourOutcomePatterns(t *testing.T) {

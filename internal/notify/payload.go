@@ -3,6 +3,7 @@ package notify
 import (
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/isseis/bsky-cleaner/internal/report"
@@ -12,10 +13,29 @@ import (
 // (nil if the run failed before producing one, e.g. login/list failure) and
 // the error that aborted the run (nil on a completed run, including one
 // with partial delete failures -- those are represented in Result.Failed
-// instead).
+// instead). Host and Account are always set from the TOML hostname field
+// (or os.Hostname() fallback) and the configured Bluesky handle; Elapsed
+// is meaningful only when Result != nil (a run that aborted before
+// producing a Result has no statistics to report).
 type Outcome struct {
 	Result *report.Result
 	Err    error
+
+	// Host identifies the machine that ran bsky-cleaner (config.ResolveHostname's
+	// result). Always set by cmd/main.go, regardless of Result/Err.
+	Host string
+
+	// Account is the Bluesky handle bsky-cleaner authenticated as
+	// (config.Credentials.Handle). Always set by cmd/main.go, regardless
+	// of Result/Err.
+	Account string
+
+	// Elapsed is the wall-clock duration of the runner.Run() call that
+	// produced Result/Err, measured by cmd/main.go immediately before and
+	// after that single call. Meaningful only when Result != nil;
+	// buildPayload ignores it otherwise (a run that aborted before
+	// producing a Result has no statistics to report).
+	Elapsed time.Duration
 }
 
 // maxPayloadLength is a conservative upper bound on a single Slack text
@@ -142,18 +162,13 @@ func truncationCutPoint(text string) int {
 	return cut
 }
 
-// buildPayload renders outcome as a Slack webhookPayload: a short
-// emoji-prefixed one-line summary that never embeds failure detail, plus,
-// only when the run failed, exactly one color-coded attachment whose
-// single field holds that failure detail (the aborting error's category
-// for a run-ending error, or every failed post's rkey and error category
-// for partial delete failures). Never includes post body content --
-// atproto.Post has no field for it in the first place. outcome.Result may
-// be nil (the run aborted before producing one, e.g. a login failure);
-// this never panics, treating the delete count as 0. text and the
-// attachment field value are truncated independently, since
-// errorKind(outcome.Err) can carry externally-sourced text of unbounded
-// length.
+// buildPayload renders outcome as a Slack webhookPayload. text is always a
+// short, fixed-shape, emoji-prefixed sentence with no numeric counts.
+// Exactly one attachment is always generated whose fields always begin with
+// Host and Account, followed by Targets/Deleted/Duration when
+// outcome.Result != nil, followed by an Error or Failed posts field when
+// the run failed. The attachment's Color is colorDanger on failure and
+// unset (no colored bar) on success.
 func buildPayload(outcome Outcome) webhookPayload {
 	var text string
 	switch {
@@ -172,14 +187,17 @@ func buildPayload(outcome Outcome) webhookPayload {
 	}
 	text = truncate(text)
 
-	var attachments []slackAttachment
+	// Always build one attachment with Host and Account fields.
+	fields := []slackField{
+		{Title: "Host", Value: sanitizeForPayload(outcome.Host)},
+		{Title: "Account", Value: sanitizeForPayload(outcome.Account)},
+	}
+
+	// Append failure detail fields (Error or Failed posts) if the run failed.
 	if isFailure(outcome) {
-		attachment := slackAttachment{Color: colorDanger}
 		switch {
 		case outcome.Err != nil:
-			attachment.Fields = []slackField{
-				{Title: "Error", Value: truncate(sanitizeForPayload(errorKind(outcome.Err)))},
-			}
+			fields = append(fields, slackField{Title: "Error", Value: truncate(sanitizeForPayload(errorKind(outcome.Err)))})
 		case outcome.Result != nil && len(outcome.Result.Failed) > 0:
 			var b strings.Builder
 			for i, failure := range outcome.Result.Failed {
@@ -190,20 +208,17 @@ func buildPayload(outcome Outcome) webhookPayload {
 				b.WriteString(": ")
 				b.WriteString(sanitizeForPayload(errorKind(failure.Err)))
 			}
-			attachment.Fields = []slackField{
-				{Title: "Failed posts", Value: truncate(b.String())},
-			}
-		}
-		// The defensive outcome.Result == nil && outcome.Err == nil case
-		// (isFailure() == true, but neither branch above has anything to
-		// report) falls through with attachment.Fields left empty. Skip it
-		// rather than sending a color-only attachment, which renders as an
-		// empty, invisible block (see docs/tasks/0012_slack_rich_formatting/02_architecture.md's
-		// Appendix: Decision History).
-		if len(attachment.Fields) > 0 {
-			attachments = []slackAttachment{attachment}
+			fields = append(fields, slackField{Title: "Failed posts", Value: truncate(b.String())})
 		}
 	}
+
+	// Generate exactly one attachment. Color is danger on failure, empty on
+	// success (omitempty removes it from JSON).
+	var color string
+	if isFailure(outcome) {
+		color = colorDanger
+	}
+	attachments := []slackAttachment{{Color: color, Fields: fields}}
 
 	return webhookPayload{Text: text, Attachments: attachments}
 }
