@@ -52,6 +52,8 @@ func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
 	require.Len(t, got.Attachments[0].Fields, 3)
 	assert.Equal(t, "Error", findField(t, got.Attachments[0].Fields, "Error").Title)
 	assert.Contains(t, findField(t, got.Attachments[0].Fields, "Error").Value, "atproto http error: com.atproto.server.createSession status=401")
+	// Error is a long-form field: it must not be laid out two-per-row.
+	assert.False(t, findField(t, got.Attachments[0].Fields, "Error").Short)
 }
 
 func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.T) {
@@ -79,6 +81,8 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=500")
 	assert.Contains(t, val, "rkey2")
 	assert.Contains(t, val, "atproto http error: com.atproto.repo.deleteRecord status=429")
+	// Failed posts is a long-form field: it must not be laid out two-per-row.
+	assert.False(t, findField(t, got.Attachments[0].Fields, "Failed posts").Short)
 }
 
 func TestBuildPayload_PartialFailure_TextHasNoFailureCount(t *testing.T) {
@@ -348,6 +352,14 @@ func TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields(t *testi
 	assert.Equal(t, "3", findField(t, got.Attachments[0].Fields, "Targets").Value)
 	assert.Equal(t, "2", findField(t, got.Attachments[0].Fields, "Deleted").Value)
 	assert.Equal(t, "2s", findField(t, got.Attachments[0].Fields, "Duration").Value)
+	// Host/Account/Targets/Deleted/Duration are short, compact fields meant
+	// to lay out two-per-row on Slack/Mattermost; Short must be true on all
+	// five.
+	assert.True(t, findField(t, got.Attachments[0].Fields, "Host").Short)
+	assert.True(t, findField(t, got.Attachments[0].Fields, "Account").Short)
+	assert.True(t, findField(t, got.Attachments[0].Fields, "Targets").Short)
+	assert.True(t, findField(t, got.Attachments[0].Fields, "Deleted").Short)
+	assert.True(t, findField(t, got.Attachments[0].Fields, "Duration").Short)
 }
 
 func TestBuildPayload_ResultNil_ExcludesTargetsDeletedDurationFields(t *testing.T) {
