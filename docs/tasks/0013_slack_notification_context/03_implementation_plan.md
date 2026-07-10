@@ -90,12 +90,12 @@
   - [x] `TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`: `ResolveHostname` に `Config{Hostname: ""}` を直接渡すと、返り値が空文字列でないことのみを確認する（アーキテクチャ設計書7節: 実際の `os.Hostname()` は環境依存のため、値そのものの一致は検証しない。AC-04）。
   - [x] `TestLoad_HostnameField_ParsesOptionalTOMLKey`: 既存の `writeTempTOML`（`internal/config/test_helpers.go:22`）と `Load()` を使い、`config_test.go` の `TestLoad_SlackAllowedHostField_ParsesOptionalTOMLKey` と同型の「キー在り/キー無し」2パターンで、TOML `hostname` キーが `rawConfig`/`validateConfig` を経て `Config.Hostname` に正しく届くことを確認する（AC-03/AC-04 のTOML読み込み経路。上記2件は `ResolveHostname` のフォールバック順序のみを検証し `Load()` を経由しないため、この経路のテストが別途必要）。
   - [x] （AC-05 の `os.Hostname()` 失敗分岐はアーキテクチャ設計書7節の判断により関数を差し替え可能にせず、テスト不可能な防御的分岐として扱う。実装レビューでの確認にとどめ、新規テストケースは追加しない。）
-- [ ] **（AC-17 追加分、要件定義書 2026-07-10 追記）** `internal/config/hostname.go` の `ResolveHostname` のシグネチャを `ResolveHostname(cfg Config) string` から `ResolveHostname(cfg Config) (string, error)` に変更する。`cfg.Hostname` が空でない場合、または `os.Hostname()` が成功した場合は `(値, nil)` を返す（AC-03/AC-04 の挙動は変更しない）。`os.Hostname()` がエラーを返す場合は `("", err)` を返す（AC-05: 通知フィールドには引き続き空文字列を使う best-effort 方針は維持しつつ、失敗した事実自体は呼び出し元に伝播できるようにする）。関数コメントを新しいシグネチャに合わせて更新する。
-- [ ] **（AC-17 追加分）** `internal/config/hostname_test.go` の `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`・`TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` を新しい2値シグネチャに追従させる（`got, err := ResolveHostname(cfg)` に変更し、いずれも `require.NoError(t, err)` を追加。TOML優先/`os.Hostname()`成功時はエラーが無いことを確認するのが目的）。`os.Hostname()` 失敗時のエラー伝播（`("", err)`）自体は既存の方針どおり関数差し替え不可のため自動テスト対象外とし、コードレビューで確認する（フェーズ1既存の注記を継続）。
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
-- [ ] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] **（AC-17 追加分、要件定義書 2026-07-10 追記）** `internal/config/hostname.go` の `ResolveHostname` のシグネチャを `ResolveHostname(cfg Config) string` から `ResolveHostname(cfg Config) (string, error)` に変更する。`cfg.Hostname` が空でない場合、または `os.Hostname()` が成功した場合は `(値, nil)` を返す（AC-03/AC-04 の挙動は変更しない）。`os.Hostname()` がエラーを返す場合は `("", err)` を返す（AC-05: 通知フィールドには引き続き空文字列を使う best-effort 方針は維持しつつ、失敗した事実自体は呼び出し元に伝播できるようにする）。関数コメントを新しいシグネチャに合わせて更新する。
+- [x] **（AC-17 追加分）** `internal/config/hostname_test.go` の `TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`・`TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname` を新しい2値シグネチャに追従させる（`got, err := ResolveHostname(cfg)` に変更し、いずれも `require.NoError(t, err)` を追加。TOML優先/`os.Hostname()`成功時はエラーが無いことを確認するのが目的）。`os.Hostname()` 失敗時のエラー伝播（`("", err)`）自体は既存の方針どおり関数差し替え不可のため自動テスト対象外とし、コードレビューで確認する（フェーズ1既存の注記を継続）。
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
+- [x] PR を作成した
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### PR-1 作成ポイント: internal/config hostname resolution
 
@@ -105,56 +105,56 @@
 
 **レビュー観点**: `ResolveHostname` のフォールバック順序（TOML優先→`os.Hostname()`→空文字列）が要件AC-03〜AC-05と一致しているか / `Config`/`rawConfig` への `Hostname` 追加が既存の `SlackAllowedHost` の非ポインタパターンと一貫しているか / `hostname_test.go` が新しいテストヘルパーを増やさず既存の `writeTempTOML` を再利用しているか（`TestLoad_HostnameField_ParsesOptionalTOMLKey`）、かつ `ResolveHostname` のフォールバック順序単体の検証（`writeTempTOML`/`Load()` を経由しない直接呼び出し2件）とTOML読み込み経路の検証が両方揃っているか / `ResolveHostname` の戻り値を `(string, error)` に変更した AC-17 追加分が、AC-03〜AC-05 の既存挙動（TOML優先・`os.Hostname()`フォールバック・空文字列の best-effort 方針）を後退させていないか
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した（AC-17 追加分の反映後に再確認が必要）
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ2: `Outcome` 型への `Host`/`Account`/`Elapsed` フィールド追加
 
 対応: F-001・F-002 の型的土台。設計: アーキテクチャ設計書 3.2節。
 
-- [ ] `internal/notify/payload.go` の `Outcome` 構造体（16-19行目）に `Host string`・`Account string`・`Elapsed time.Duration` を追加する。コメントはアーキテクチャ設計書 3.2節のコード例（209-228行目）に準じる。
-- [ ] `import "time"` を `internal/notify/payload.go` に追加する。
-- [ ] `go build ./...` がこの時点で成功することを確認する（`buildPayload` はまだ新フィールドを読まないため、コンパイルのみが目的）。
+- [x] `internal/notify/payload.go` の `Outcome` 構造体（16-19行目）に `Host string`・`Account string`・`Elapsed time.Duration` を追加する。コメントはアーキテクチャ設計書 3.2節のコード例（209-228行目）に準じる。
+- [x] `import "time"` を `internal/notify/payload.go` に追加する。
+- [x] `go build ./...` がこの時点で成功することを確認する（`buildPayload` はまだ新フィールドを読まないため、コンパイルのみが目的）。
 
 ### フェーズ3: `buildPayload` に Host/Account フィールドを追加し、常に attachment を生成する
 
 対応: F-001（AC-01, AC-02, AC-06）。設計: アーキテクチャ設計書 3.3節（手順2・5）・3.5節。
 
-- [ ] `internal/notify/payload.go` の `buildPayload`（157-209行目）を変更する。
-  - [ ] `fields` スライスを新設し、`sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ...}` として先頭に追加する。
-  - [ ] 続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ...}` として追加する。
-  - [ ] 既存の `isFailure(outcome)` 分岐（176-206行目）が構築する `attachment.Fields`（"Error" または "Failed posts"）を、この `fields` に対する追記（`append`）に変更する。
-  - [ ] `attachments` の生成条件を「`isFailure(outcome)` かつ `len(attachment.Fields) > 0`」から「常に1件生成する」に変更する。`color` は `isFailure(outcome)` が真なら `colorDanger`、偽なら空文字列（`omitempty` によりJSON上は省略）とする（アーキテクチャ設計書 3.3節手順5）。
-  - [ ] 197-202行目にある「color-only attachment を送らない」ための防御コメント・分岐を削除する（Host/Account により `fields` が常に非空になるため、この防御は不要になる。アーキテクチャ設計書 3.5節）。
-- [ ] `internal/notify/payload.go` の `buildPayload` の関数コメント（145-156行目）を、「成功時は attachment を生成しない」という記述から「常に1件の attachment を生成する」という記述に更新する。
-- [ ] `internal/notify/payload.go` の `webhookPayload`・`slackAttachment` の型コメント（32-59行目）を、「失敗時のみ attachment を生成する」という記述から実態（常に1件生成、`Fields` に Host/Account を含む）に合わせて更新する。
-- [ ] `internal/notify/test_helpers_test.go`（既存ファイル、B2: 非公開シンボルのみ、ビルドタグ不要。`docs/dev/developer_guide/test_organization.md` の分類B2に該当）に、`slackField` を `Title` で検索するテストヘルパー `findField(t *testing.T, fields []slackField, title string) slackField` を追加する。`title` に一致する要素が無ければ `t.Fatalf` で即座に失敗させる。以降のフェーズで `Fields` の総件数がフェーズを追うごとに変化する（フェーズ3で+2, フェーズ5で+最大3）ため、個々のフィールド値の検証をインデックス依存にしないための共通ヘルパーとして使う。
-- [ ] `internal/notify/payload_test.go` の `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（20-36行目）を更新する。
-  - [ ] `outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する。
-  - [ ] `assert.Empty(t, got.Attachments)`（35行目）を、`assert.Len(t, got.Attachments, 1)` および `assert.Equal(t, "", got.Attachments[0].Color)`（danger色でないこと）に置き換える。
-  - [ ] `findField(t, got.Attachments[0].Fields, "Host").Value` が `"worker-1"`、`findField(t, got.Attachments[0].Fields, "Account").Value` が `"alice.bsky.social"` であることを検証するアサーションを追加する。
-- [ ] `internal/notify/payload_test.go` の `TestBuildPayload_ResultAndErrNil_HasNoAttachment`（248-251行目）を更新する。
-  - [ ] テスト名を `TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields` に変更する（実態に合わせる。アーキテクチャ設計書 3.5節の更新指示）。
-  - [ ] `Outcome{}`（Host/Account ともゼロ値）を渡し、`assert.Len(t, got.Attachments, 1)` および `assert.Equal(t, []slackField{{Title: "Host", Value: ""}, {Title: "Account", Value: ""}}, got.Attachments[0].Fields)` で、Fields が Host/Account の2件のみであることを検証するよう変更する（このケースは `outcome.Err == nil && outcome.Result == nil` で `isFailure` は真だが Error/Failed posts フィールドは追加されず、`outcome.Result == nil` のためフェーズ5の統計フィールドも追加されないため、Fields はこの2件で以降のフェーズを通じて変化しない）。
-- [ ] `internal/notify/payload_test.go` の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（80-96行目、既存コード調査結果参照）を更新する。**この関数のみフェーズ5でも再度更新が必要（既存コード調査結果参照）。**
-  - [ ] `require.Len(t, got.Attachments[0].Fields, 1)`（92行目）を `require.Len(t, got.Attachments[0].Fields, 3)` に変更する。
-  - [ ] `Fields[0]` への完全一致アサーション（94-95行目）を `Fields[2]`（Host, Account に続く3番目の要素）への完全一致アサーションに変更する。
-- [ ] `internal/notify/payload_test.go` の次の6テストを、`Fields` の総件数チェックからフィールド個別の値チェックへ書き換える（`outcome.Result != nil` でフェーズ5により総件数がさらに変化するため、`findField` ヘルパーを使い件数に依存しない形にする。各テストで `require.Len(t, got.Attachments[0].Fields, 1)` を削除し、該当フィールドの参照を `got.Attachments[0].Fields[0]` から `findField(t, got.Attachments[0].Fields, "<Title>")` に置き換える。既存の `Value` に対するアサーション自体は変更しない）。
-  - [ ] `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`（73行目、`Title: "Failed posts"`）
-  - [ ] `TestBuildPayload_EscapesMentionSyntaxInFailedRKey`（110行目、`Title: "Failed posts"`）
-  - [ ] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`（127行目、`Title: "Failed posts"`）
-  - [ ] `TestBuildPayload_SanitizesNewlineInFailedRKey`（143行目、`Title: "Failed posts"`）
-  - [ ] `TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（186行目、`Title: "Failed posts"`）
-  - [ ] `TestBuildPayload_TruncationIsUTF8Safe`（212行目、`Title: "Failed posts"`）
-- [ ] `internal/notify/payload_test.go` の次の3テストも同様に `findField` へ書き換える（`outcome.Result == nil` のためフェーズ5の影響は受けないが、フェーズ3の Host/Account 追加で `require.Len(..., 1)` は破壊されるため書き換えが必須）。
-  - [ ] `TestBuildPayload_RunError_IncludesErrorKind`（48行目、`Title: "Error"`）
-  - [ ] `TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint`（167行目、`Title: "Error"`）
-  - [ ] `TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（236行目、`Title: "Error"`）
-- [ ] `internal/notify/payload_test.go` に、Host/Account のサニタイズを検証する新規テスト `TestBuildPayload_SanitizesMentionSyntaxAndControlCharsInHostAndAccount` を追加する。`outcome.Host`/`outcome.Account` に `"<!channel>"`・ANSI エスケープ・改行を含む値を与え、`findField` で取得した対応する `Fields` の値がエスケープ・除去済みであることを検証する（`TestBuildPayload_EscapesMentionSyntaxInFailedRKey` 等の既存パターンを流用、NF-003）。
-- [ ] `internal/notify/payload_test.go` に、正常終了時・異常終了時の双方で `Fields` に `Title: "Host"`・`Title: "Account"` が含まれることを確認する新規テスト `TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields` を追加する（AC-01, AC-02 の異常系側。`TestBuildPayload_RunError_IncludesErrorKind` の `outcome` に `Host`/`Account` を追加した派生ケース）。
-- [ ] `make notify-preview` を実行し、コンパイルが通ることを確認する（`notifypreview` の `Outcome` フィールドはまだ未設定だが、`buildPayload` は空文字列の `Host`/`Account` でもパニックしないため、この時点でも実行は成功するはずである）。
+- [x] `internal/notify/payload.go` の `buildPayload`（157-209行目）を変更する。
+  - [x] `fields` スライスを新設し、`sanitizeForPayload(outcome.Host)` を `slackField{Title: "Host", Value: ...}` として先頭に追加する。
+  - [x] 続けて `sanitizeForPayload(outcome.Account)` を `slackField{Title: "Account", Value: ...}` として追加する。
+  - [x] 既存の `isFailure(outcome)` 分岐（176-206行目）が構築する `attachment.Fields`（"Error" または "Failed posts"）を、この `fields` に対する追記（`append`）に変更する。
+  - [x] `attachments` の生成条件を「`isFailure(outcome)` かつ `len(attachment.Fields) > 0`」から「常に1件生成する」に変更する。`color` は `isFailure(outcome)` が真なら `colorDanger`、偽なら空文字列（`omitempty` によりJSON上は省略）とする（アーキテクチャ設計書 3.3節手順5）。
+  - [x] 197-202行目にある「color-only attachment を送らない」ための防御コメント・分岐を削除する（Host/Account により `fields` が常に非空になるため、この防御は不要になる。アーキテクチャ設計書 3.5節）。
+- [x] `internal/notify/payload.go` の `buildPayload` の関数コメント（145-156行目）を、「成功時は attachment を生成しない」という記述から「常に1件の attachment を生成する」という記述に更新する。
+- [x] `internal/notify/payload.go` の `webhookPayload`・`slackAttachment` の型コメント（32-59行目）を、「失敗時のみ attachment を生成する」という記述から実態（常に1件生成、`Fields` に Host/Account を含む）に合わせて更新する。
+- [x] `internal/notify/test_helpers_test.go`（既存ファイル、B2: 非公開シンボルのみ、ビルドタグ不要。`docs/dev/developer_guide/test_organization.md` の分類B2に該当）に、`slackField` を `Title` で検索するテストヘルパー `findField(t *testing.T, fields []slackField, title string) slackField` を追加する。`title` に一致する要素が無ければ `t.Fatalf` で即座に失敗させる。以降のフェーズで `Fields` の総件数がフェーズを追うごとに変化する（フェーズ3で+2, フェーズ5で+最大3）ため、個々のフィールド値の検証をインデックス依存にしないための共通ヘルパーとして使う。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus`（20-36行目）を更新する。
+  - [x] `outcome` に `Host: "worker-1"`・`Account: "alice.bsky.social"` を追加する。
+  - [x] `assert.Empty(t, got.Attachments)`（35行目）を、`assert.Len(t, got.Attachments, 1)` および `assert.Equal(t, "", got.Attachments[0].Color)`（danger色でないこと）に置き換える。
+  - [x] `findField(t, got.Attachments[0].Fields, "Host").Value` が `"worker-1"`、`findField(t, got.Attachments[0].Fields, "Account").Value` が `"alice.bsky.social"` であることを検証するアサーションを追加する。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_ResultAndErrNil_HasNoAttachment`（248-251行目）を更新する。
+  - [x] テスト名を `TestBuildPayload_ResultAndErrNil_AttachmentHasOnlyHostAccountFields` に変更する（実態に合わせる。アーキテクチャ設計書 3.5節の更新指示）。
+  - [x] `Outcome{}`（Host/Account ともゼロ値）を渡し、`assert.Len(t, got.Attachments, 1)` および `assert.Equal(t, []slackField{{Title: "Host", Value: ""}, {Title: "Account", Value: ""}}, got.Attachments[0].Fields)` で、Fields が Host/Account の2件のみであることを検証するよう変更する（このケースは `outcome.Err == nil && outcome.Result == nil` で `isFailure` は真だが Error/Failed posts フィールドは追加されず、`outcome.Result == nil` のためフェーズ5の統計フィールドも追加されないため、Fields はこの2件で以降のフェーズを通じて変化しない）。
+- [x] `internal/notify/payload_test.go` の `TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields`（80-96行目、既存コード調査結果参照）を更新する。**この関数のみフェーズ5でも再度更新が必要（既存コード調査結果参照）。**
+  - [x] `require.Len(t, got.Attachments[0].Fields, 1)`（92行目）を `require.Len(t, got.Attachments[0].Fields, 3)` に変更する。
+  - [x] `Fields[0]` への完全一致アサーション（94-95行目）を `Fields[2]`（Host, Account に続く3番目の要素）への完全一致アサーションに変更する。
+- [x] `internal/notify/payload_test.go` の次の6テストを、`Fields` の総件数チェックからフィールド個別の値チェックへ書き換える（`outcome.Result != nil` でフェーズ5により総件数がさらに変化するため、`findField` ヘルパーを使い件数に依存しない形にする。各テストで `require.Len(t, got.Attachments[0].Fields, 1)` を削除し、該当フィールドの参照を `got.Attachments[0].Fields[0]` から `findField(t, got.Attachments[0].Fields, "<Title>")` に置き換える。既存の `Value` に対するアサーション自体は変更しない）。
+  - [x] `TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind`（73行目、`Title: "Failed posts"`）
+  - [x] `TestBuildPayload_EscapesMentionSyntaxInFailedRKey`（110行目、`Title: "Failed posts"`）
+  - [x] `TestBuildPayload_SanitizesANSIEscapeInFailedRKey`（127行目、`Title: "Failed posts"`）
+  - [x] `TestBuildPayload_SanitizesNewlineInFailedRKey`（143行目、`Title: "Failed posts"`）
+  - [x] `TestBuildPayload_FailureFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（186行目、`Title: "Failed posts"`）
+  - [x] `TestBuildPayload_TruncationIsUTF8Safe`（212行目、`Title: "Failed posts"`）
+- [x] `internal/notify/payload_test.go` の次の3テストも同様に `findField` へ書き換える（`outcome.Result == nil` のためフェーズ5の影響は受けないが、フェーズ3の Host/Account 追加で `require.Len(..., 1)` は破壊されるため書き換えが必須）。
+  - [x] `TestBuildPayload_RunError_IncludesErrorKind`（48行目、`Title: "Error"`）
+  - [x] `TestBuildPayload_RunError_EscapesMentionSyntaxInSSRFErrorEndpoint`（167行目、`Title: "Error"`）
+  - [x] `TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker`（236行目、`Title: "Error"`）
+- [x] `internal/notify/payload_test.go` に、Host/Account のサニタイズを検証する新規テスト `TestBuildPayload_SanitizesMentionSyntaxAndControlCharsInHostAndAccount` を追加する。`outcome.Host`/`outcome.Account` に `"<!channel>"`・ANSI エスケープ・改行を含む値を与え、`findField` で取得した対応する `Fields` の値がエスケープ・除去済みであることを検証する（`TestBuildPayload_EscapesMentionSyntaxInFailedRKey` 等の既存パターンを流用、NF-003）。
+- [x] `internal/notify/payload_test.go` に、正常終了時・異常終了時の双方で `Fields` に `Title: "Host"`・`Title: "Account"` が含まれることを確認する新規テスト `TestBuildPayload_ErrOutcome_IncludesHostAndAccountFields` を追加する（AC-01, AC-02 の異常系側。`TestBuildPayload_RunError_IncludesErrorKind` の `outcome` に `Host`/`Account` を追加した派生ケース）。
+- [x] `make notify-preview` を実行し、コンパイルが通ることを確認する（`notifypreview` の `Outcome` フィールドはまだ未設定だが、`buildPayload` は空文字列の `Host`/`Account` でもパニックしないため、この時点でも実行は成功するはずである）。
 
 ### PR-2 作成ポイント: always-attachment host/account fields
 
@@ -164,9 +164,9 @@
 
 **レビュー観点**: 完全成功時にも attachment を常時生成する変更が、0012 で確立した「`Fields` が空の attachment は一部クライアントで不可視になる」問題を再発させる懸念に対し、コードレベルでどう説明できるか（実際のクライアント描画確認は PR-3 のフェーズ4で行うため、このPRの時点では設計上の妥当性のみをレビューする） / Host/Account が `sanitizeForPayload` を経由してから格納されているか（NF-003） / 12件の既存テスト更新（`findField` へ書き換えた9件、期待値そのものを更新した3件）が漏れなく行われているか（既存コード調査結果参照）
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
-- [ ] PR がマージされた
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した
+- [ ] PR がマージされた（PR-2 は `issei/0013-slack-notification-context-05` ブランチ上に実装済みだが、未マージ）
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ4: `notifypreview` フィクスチャへの Host/Account 追加と実送信確認
@@ -362,7 +362,7 @@
 | AC-02 | 正常/異常終了いずれも `fields` に Account フィールドを含む | test | 同上2テスト（Host と同一テスト内でアサーション） |
 | AC-03 | TOML `hostname` 指定時はその値を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueSet_ReturnsTOMLValue`（`ResolveHostname` 単体のフォールバック順序）・`internal/config/hostname_test.go::TestLoad_HostnameField_ParsesOptionalTOMLKey`（TOML読み込み経路） |
 | AC-04 | TOML `hostname` 未指定時は `os.Hostname()` を使う | test | `internal/config/hostname_test.go::TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname`（`ResolveHostname` 単体のフォールバック順序）・`internal/config/hostname_test.go::TestLoad_HostnameField_ParsesOptionalTOMLKey`（TOML読み込み経路、キー無し時に空文字列がそのまま `Config.Hostname` へ届くことの確認） |
-| AC-05 | `os.Hostname()` 失敗時も通知送信自体は失敗しない | static, manual | static: `rg -n "^func ResolveHostname\(cfg Config\) string \{$" internal/config/hostname.go` を実行し、1件マッチすること（関数がエラーを返さないシグネチャであること自体が「エラーを外へ伝播しない」設計を型で強制していることの確認）。manual: `os.Hostname()` のエラーを空文字列にフォールバックしていることをコードレビューで確認する（`os.Hostname()` 失敗分岐自体はアーキテクチャ設計書7節の判断により自動テスト対象外） |
+| AC-05 | `os.Hostname()` 失敗時も通知送信自体は失敗しない | static, manual | static: `rg -n "^func ResolveHostname\(cfg Config\) \(string, error\) \{$" internal/config/hostname.go` を実行し、1件マッチすること（AC-17 追加分により `ResolveHostname` は `(string, error)` を返すシグネチャに変更されたが、`os.Hostname()` 失敗時に通知フィールド用の値としては引き続き空文字列を返す設計であることの確認）。manual: `os.Hostname()` のエラーを空文字列にフォールバックしていること、および `run()` が `hostErr` を通知送信の失敗として扱わないことをコードレビューで確認する（`os.Hostname()` 失敗分岐自体はアーキテクチャ設計書7節の判断により自動テスト対象外） |
 | AC-06 | 完全成功時にも attachment を生成する | test | `internal/notify/payload_test.go::TestBuildPayload_SuccessOutcome_TextHasNoDeleteCount`（`assert.Len(t, got.Attachments, 1)` のアサーション） |
 | AC-07 | `Result != nil` の場合、削除対象件数フィールドを含む | test | `internal/notify/payload_test.go::TestBuildPayload_ResultNotNil_IncludesTargetsDeletedDurationFields` |
 | AC-08 | `Result != nil` の場合、実削除件数フィールドを含む | test | 同上 |
@@ -404,8 +404,8 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）はフェーズ9・下�
 
 ## 8. 実装チェックリスト
 
-- [ ] PR-1 マージ済み（対象ステップ: フェーズ1）
-- [ ] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3）
+- [x] PR-1 マージ済み（対象ステップ: フェーズ1）
+- [ ] PR-2 マージ済み（対象ステップ: フェーズ2 / フェーズ3 — コードは実装済みだが未マージ、`issei/0013-slack-notification-context-05`）
 - [ ] PR-3 マージ済み（対象ステップ: フェーズ4）
 - [ ] PR-4 マージ済み（対象ステップ: フェーズ5 / フェーズ6）
 - [ ] PR-5 マージ済み（対象ステップ: フェーズ7 / フェーズ8 / フェーズ9 / フェーズ10）

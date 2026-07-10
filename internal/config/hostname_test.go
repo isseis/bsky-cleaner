@@ -10,7 +10,8 @@ import (
 
 func TestResolveHostname_TOMLValueSet_ReturnsTOMLValue(t *testing.T) {
 	cfg := Config{Hostname: "worker-1"}
-	got := ResolveHostname(cfg)
+	got, err := ResolveHostname(cfg)
+	require.NoError(t, err)
 	assert.Equal(t, "worker-1", got)
 }
 
@@ -20,7 +21,8 @@ func TestResolveHostname_TOMLValueEmpty_ReturnsOSHostname(t *testing.T) {
 		t.Skipf("os.Hostname() failed: %v", err)
 	}
 	cfg := Config{Hostname: ""}
-	got := ResolveHostname(cfg)
+	got, err := ResolveHostname(cfg)
+	require.NoError(t, err)
 	assert.Equal(t, hostname, got)
 }
 
