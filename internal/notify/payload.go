@@ -35,9 +35,10 @@ const truncatedMarker = "...(truncated)"
 // failure detail, but only when the run failed -- a fully successful run
 // has no failure detail to show, so it omits attachments entirely rather
 // than emitting a color-only block (see
-// docs/tasks/0012_slack_rich_formatting/02_architecture.md 付録 決定履歴:
-// a color-only attachment with no text/fields renders as an empty,
-// invisible block on at least one Incoming Webhook-compatible client).
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md's Appendix:
+// Decision History: a color-only attachment with no text/fields renders
+// as an empty, invisible block on at least one Incoming Webhook-compatible
+// client).
 // Uses Slack's legacy attachments API (color + fields) rather than Block
 // Kit -- still documented and supported by Slack's Incoming Webhooks, and
 // sufficient for the success/failure summary this tool needs.
@@ -191,7 +192,15 @@ func buildPayload(outcome Outcome) webhookPayload {
 				{Title: "Failed posts", Value: truncate(b.String())},
 			}
 		}
-		attachments = []slackAttachment{attachment}
+		// The defensive outcome.Result == nil && outcome.Err == nil case
+		// (isFailure() == true, but neither branch above has anything to
+		// report) falls through with attachment.Fields left empty. Skip it
+		// rather than sending a color-only attachment, which renders as an
+		// empty, invisible block (see docs/tasks/0012_slack_rich_formatting/02_architecture.md's
+		// Appendix: Decision History).
+		if len(attachment.Fields) > 0 {
+			attachments = []slackAttachment{attachment}
+		}
 	}
 
 	return webhookPayload{Text: text, Attachments: attachments}

@@ -238,6 +238,18 @@ func TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker
 	assert.True(t, strings.HasSuffix(got.Attachments[0].Fields[0].Value, truncatedMarker))
 }
 
+// TestBuildPayload_ResultAndErrNil_HasNoAttachment guards the defensive
+// outcome.Result == nil && outcome.Err == nil case: isFailure() reports
+// this as a failure, but buildPayload has no failure detail to report (the
+// Error and Failed-posts branches both require a non-nil source), so it
+// must not send a color-only attachment with empty Fields -- the exact
+// invisible-block defect this task's real-send verification (phase 8)
+// found and fixed for the other cases.
+func TestBuildPayload_ResultAndErrNil_HasNoAttachment(t *testing.T) {
+	got := buildPayload(Outcome{})
+	assert.Empty(t, got.Attachments)
+}
+
 func TestIsFailure_FourOutcomePatterns(t *testing.T) {
 	tests := []struct {
 		name    string

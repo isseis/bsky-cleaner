@@ -185,7 +185,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 - [ ] `make fmt` を実行する。
 - [ ] `make test` を実行し、`internal/notify` パッケージおよびリポジトリ全体のテストが緑であることを確認する。
 - [ ] `make lint` を実行し、警告・エラーがないことを確認する。
-- [ ] `make deadcode` を実行し、`buildPayload`/`isFailure`/`colorFor`/`truncate` 等の新規シンボルに到達不能コードがないことを確認する。
+- [ ] `make deadcode` を実行し、`buildPayload`/`isFailure`/`truncate` 等の新規シンボルに到達不能コードがないことを確認する。
 
 ### PR-3 作成ポイント
 - **対象ステップ**: フェーズ9〜10 (ドキュメント更新、品質確認)
@@ -215,7 +215,7 @@ PR checkpoint checkboxes (used by step 4/5a to detect PR boundaries):
 
 ## 4. テスト戦略
 
-- **ユニットテスト**: `internal/notify/payload_test.go` に `isFailure()`・`buildPayload()`（絵文字・色・フィールド分離・切り詰めの各観点）のテストを配置する（フェーズ6で詳述、設計書 7節）。新規ヘルパー `truncate()`・`colorFor()` は `buildPayload()` 経由の既存のテストケースで間接的に検証し、独立した単体テストは追加しない（`buildPayload` の全分岐がこれらの関数の全パターンをすでに網羅しているため、重複テストを避ける — YAGNI）。
+- **ユニットテスト**: `internal/notify/payload_test.go` に `isFailure()`・`buildPayload()`（絵文字・attachment 有無・フィールド分離・切り詰めの各観点）のテストを配置する（フェーズ6で詳述、設計書 7節）。新規ヘルパー `truncate()` は `buildPayload()` 経由の既存のテストケースで間接的に検証し、独立した単体テストは追加しない（`buildPayload` の全分岐がこの関数の全パターンをすでに網羅しているため、重複テストを避ける — YAGNI。`colorFor()` はフェーズ8の設計変更で削除済み、フェーズ3の同様の注記を参照）。
 - **回帰テスト**: `internal/notify/notify_test.go` の既存 `TestSend_*` 群（16件）は無変更のまま実行し、`isFailure()` への置き換えと `buildPayload` の戻り値型変更が送信先振り分け・リトライ・タイムアウト・秘密情報非露出の既存の振る舞いを変えないことを確認する。
 - **手動確認**: `make notify-preview`（表示整形の目視確認）と `make notify-preview-send`（実際の Slack チャンネルへの送信確認、フェーズ8）。
 - **新規テスト・test_helpers**: 新しいテストヘルパーファイルは不要と判断した。`internal/notify/test_helpers.go`（B1、`//go:build test`）と `internal/notify/test_helpers_test.go`（B2、無タグ）は既存のまま流用し、前者は戻り値型のみ変更する（[test_organization.md](../../dev/developer_guide/test_organization.md)）。
