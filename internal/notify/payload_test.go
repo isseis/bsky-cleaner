@@ -28,10 +28,10 @@ func TestBuildPayload_SuccessOutcome_IncludesDeleteCountAndStatus(t *testing.T) 
 	assert.Contains(t, got.Text, emojiSuccess)
 	assert.Contains(t, got.Text, "2")
 	assert.Contains(t, strings.ToLower(got.Text), "succeeded")
-	// AC-05/AC-06: a fully successful run has no attachment -- there is no
-	// failure detail to show, and a color-only attachment (no text/fields)
-	// renders as an empty, invisible block on at least one Incoming
-	// Webhook-compatible client (confirmed via make notify-preview-send).
+	// A fully successful run has no failure detail to show, and a
+	// color-only attachment (no text/fields) renders as an empty, invisible
+	// block on at least one Incoming Webhook-compatible client (confirmed
+	// via make notify-preview-send), so no attachment is sent at all.
 	assert.Empty(t, got.Attachments)
 }
 
@@ -39,10 +39,10 @@ func TestBuildPayload_RunError_IncludesErrorKind(t *testing.T) {
 	someErr := &atproto.HTTPError{Method: "com.atproto.server.createSession", StatusCode: 401, Err: errors.New("unauthorized")}
 	outcome := Outcome{Result: nil, Err: someErr}
 	got := buildPayload(outcome)
-	// AC-03: text carries only a short summary, not the error category detail
+	// text carries only a short summary, not the error category detail
 	assert.Contains(t, got.Text, emojiFailure)
 	assert.NotContains(t, got.Text, "atproto http error")
-	// AC-04, AC-07: error category goes into a structured, danger-colored field
+	// the error category goes into a structured, danger-colored field instead
 	assert.Len(t, got.Attachments, 1)
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
 	require.Len(t, got.Attachments[0].Fields, 1)
@@ -63,14 +63,13 @@ func TestBuildPayload_PartialFailure_IncludesFailedRKeysAndErrorKind(t *testing.
 		},
 	}
 	got := buildPayload(outcome)
-	// AC-03: text should not contain individual failure details
+	// text should not contain individual failure details
 	assert.Contains(t, got.Text, emojiFailure)
 	assert.NotContains(t, got.Text, "rkey1")
 	assert.NotContains(t, got.Text, "rkey2")
-	// AC-07: color should be danger
 	assert.Len(t, got.Attachments, 1)
 	assert.Equal(t, colorDanger, got.Attachments[0].Color)
-	// AC-04: failure details in fields
+	// failure details go into the attachment's fields instead
 	assert.Len(t, got.Attachments[0].Fields, 1)
 	assert.Contains(t, got.Attachments[0].Fields[0].Value, "rkey1")
 	assert.Contains(t, got.Attachments[0].Fields[0].Value, "atproto http error: com.atproto.repo.deleteRecord status=500")
@@ -91,7 +90,7 @@ func TestBuildPayload_ExcludesPostBody_OnlyIncludesStructuredFields(t *testing.T
 	got := buildPayload(outcome)
 	require.Len(t, got.Attachments, 1)
 	require.Len(t, got.Attachments[0].Fields, 1)
-	// AC-04, AC-12: full equality on the field ensures no extra fields leak in
+	// full equality on the field ensures no extra fields leak in
 	assert.Equal(t, "Failed posts", got.Attachments[0].Fields[0].Title)
 	assert.Equal(t, "rkey1: atproto http error: com.atproto.repo.deleteRecord status=500", got.Attachments[0].Fields[0].Value)
 }
@@ -219,8 +218,10 @@ func TestBuildPayload_TruncationIsUTF8Safe(t *testing.T) {
 // TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker
 // guards the run-error attachment field: errorKind(outcome.Err) can embed
 // atproto.HTTPError.ErrorName, which is PDS-response-derived and has no
-// length limit of its own (see 02_architecture.md 3.4節), so this field
-// must be truncated independently of the (now fixed-length) text summary.
+// length limit of its own (see
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md §3.4), so this
+// field must be truncated independently of the (now fixed-length) text
+// summary.
 func TestBuildPayload_ErrorFieldTruncatesWhenExceedsLimit_AppendsTruncatedMarker(t *testing.T) {
 	outcome := Outcome{
 		Result: nil,
@@ -264,8 +265,8 @@ func TestIsFailure_FourOutcomePatterns(t *testing.T) {
 			name: "result_nil_and_err_nil",
 			// internal/runner.Run's contract guarantees this combination
 			// is never produced, but isFailure defensively treats a
-			// missing Result as failure so that formatting/color/routing
-			// remain consistent if it leaks in (AC-08).
+			// missing Result as failure so that channel routing and
+			// attachment rendering remain consistent if it leaks in.
 			outcome: Outcome{
 				Result: nil,
 				Err:    nil,

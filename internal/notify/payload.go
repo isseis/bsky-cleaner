@@ -34,13 +34,13 @@ const truncatedMarker = "...(truncated)"
 // detail; attachments holds exactly one color-coded block carrying the
 // failure detail, but only when the run failed -- a fully successful run
 // has no failure detail to show, so it omits attachments entirely rather
-// than emitting a color-only block (see 02_architecture.md's decision
-// history: a color-only attachment with no text/fields renders as an
-// empty, invisible block on at least one Incoming Webhook-compatible
-// client). Uses Slack's legacy attachments API (color + fields) rather
-// than Block Kit -- still documented and supported by Slack's Incoming
-// Webhooks, and sufficient for the success/failure summary this tool
-// needs.
+// than emitting a color-only block (see
+// docs/tasks/0012_slack_rich_formatting/02_architecture.md 付録 決定履歴:
+// a color-only attachment with no text/fields renders as an empty,
+// invisible block on at least one Incoming Webhook-compatible client).
+// Uses Slack's legacy attachments API (color + fields) rather than Block
+// Kit -- still documented and supported by Slack's Incoming Webhooks, and
+// sufficient for the success/failure summary this tool needs.
 type webhookPayload struct {
 	Text        string            `json:"text"`
 	Attachments []slackAttachment `json:"attachments,omitempty"`
