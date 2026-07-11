@@ -281,24 +281,24 @@
 
 **実装項目**:
 
-- [ ] `internal/retry/doer.go` に `maxRetryAfterSeconds` 定数を追加する（値は24時間相当の秒数 `24 * 60 * 60`。[02_architecture.md](02_architecture.md) 3.5 が言う「現実的な `MaxDelay` を十分上回りつつオーバーフローしない定数」の具体値）。
-- [ ] `parseRetryAfter`（現状213-229行目）の秒数解釈部分を次の内容に置き換える: `time.ParseDuration(value + "s")` の呼び出しを `strconv.Atoi(value)` に変更する。パース成功時、`seconds <= 0` なら従来どおり0を返す。`seconds > maxRetryAfterSeconds` の場合は `seconds = maxRetryAfterSeconds` にクランプしてから `time.Duration(seconds) * time.Second` を返す（乗算前にクランプすることで `int64` オーバーフローを構造的に排除する）。HTTP-date 分岐（`http.ParseTime` 以降）は変更しない。
-- [ ] `parseRetryAfter` の doc コメント（現状206-212行目）を、`time.ParseDuration` 依存から `strconv.Atoi` ベースの RFC 9110 準拠パースに変わったこと、および巨大な値が `maxRetryAfterSeconds` でクランプされることを反映する内容に更新する。
-- [ ] `internal/retry/doer.go` の先頭 `import` に `"strconv"` を追加する。
+- [x] `internal/retry/doer.go` に `maxRetryAfterSeconds` 定数を追加する（値は24時間相当の秒数 `24 * 60 * 60`。[02_architecture.md](02_architecture.md) 3.5 が言う「現実的な `MaxDelay` を十分上回りつつオーバーフローしない定数」の具体値）。
+- [x] `parseRetryAfter`（現状213-229行目）の秒数解釈部分を次の内容に置き換える: `time.ParseDuration(value + "s")` の呼び出しを `strconv.Atoi(value)` に変更する。パース成功時、`seconds <= 0` なら従来どおり0を返す。`seconds > maxRetryAfterSeconds` の場合は `seconds = maxRetryAfterSeconds` にクランプしてから `time.Duration(seconds) * time.Second` を返す（乗算前にクランプすることで `int64` オーバーフローを構造的に排除する）。HTTP-date 分岐（`http.ParseTime` 以降）は変更しない。
+- [x] `parseRetryAfter` の doc コメント（現状206-212行目）を、`time.ParseDuration` 依存から `strconv.Atoi` ベースの RFC 9110 準拠パースに変わったこと、および巨大な値が `maxRetryAfterSeconds` でクランプされることを反映する内容に更新する。
+- [x] `internal/retry/doer.go` の先頭 `import` に `"strconv"` を追加する。
 
 ### 7.2 テスト内容
 
-- [ ] `internal/retry/doer_test.go::TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay` — `Retry-After: "5"`、`MaxDelay` を30秒などキャップに掛からない値に設定し、`clock.SleepCalls[0]` が正確に5秒であることを検証する（AC-15）。
-- [ ] `internal/retry/doer_test.go::TestDoer_Do_UnitSuffixedRetryAfterIgnored_FallsBackToExponential` — `Retry-After: "5m"` を設定し、`clock.SleepCalls[0]` が `policy.BaseDelay`（指数バックオフの初回値、例: 2秒）と一致すること、`5*time.Millisecond` ではないことを明示的にアサートする（AC-16）。
-- [ ] `internal/retry/doer_test.go::TestDoer_Do_HugeIntegerRetryAfter_ClampedNotOverflowed` — `Retry-After: "9999999999"`（現行実装なら `time.ParseDuration` がエラーとして拒否し0にフォールバックしていた値）を設定し、`clock.SleepCalls[0]` が `policy.MaxDelay` にキャップされること（`time.Duration` オーバーフローによる異常に短い待機になっていないこと）を検証する（3.5節のオーバーフロー安全性を担保する追加テスト）。
-- [ ] AC-17 は既存の `TestDoer_Do_FutureRetryAfterHTTPDate_UsesParsedDelay`・`TestDoer_Do_NonPositiveRetryAfterFallsBackToExponential`（`past_http_date` サブテスト）が無変更で再実行されることで検証する。新規テストは追加しない。
+- [x] `internal/retry/doer_test.go::TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay` — `Retry-After: "5"`、`MaxDelay` を30秒などキャップに掛からない値に設定し、`clock.SleepCalls[0]` が正確に5秒であることを検証する（AC-15）。
+- [x] `internal/retry/doer_test.go::TestDoer_Do_UnitSuffixedRetryAfterIgnored_FallsBackToExponential` — `Retry-After: "5m"` を設定し、`clock.SleepCalls[0]` が `policy.BaseDelay`（指数バックオフの初回値、例: 2秒）と一致すること、`5*time.Millisecond` ではないことを明示的にアサートする（AC-16）。
+- [x] `internal/retry/doer_test.go::TestDoer_Do_HugeIntegerRetryAfter_ClampedNotOverflowed` — `Retry-After: "9999999999"`（現行実装なら `time.ParseDuration` がエラーとして拒否し0にフォールバックしていた値）を設定し、`clock.SleepCalls[0]` が `policy.MaxDelay` にキャップされること（`time.Duration` オーバーフローによる異常に短い待機になっていないこと）を検証する（3.5節のオーバーフロー安全性を担保する追加テスト）。
+- [x] AC-17 は既存の `TestDoer_Do_FutureRetryAfterHTTPDate_UsesParsedDelay`・`TestDoer_Do_NonPositiveRetryAfterFallsBackToExponential`（`past_http_date` サブテスト）が無変更で再実行されることで検証する。新規テストは追加しない。
 
 ### 7.3 PR-5 作成ポイント
 
 - **PR タイトル**: `fix(0015): parse Retry-After as RFC 9110 delta-seconds, not a Go duration`
 - **レビュー観点**: `strconv.Atoi` への置き換えが単位付き文字列を正しく無視すること、巨大な整数値がオーバーフローせずクランプされること、既存の HTTP-date 分岐が無変更であること。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 
@@ -345,7 +345,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）は10章の実装チェ�
 - [x] Phase 2（F-004）完了
 - [x] Phase 3（F-002）完了
 - [x] Phase 4（F-003）完了
-- [ ] Phase 5（F-005）完了
+- [x] Phase 5（F-005）完了
 - [ ] `rg -n "http.DefaultClient" cmd/main.go` の結果が0件であることを確認する（Phase 3 の置き換え漏れがないことの静的確認）
 - [ ] `rg -n "atproto.NewRedirectRejectingHTTPClient\(\)" cmd/main.go` の結果が1件（`run(...)` 呼び出し箇所）であることを確認する
 - [ ] `rg -n 'DeleteRecord\(' --type go` の全結果が `Post` 引数を渡す形（または `Post` を受け取るシグネチャ定義自体）になっていることを目視確認する（Phase 1 完了後の残存箇所チェック）
