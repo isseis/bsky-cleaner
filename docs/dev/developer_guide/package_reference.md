@@ -31,7 +31,7 @@ codebase grows.
 
 **AT Protocol Client**
 
-- `internal/atproto`: resolves an account's DID and PDS endpoint (SSRF-guarded, `NewClient`), authenticates with an app password (`Client.Login`), lists the account's posts/reposts with type classification and pinned-post detection (`Client.ListPosts`), and deletes a post by rkey (`Client.DeleteRecord`). HTTP access is abstracted behind the `HTTPDoer` interface so all tests run without real network I/O; dry-run/apply switching and post-age/type filtering are out of scope and left to other packages (see docs/tasks/0002_atproto_client/01_requirements.md); retrying transient HTTP failures is delegated to internal/retry, which NewClient wraps every outbound HTTPDoer (DID resolution and the post-validation PDS client) in before use (see docs/tasks/0005_retry_timeout/01_requirements.md).
+- `internal/atproto`: resolves an account's DID and PDS endpoint (SSRF-guarded, `NewClient`), authenticates with an app password (`Client.Login`), lists the account's posts/reposts with type classification and pinned-post detection (`Client.ListPosts`), and deletes a post or repost, selecting the collection from its type (`Client.DeleteRecord`). HTTP access is abstracted behind the `HTTPDoer` interface so all tests run without real network I/O; dry-run/apply switching and post-age/type filtering are out of scope and left to other packages (see docs/tasks/0002_atproto_client/01_requirements.md); retrying transient HTTP failures is delegated to internal/retry, which NewClient wraps every outbound HTTPDoer (DID resolution and the post-validation PDS client) in before use (see docs/tasks/0005_retry_timeout/01_requirements.md).
 
 **Retry**
 
