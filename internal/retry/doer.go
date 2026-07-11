@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -42,6 +43,12 @@ type permanentError interface {
 // so a hostile or buggy server cannot make a retry loop spend unbounded
 // time discarding an oversized 429/5xx body.
 const maxDrainBytes = 64 * 1024
+
+// maxRetryAfterSeconds bounds a parsed Retry-After delta-seconds value
+// (clamped to this before converting to time.Duration) so the
+// multiplication by time.Second cannot overflow int64; 24 hours comfortably
+// exceeds any realistic MaxDelay.
+const maxRetryAfterSeconds = 24 * 60 * 60
 
 // Doer wraps an HTTPDoer, retrying transient failures (transport errors,
 // HTTP 429, HTTP 5xx) per policy, and never retrying an error satisfying
@@ -204,21 +211,29 @@ func backoffDelay(policy Policy, attempt int, retryAfter time.Duration) time.Dur
 }
 
 // parseRetryAfter interprets a 429 response's Retry-After header value as
-// either a delay in seconds or an HTTP-date, per RFC 9110 10.2.3. It
-// returns 0 (meaning "no usable hint, fall back to exponential backoff")
+// either a delta-seconds integer or an HTTP-date, per RFC 9110 10.2.3.
+// It returns 0 (meaning "no usable hint, fall back to exponential backoff")
 // for a missing/unparseable header, or for a value that resolves to zero
 // or negative -- a negative delay or a past HTTP-date -- since honoring
 // either would mean retrying without any wait, defeating the point of a
 // backoff.
+//
+// Only bare integer strings are parsed as delta-seconds; a unit-suffixed
+// value like "5m" is not accepted and falls through to the HTTP-date branch
+// (which will also fail), returning 0. Values greater than
+// maxRetryAfterSeconds are clamped (see its doc comment).
 func parseRetryAfter(value string) time.Duration {
 	if value == "" {
 		return 0
 	}
-	if seconds, err := time.ParseDuration(value + "s"); err == nil {
+	if seconds, err := strconv.Atoi(value); err == nil {
 		if seconds <= 0 {
 			return 0
 		}
-		return seconds
+		if seconds > maxRetryAfterSeconds {
+			seconds = maxRetryAfterSeconds
+		}
+		return time.Duration(seconds) * time.Second
 	}
 	if when, err := http.ParseTime(value); err == nil {
 		if d := time.Until(when); d > 0 {
