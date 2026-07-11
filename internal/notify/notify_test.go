@@ -348,7 +348,7 @@ func errorsAsSendError(err error) (*SendError, bool) {
 }
 
 // TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully
-// guards AC-08: a 429 response with body must still be drainable (per-attempt
+// verifies that a 429 response with body is still drainable (per-attempt
 // context is alive during drain), so the retry loop can proceed and eventually
 // succeed. With the buggy implementation (cancel on Do return), the first
 // attempt's drain would see context.Canceled and abort the retry loop.
@@ -382,7 +382,8 @@ func TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfull
 }
 
 // TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully
-// guards AC-09: same as AC-08 but with a 5xx status instead of 429.
+// is the same as TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully
+// but with a 5xx status instead of 429.
 func TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully(t *testing.T) {
 	const testTimeout = time.Hour
 
@@ -411,8 +412,8 @@ func TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfull
 	assert.Len(t, clock.SleepCalls, 1, "expected one backoff sleep between attempts")
 }
 
-// TestSend_PerAttemptTimeout_BoundsHangingBodyRead guards AC-11: the
-// per-attempt timeout must apply to body reads as well, not just the HTTP
+// TestSend_PerAttemptTimeout_BoundsHangingBodyRead verifies that the
+// per-attempt timeout applies to body reads as well, not just the HTTP
 // call. With cancelOnCloseBody, the cancel only fires on body Close, so the
 // blockingUntilCtxDoneBody will block in Read until the per-attempt timeout
 // fires and cancels its context. The total test time must not greatly exceed

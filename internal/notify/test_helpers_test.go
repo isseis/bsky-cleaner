@@ -28,7 +28,7 @@ func (c *fakeClock) Sleep(ctx context.Context, d time.Duration) error {
 // buf exactly once, then io.EOF — but only if ctx is still alive. If ctx
 // has already been cancelled (ctx.Err() != nil), Read returns ctx.Err()
 // instead. This lets tests assert that per-attempt contexts are still valid
-// when the retry loop drains a 429/5xx response body (AC-08/AC-09).
+// when the retry loop drains a 429/5xx response body.
 type ctxSensitiveBody struct {
 	buf  []byte
 	ctx  context.Context
@@ -50,7 +50,7 @@ func (b *ctxSensitiveBody) Close() error { return nil }
 
 // blockingUntilCtxDoneBody is an io.ReadCloser whose Read blocks until
 // ctx is done and then returns ctx.Err(). This lets tests verify that
-// per-attempt timeout bounds the body read as well (AC-11).
+// per-attempt timeout bounds the body read as well.
 type blockingUntilCtxDoneBody struct {
 	ctx context.Context
 }
