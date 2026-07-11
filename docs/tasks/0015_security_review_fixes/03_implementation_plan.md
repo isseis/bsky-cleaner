@@ -22,7 +22,7 @@
 
 - 各フェーズは1件の欠陥（F-001〜F-005）に対応し、対応する受け入れ基準（AC）をすべて満たすまでを1単位とする。
 - 実装順序は [02_architecture.md](02_architecture.md) 8章の優先順位（F-001 → F-004 → F-002 → F-003 → F-005）に従う。誤削除防止に直結する修正を最優先し、次に fail-closed 強化、SSRF 対策拡張、通知信頼性、バックオフ正確性の順とする。
-- 既存テストのシグネチャ更新（呼び出し形の追従）と、新規 AC 検証テストの追加は別のチェックボックスに分ける。
+- 既存テストのシグネチャ更新（シグネチャ変更への追従）と、新規 AC 検証テストの追加は別のチェックボックスに分ける。
 
 ### 1.3 既存コード調査結果
 
@@ -50,9 +50,9 @@
 - `doer.go`: `parseRetryAfter` の秒数解釈を `time.ParseDuration(value + "s")` から `strconv.Atoi` ベースへ変更し、オーバーフロー安全性のための秒数クランプを追加する。`classify`・`backoffDelay`・`drainAndClose` は変更不要。
 
 **`cmd`**
-- `main.go`: `main()` 内の `run(configPath, apply, now, http.DefaultClient, os.Stdout, os.Stderr)` の `http.DefaultClient` を `atproto.NewRedirectRejectingHTTPClient()` に差し替える。`"net/http"` インポートは他に使用箇所がないため削除が必要。`run` 関数のドキュメントコメント（330-334行目）が `http.DefaultClient` を名指ししているため、文言を更新する。
+- `main.go`: `main()` 内の `run(configPath, apply, now, http.DefaultClient, os.Stdout, os.Stderr)` の `http.DefaultClient` を `atproto.NewRedirectRejectingHTTPClient()` に差し替える。`"net/http"` インポートは他に使用箇所がないため削除が必要。`run` 関数のドキュメントコメント（330-334行目）が `http.DefaultClient` を明示的に参照しているため、文言を更新する。
 
-**影響を受けるが変更不要な既存テスト**（[02_architecture.md](02_architecture.md) 3.7 のとおり、呼び出し形の追従のみ、または無変更）
+**影響を受けるが変更不要な既存テスト**（[02_architecture.md](02_architecture.md) 3.7 のとおり、シグネチャ変更への追従のみ、または無変更）
 - `internal/atproto/delete_test.go`・`errors_test.go`・`client_test.go`: `DeleteRecord` 呼び出し箇所をすべて `Post{...}` 引数へ更新する（詳細は Phase 1）。
 - `internal/atproto/session_test.go`・`errors_test.go`: `loginTestClient` のシグネチャに `did` 引数を追加する（詳細は Phase 2 — [02_architecture.md](02_architecture.md) には明記されていないが、`Login` の DID 検証追加により既存テストの `did: ""` では 2xx 応答のケースが新たに不一致エラーになってしまうため、本計画で追加が必要と判明した差分である）。
 - `cmd/main_test.go`・`cmd/secret_leak_integration_test.go`・`internal/atproto/idempotency_integration_test.go`・`internal/atproto/runner_integration_test.go`・`internal/notify/notify_test.go`（F-003 で変更する行を除く）: いずれもモック `HTTPDoer` 経由か `run()`/`Send()` にモックを注入する形であり、`http.DefaultClient` 差し替え（F-002）や `DeleteRecord` シグネチャ変更（F-001、`runner.Client` 経由のため直接の呼び出しがない）の影響を受けない。変更不要。
@@ -125,7 +125,7 @@
 - [ ] `cmd/main.go` の `run` 関数の doc コメント（330-334行目）を更新する。「rather than reaching for http.DefaultClient/os.Stdout/os.Stderr directly」という記述を、`main` が具体的な `HTTPDoer` の構築方法（`atproto.NewRedirectRejectingHTTPClient()`）を選べることが `run` のテスト容易性の理由である旨に改め、`http.DefaultClient` という具体名は削除する。
 - [ ] `internal/atproto/http_test.go` に AC-05 検証テストを追加する（詳細は4章）。
 
-**スコープ注記**: `internal/notify/notifypreview/main.go`（`//go:build test` の開発者向けプレビューツール、[test_organization.md](../../dev/developer_guide/test_organization.md) の対象外の独立 `main` パッケージ）も `notify.Send` の呼び出しに `http.DefaultClient` を直接使っている。これは本番のリクエスト経路ではなく、テストビルドタグでゲートされた開発者向けローカルツールであり、[01_requirements.md](01_requirements.md) の In Scope（F-002: DID 解決フェーズおよび `cmd/main.go` が構築する共有クライアント）にも含まれないため、本タスクでは変更しない。
+**スコープ注記**: `internal/notify/notifypreview/main.go`（`//go:build test` の開発者向けプレビューツール、[test_organization.md](../../dev/developer_guide/test_organization.md) の対象外である独立した `main` パッケージ）も `notify.Send` の呼び出しに `http.DefaultClient` を直接使っている。これは本番のリクエスト経路ではなく、テストビルドタグでゲートされた開発者向けローカルツールであり、[01_requirements.md](01_requirements.md) の In Scope（F-002: DID 解決フェーズおよび `cmd/main.go` が構築する共有クライアント）にも含まれないため、本タスクでは変更しない。
 
 **成功基準**: `go build ./...` が成功し、`go vet ./...` が `"net/http"` の未使用インポートを検出しない。`go test -tags test ./internal/atproto/... ./cmd/...` が緑になる。
 
