@@ -252,7 +252,9 @@ crontab に登録するエントリは `分 時 日 月 曜日 コマンド` の
 - **GitHub リポジトリ**: [https://github.com/isseis/bsky-cleaner](https://github.com/isseis/bsky-cleaner)
 - **ソースコードの取得・ビルド**: [ソースからのビルド](docs/dev/developer_guide/build_from_source.md)
 - **プロジェクトの規約**: [CLAUDE.md](CLAUDE.md)
-- **開発者向けドキュメント**: [docs/dev/developer_guide/](docs/dev/developer_guide/)
+- **開発者向けドキュメント**: [docs/dev/developer_guide/](docs/dev/developer_guide/) — まず
+  [Development Workflow](docs/dev/developer_guide/development_workflow.md) を参照。ドキュメント一覧、
+  要件定義→設計→実装→PR の進め方、AI コマンド一覧、日英ドキュメントの扱いをまとめている（英語のみ）
 
 ## ライセンス
 

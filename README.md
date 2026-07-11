@@ -257,7 +257,10 @@ See [Security Design](docs/design/security.md) for details.
 - **GitHub repository**: [https://github.com/isseis/bsky-cleaner](https://github.com/isseis/bsky-cleaner)
 - **Source code retrieval and build**: [Building from Source](docs/dev/developer_guide/build_from_source.md)
 - **Project conventions**: [CLAUDE.md](CLAUDE.md)
-- **Developer documentation**: [docs/dev/developer_guide/](docs/dev/developer_guide/)
+- **Developer documentation**: [docs/dev/developer_guide/](docs/dev/developer_guide/) — start with
+  [Development Workflow](docs/dev/developer_guide/development_workflow.md) for the document map,
+  the requirements → design → implementation → PR process, the AI command list, and bilingual
+  doc handling
 
 ## License
 
