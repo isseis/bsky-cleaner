@@ -120,7 +120,7 @@
 - **PR タイトル**: `fix(0015): send repost deletions to app.bsky.feed.repost collection`
 - **レビュー観点**: `collectionForPostType` の網羅性（既知4種別＋fail-closed）、`DeleteRecord`/`runner.Client` のシグネチャ変更が呼び出し元すべてに反映されているか、AC-01〜AC-04 のテストが実際にコレクション取り違えを検出できる設計になっているか。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
