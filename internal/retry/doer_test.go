@@ -559,3 +559,63 @@ func TestDoer_Do_LogsRetryAttempt(t *testing.T) {
 	assert.Contains(t, logged, "url=http://example.com/xrpc/test")
 	assert.Contains(t, logged, "wait=1s")
 }
+
+// TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay guards the
+// strconv.Atoi branch of parseRetryAfter: Retry-After: 5 must produce a
+// 5-second delay (AC-15).
+func TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay(t *testing.T) {
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: time.Second, MaxDelay: 30 * time.Second}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}
+		resp.Header.Set("Retry-After", "5")
+		return resp, nil
+	}), policy, clock)
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	require.Len(t, clock.SleepCalls, 1)
+	assert.Equal(t, 5*time.Second, clock.SleepCalls[0])
+}
+
+// TestDoer_Do_UnitSuffixedRetryAfterIgnored_FallsBackToExponential guards
+// that a unit-suffixed value like "5m" is not interpreted as 5ms (the old
+// time.ParseDuration behavior) but instead falls back to exponential
+// backoff (AC-16).
+func TestDoer_Do_UnitSuffixedRetryAfterIgnored_FallsBackToExponential(t *testing.T) {
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: 2 * time.Second, MaxDelay: 30 * time.Second}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}
+		resp.Header.Set("Retry-After", "5m")
+		return resp, nil
+	}), policy, clock)
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	require.Len(t, clock.SleepCalls, 1)
+	// Must be the exponential backoff BaseDelay, not 5ms.
+	assert.Equal(t, policy.BaseDelay, clock.SleepCalls[0])
+}
+
+// TestDoer_Do_HugeIntegerRetryAfter_ClampedNotOverflowed guards against
+// the int64 overflow that would occur if a very large delta-seconds value
+// (e.g. 9999999999) were multiplied by time.Second without clamping. The
+// result must be capped at MaxDelay, not a sub-second value from overflow.
+func TestDoer_Do_HugeIntegerRetryAfter_ClampedNotOverflowed(t *testing.T) {
+	clock := &fakeClock{}
+	policy := Policy{MaxRetries: 1, BaseDelay: time.Second, MaxDelay: 30 * time.Second}
+	doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}
+		resp.Header.Set("Retry-After", "9999999999")
+		return resp, nil
+	}), policy, clock)
+
+	_, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+	require.NoError(t, err)
+	require.Len(t, clock.SleepCalls, 1)
+	assert.Equal(t, policy.MaxDelay, clock.SleepCalls[0])
+}
