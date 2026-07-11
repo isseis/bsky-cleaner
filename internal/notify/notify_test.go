@@ -347,4 +347,116 @@ func errorsAsSendError(err error) (*SendError, bool) {
 	return errors.AsType[*SendError](err)
 }
 
+// TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully
+// guards AC-08: a 429 response with body must still be drainable (per-attempt
+// context is alive during drain), so the retry loop can proceed and eventually
+// succeed. With the buggy implementation (cancel on Do return), the first
+// attempt's drain would see context.Canceled and abort the retry loop.
+func TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully(t *testing.T) {
+	const testTimeout = time.Hour // effectively no per-attempt timeout for this test
+	const bodyContent = "rate limited, please back off"
+
+	doer := &scriptedDoer{t: t, steps: []handlerFunc{
+		func(req *http.Request) (*http.Response, error) {
+			body := &ctxSensitiveBody{buf: []byte(bodyContent), ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       body,
+			}, nil
+		},
+		func(req *http.Request) (*http.Response, error) {
+			body := &ctxSensitiveBody{buf: []byte("ok"), ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       body,
+			}, nil
+		},
+	}}
+
+	cfg := Config{SuccessWebhookURL: newSecretString(t, "https://hooks.slack.com/services/T00/B00/valid")}
+	clock := &fakeClock{}
+	err := send(context.Background(), cfg, doer, clock, succeededOutcome(), testTimeout, defaultRetryPolicy)
+	require.NoError(t, err)
+	assert.Equal(t, 2, doer.cursor, "expected two HTTP calls (429 + retry)")
+	assert.Len(t, clock.SleepCalls, 1, "expected one backoff sleep between attempts")
+}
+
+// TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully
+// guards AC-09: same as AC-08 but with a 5xx status instead of 429.
+func TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully(t *testing.T) {
+	const testTimeout = time.Hour
+
+	doer := &scriptedDoer{t: t, steps: []handlerFunc{
+		func(req *http.Request) (*http.Response, error) {
+			body := &ctxSensitiveBody{buf: []byte("server error"), ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       body,
+			}, nil
+		},
+		func(req *http.Request) (*http.Response, error) {
+			body := &ctxSensitiveBody{buf: []byte("ok"), ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       body,
+			}, nil
+		},
+	}}
+
+	cfg := Config{SuccessWebhookURL: newSecretString(t, "https://hooks.slack.com/services/T00/B00/valid")}
+	clock := &fakeClock{}
+	err := send(context.Background(), cfg, doer, clock, succeededOutcome(), testTimeout, defaultRetryPolicy)
+	require.NoError(t, err)
+	assert.Equal(t, 2, doer.cursor, "expected two HTTP calls (5xx + retry)")
+	assert.Len(t, clock.SleepCalls, 1, "expected one backoff sleep between attempts")
+}
+
+// TestSend_PerAttemptTimeout_BoundsHangingBodyRead guards AC-11: the
+// per-attempt timeout must apply to body reads as well, not just the HTTP
+// call. With cancelOnCloseBody, the cancel only fires on body Close, so the
+// blockingUntilCtxDoneBody will block in Read until the per-attempt timeout
+// fires and cancels its context. The total test time must not greatly exceed
+// requestTimeout per attempt.
+//
+// Wall-clock cost note (same pattern as TestSend_HTTPTimeout_ReturnsSendError):
+// perAttemptTimeoutDoer's context.WithTimeout is real-time, so this test
+// waits ~requestTimeout * (MaxRetries+1) = 3*150ms = ~450ms.
+func TestSend_PerAttemptTimeout_BoundsHangingBodyRead(t *testing.T) {
+	const testTimeout = 150 * time.Millisecond
+	const tolerance = 3 * testTimeout // 450ms; each attempt's body blocks until timeout
+
+	doer := &scriptedDoer{t: t, steps: []handlerFunc{
+		func(req *http.Request) (*http.Response, error) {
+			body := &blockingUntilCtxDoneBody{ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       body,
+			}, nil
+		},
+		func(req *http.Request) (*http.Response, error) {
+			body := &blockingUntilCtxDoneBody{ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       body,
+			}, nil
+		},
+		func(req *http.Request) (*http.Response, error) {
+			body := &blockingUntilCtxDoneBody{ctx: req.Context()}
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       body,
+			}, nil
+		},
+	}}
+
+	start := time.Now()
+	cfg := Config{SuccessWebhookURL: newSecretString(t, "https://hooks.slack.com/services/T00/B00/valid")}
+	clock := &fakeClock{}
+	err := send(context.Background(), cfg, doer, clock, succeededOutcome(), testTimeout, defaultRetryPolicy)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.Less(t, elapsed, 2*tolerance, "total time should be bounded by ~3 requestTimeouts")
+}
+
 var _ retry.Clock = (*fakeClock)(nil)
