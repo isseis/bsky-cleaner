@@ -91,12 +91,11 @@ func (b *cancelOnCloseBody) Close() error {
 // "requestTimeout per attempt" worst-case model in the architecture doc
 // (section 3.6).
 //
-// Unlike the previous implementation which called cancel() on Do return
-// (via defer), this version ties cancellation to the response body's
-// Close(): the per-attempt context stays alive while the retry loop drains
-// the body or reads it for success/failure determination. When Do returns
-// an error, or the response/body is nil, cancellation happens immediately
-// since there is nothing to read.
+// Cancellation is tied to the response body's Close(), not to Do's return:
+// the per-attempt context stays alive while the retry loop drains the body
+// or reads it for success/failure determination. When Do returns an error,
+// or the response/body is nil, cancellation happens immediately since there
+// is nothing to read.
 type perAttemptTimeoutDoer struct {
 	inner   HTTPDoer
 	timeout time.Duration
