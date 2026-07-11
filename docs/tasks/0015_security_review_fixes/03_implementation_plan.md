@@ -204,7 +204,7 @@
 - **PR タイトル**: `fix(0015): reject HTTP redirects during DID resolution`
 - **レビュー観点**: `cmd/main.go` の配線差し替えが Slack 通知側にも意図通り及ぶこと（[02_architecture.md](02_architecture.md) 3.2 の「共有クライアント」節）、未使用インポート削除、AC-05 のテストが実際に3xxを拒否することを確認していること。
 
-- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
