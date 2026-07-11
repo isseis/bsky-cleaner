@@ -44,11 +44,10 @@ type permanentError interface {
 // time discarding an oversized 429/5xx body.
 const maxDrainBytes = 64 * 1024
 
-// maxRetryAfterSeconds is the upper bound for a parsed Retry-After header
-// delta-seconds value, set at 24 hours. Values beyond this are clamped to
-// prevent int64 overflow when multiplying by time.Second. The bound
-// comfortably exceeds any realistic MaxDelay while being small enough that
-// the multiplication cannot overflow int64.
+// maxRetryAfterSeconds bounds a parsed Retry-After delta-seconds value
+// (clamped to this before converting to time.Duration) so the
+// multiplication by time.Second cannot overflow int64; 24 hours comfortably
+// exceeds any realistic MaxDelay.
 const maxRetryAfterSeconds = 24 * 60 * 60
 
 // Doer wraps an HTTPDoer, retrying transient failures (transport errors,
@@ -219,13 +218,10 @@ func backoffDelay(policy Policy, attempt int, retryAfter time.Duration) time.Dur
 // either would mean retrying without any wait, defeating the point of a
 // backoff.
 //
-// Unlike the previous implementation (which used time.ParseDuration(value +
-// "s")), this function parses only bare integer strings as delta-seconds.
-// A unit-suffixed value like "5m" is not accepted as a valid seconds value
-// and falls through to the HTTP-date branch (which will also fail) and
-// returns 0, preventing misinterpretation as 5ms. Values greater than
-// maxRetryAfterSeconds are clamped to prevent int64 overflow when
-// converting to time.Duration.
+// Only bare integer strings are parsed as delta-seconds; a unit-suffixed
+// value like "5m" is not accepted and falls through to the HTTP-date branch
+// (which will also fail), returning 0. Values greater than
+// maxRetryAfterSeconds are clamped (see its doc comment).
 func parseRetryAfter(value string) time.Duration {
 	if value == "" {
 		return 0
