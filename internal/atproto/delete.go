@@ -17,9 +17,10 @@ type deleteRecordRequest struct {
 	RKey       string `json:"rkey"`
 }
 
-// DeleteRecord deletes the app.bsky.feed.post record identified by rkey
-// from the authenticated account's own repository. repo is always
-// c.session.DID (the DID Login obtained for this account), never a
+// DeleteRecord deletes post from the authenticated account's own
+// repository, choosing the collection from post.Type (reposts live in
+// app.bsky.feed.repost, everything else in app.bsky.feed.post). repo is
+// always c.session.DID (the DID Login obtained for this account), never a
 // caller-supplied value, so a caller cannot direct a deletion at another
 // account's repository (AC-13). Unlike ListPosts's read endpoints,
 // deleteRecord requires auth per the AT Protocol lexicon, so the request
@@ -32,20 +33,24 @@ type deleteRecordRequest struct {
 // for "not found" to special-case, unlike ListPosts's getRecord fallback.
 // DeleteRecord therefore treats any 2xx response (via doXRPC's shared
 // success check) as success and any other response as a genuine failure.
-func (c *Client) DeleteRecord(ctx context.Context, rkey string) error {
+func (c *Client) DeleteRecord(ctx context.Context, post Post) error {
 	if c.session == nil {
 		return fmt.Errorf("delete record: %w", ErrAuthenticationFailed)
 	}
 
+	collection, err := collectionForPostType(post.Type)
+	if err != nil {
+		return fmt.Errorf("delete record: %w", err)
+	}
+
 	reqBody := deleteRecordRequest{
 		Repo:       c.session.DID,
-		Collection: collectionFeedPost,
-		RKey:       rkey,
+		Collection: collection,
+		RKey:       post.RKey,
 	}
 
 	authHeader := "Bearer " + c.session.AccessJWT.Reveal()
-	err := doXRPC(ctx, c.httpDoer, c.pdsBaseURL, http.MethodPost, "com.atproto.repo.deleteRecord", nil, reqBody, nil, authHeader)
-	if err != nil {
+	if err := doXRPC(ctx, c.httpDoer, c.pdsBaseURL, http.MethodPost, "com.atproto.repo.deleteRecord", nil, reqBody, nil, authHeader); err != nil {
 		return fmt.Errorf("delete record: %w", err)
 	}
 	return nil

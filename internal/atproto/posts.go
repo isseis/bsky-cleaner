@@ -63,6 +63,21 @@ const (
 	PostTypeRepost
 )
 
+// collectionForPostType maps a PostType to the XRPC collection its record
+// lives in: PostTypeRepost -> app.bsky.feed.repost, the three known post
+// types -> app.bsky.feed.post. An unrecognized PostType returns an error
+// (fail-closed) rather than guessing a writable collection to delete from.
+func collectionForPostType(t PostType) (string, error) {
+	switch t {
+	case PostTypeOriginal, PostTypeReply, PostTypeQuote:
+		return collectionFeedPost, nil
+	case PostTypeRepost:
+		return collectionRepost, nil
+	default:
+		return "", fmt.Errorf("collection for post type: %w", ErrUnknownPostType)
+	}
+}
+
 // Post is the subset of a post/repost record ListPosts exposes to callers:
 // enough to decide whether and how to delete it, without the full record
 // body (which downstream filtering does not need).

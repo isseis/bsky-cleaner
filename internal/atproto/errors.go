@@ -29,6 +29,10 @@ var (
 	// ErrPaginationLimitExceeded is returned when listAllRecords exceeds
 	// any of its limits: total bytes, total pages, or total records.
 	ErrPaginationLimitExceeded = errors.New("pagination byte/page/record limit exceeded")
+	// ErrUnknownPostType is returned by collectionForPostType when given a
+	// PostType it does not recognize, so DeleteRecord fails closed instead
+	// of guessing a collection to delete from.
+	ErrUnknownPostType = errors.New("unknown post type")
 )
 
 // SSRFStage identifies which validation step rejected a PDS endpoint, so a
