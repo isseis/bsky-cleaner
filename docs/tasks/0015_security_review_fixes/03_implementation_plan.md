@@ -113,7 +113,7 @@
 - [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_NonRepostTypes_UsesFeedPostCollection` — `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` をテーブル駆動で渡し、いずれも `Collection` が `app.bsky.feed.post` であることを検証する（AC-02）。
 - [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_Repost_SendsOnlyRepostCollection_NotFeedPost` — `Post{RKey: "shared-rkey", Type: PostTypeRepost}` を渡し、`mock.CallCount()` が1、かつその唯一のリクエストの `deleteRecordRequest.Collection` が `app.bsky.feed.repost` であることを検証する（AC-03）。`com.atproto.repo.deleteRecord` は `(repo, collection, rkey)` の3つ組でしか対象レコードを特定できない AT Protocol の lexicon 仕様上、`collection=app.bsky.feed.repost` を指定した削除リクエストは `app.bsky.feed.post` 側に実在する同名 rkey のレコードに一切作用し得ない。したがって「送信された唯一のリクエストの `collection` が `app.bsky.feed.repost` である」ことの検証は、`MockHTTPDoer` にコレクション別の実データ状態を持たせずとも、AC-03 が求める「コレクションを跨いだ誤削除が発生しないこと」の証明として十分である。この論拠をテスト本体のコメントとして明記する（`app.bsky.feed.post` 側に同一 rkey のレコードが実在するという前提部分は、テストの前提コメントとして記述するに留め、実際の HTTP 応答スクリプトとしては用意しない）。
 - [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_UnknownPostType_NoRequestSent` — 未知の `PostType` を渡すと `errors.Is(err, ErrUnknownPostType)` になり、`mock.CallCount()` が0（HTTPリクエストが一切送信されない = fail-closed）であることを検証する。
-- [ ] `internal/atproto/runner_integration_test.go::TestRunnerRun_RepostDeleteSuccessAndFailure_MapsToDeletedAndFailed` — `runner.Run` に2件のリポスト投稿を目標として与え、モックが一方に2xx・他方に5xxを返すよう設定した上で、`result.Deleted`/`result.Failed` への振り分けが HTTP 応答の成否と一致することを検証する（AC-04）。モックのハンドラで `req.URL.Query().Get("collection")`（`deleteRecord` はクエリではなく JSON ボディなので、リクエストボディをデコードして `Collection` フィールドを見る）が `app.bsky.feed.repost` であることも併せて確認し、コレクション選択とHTTP成否判定が両方正しいことを1テストで確認する。
+- [ ] `internal/atproto/runner_integration_test.go::TestRunnerRun_RepostDeleteSuccessAndFailure_MapsToDeletedAndFailed` — `runner.Run` に2件のリポスト投稿を目標として与え、モックが一方に2xx・他方に5xxを返すよう設定した上で、`result.Deleted`/`result.Failed` への振り分けが HTTP 応答の成否と一致することを検証する（AC-04）。モックのハンドラでリクエストボディの JSON をデコードして `Collection` フィールドが `app.bsky.feed.repost` であることも併せて確認し、コレクション選択とHTTP成否判定が両方正しいことを1テストで確認する。
 
 ### 3.3 PR-1 作成ポイント
 
@@ -310,7 +310,7 @@
 
 | リスク | 内容 | 軽減策 |
 |---|---|---|
-| F-001 のシグネチャ変更漏れ | `DeleteRecord`/`runner.Client` の呼び出し元・テストダブルが多数のファイルに散在しており、更新漏れがあるとコンパイルエラーになる | `go build ./...`/`go vet -tags test ./...` が Phase 1 の成功基準に含まれるため、シグネチャ不一致は即座に検出される。加えて1.3節・各 Phase の作業内容で全呼び出し箇所（`rg -n "DeleteRecord\(" --type go` の結果）を列挙済み |
+| F-001 のシグネチャ変更漏れ | `DeleteRecord`/`runner.Client` の呼び出し元・テストダブルが多数のファイルに散在しており、更新漏れがあるとコンパイルエラーになる | `go build ./...`/`go test -tags test ./internal/atproto/... ./internal/runner/...` が Phase 1 の成功基準（3.4節）に含まれるため、シグネチャ不一致は即座に検出される。加えて1.3節・各 Phase の作業内容で全呼び出し箇所（`rg -n "DeleteRecord\(" --type go` の結果）を列挙済み |
 | F-003 のテストがループバック環境でマスキングされる | [02_architecture.md](02_architecture.md) 3.3 の引用ブロックが指摘するとおり、実サーバ + 小さいレスポンスボディでは EOF がキャンセル前に読み切られてしまい、バグの有無に関わらずテストが緑になる | 6.2節のテストは実サーバではなく `scriptedDoer`/`ctxSensitiveBody`（per-attempt コンテキストの状態を明示的に反映するテストダブル）を用いるため、実ネットワーク環境に依存せず確定的にバグを検出できる |
 | F-002 の `cmd/main.go` 配線差し替えが実行時にしか確認できない | `main()` は `os.Exit` を直接呼ぶため単体テストで駆動できず、`http.DefaultClient` → `atproto.NewRedirectRejectingHTTPClient()` の置き換え自体は Go のテストで直接検証できない | 10章の静的検証タスクで `rg` による配線確認を行う。`NewRedirectRejectingHTTPClient` 自体の挙動（AC-05）は `http_test.go` のユニットテストで別途担保する |
 | F-004 の `loginTestClient` シグネチャ変更が波及範囲を過小評価している | 呼び出し元は `session_test.go` 3箇所・`errors_test.go` 2箇所の計5箇所（`rg -n "loginTestClient\(" --type go` で確認済み） | Phase 2 の作業内容に全5箇所を明記済み。`go build -tags test ./...` で更新漏れは即座にコンパイルエラーとして検出される |
