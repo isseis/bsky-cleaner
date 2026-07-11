@@ -103,9 +103,13 @@ func (d perAttemptTimeoutDoer) Do(req *http.Request) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(req.Context(), d.timeout)
 
 	resp, err := d.inner.Do(req.Clone(ctx))
-	if err != nil || resp == nil || resp.Body == nil {
+	if err != nil {
 		cancel()
-		return resp, err
+		return nil, err
+	}
+	if resp == nil || resp.Body == nil {
+		cancel()
+		return nil, fmt.Errorf("notify: inner HTTPDoer returned a nil response or body with a nil error")
 	}
 
 	resp.Body = &cancelOnCloseBody{ReadCloser: resp.Body, cancel: cancel}
