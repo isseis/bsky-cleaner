@@ -25,7 +25,7 @@
 ### 1.2 目的（ゴール）
 
 - エラーチェーンのどこかに永続エラー（`permanentError` を満たすエラー）が含まれる場合、それがラップされていてもリトライを打ち切る。
-- これにより、ラップされた `*atproto.SSRFError` が無駄なリトライ予算を消費せず、速やかに呼び出し元へ伝播する。これは `CheckRedirect` によるリダイレクト拒否（`SSRFStageDialRevalidation`）だけでなく、`DialContext` ラッパーが検証済みアドレス集合外への接続を拒否して返す `*SSRFError`（同じく `*url.Error` でラップされる）にも同様に適用される。
+- これにより、ラップされた `*atproto.SSRFError` が無駄なリトライ予算を消費せず、速やかに呼び出し元へ伝播する。これは `CheckRedirect` によるリダイレクト拒否（`SSRFStageDialRevalidation`）だけでなく、`DialContext` ラッパーが検証済みアドレス集合外への接続を拒否して返す `*atproto.SSRFError`（同じく `*url.Error` でラップされる）にも同様に適用される。
 - 永続エラーを含まないエラー（トランスポート失敗、DNS 一時エラー等）の既存のリトライ挙動は一切変えない。
 
 ## 2. スコープ
