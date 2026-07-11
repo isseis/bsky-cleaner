@@ -311,7 +311,7 @@ func TestNewRedirectRejectingHTTPClient_RejectsRedirect(t *testing.T) {
 	srvURL = srv.URL
 
 	client := NewRedirectRejectingHTTPClient()
-	req, err := http.NewRequest("GET", srv.URL+"/redirect", nil)
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/redirect", nil)
 	require.NoError(t, err)
 
 	resp, err := client.Do(req)
