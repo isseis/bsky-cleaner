@@ -98,7 +98,7 @@ func TestRunnerRun_WithRealAtprotoClient(t *testing.T) {
 }
 
 // TestRunnerRun_RepostDeleteSuccessAndFailure_MapsToDeletedAndFailed
-// verifies AC-04: given two reposts to delete, the HTTP success/failure of
+// verifies that, given two reposts to delete, the HTTP success/failure of
 // each deleteRecord call (not the fact that a request was merely sent)
 // determines whether it lands in result.Deleted or result.Failed. It also
 // asserts every deleteRecord request carries

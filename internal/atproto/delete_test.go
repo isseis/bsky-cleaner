@@ -99,7 +99,7 @@ func TestClient_DeleteRecord_HTTPError(t *testing.T) {
 	assert.ErrorIs(t, err, ErrHTTPStatus)
 }
 
-// TestClient_DeleteRecord_Repost_UsesRepostCollection verifies AC-01:
+// TestClient_DeleteRecord_Repost_UsesRepostCollection verifies that
 // deleting a PostTypeRepost sends collection=app.bsky.feed.repost, not the
 // app.bsky.feed.post default.
 func TestClient_DeleteRecord_Repost_UsesRepostCollection(t *testing.T) {
@@ -118,7 +118,7 @@ func TestClient_DeleteRecord_Repost_UsesRepostCollection(t *testing.T) {
 }
 
 // TestClient_DeleteRecord_NonRepostTypes_UsesFeedPostCollection verifies
-// AC-02: original/reply/quote posts keep sending
+// that original/reply/quote posts keep sending
 // collection=app.bsky.feed.post.
 func TestClient_DeleteRecord_NonRepostTypes_UsesFeedPostCollection(t *testing.T) {
 	tests := []struct {
@@ -149,7 +149,7 @@ func TestClient_DeleteRecord_NonRepostTypes_UsesFeedPostCollection(t *testing.T)
 }
 
 // TestClient_DeleteRecord_Repost_SendsOnlyRepostCollection_NotFeedPost
-// verifies AC-03: deleting a repost whose rkey happens to collide with an
+// verifies that deleting a repost whose rkey happens to collide with an
 // unrelated app.bsky.feed.post record's rkey must not touch that other
 // record. Per the com.atproto.repo.deleteRecord lexicon, a delete request
 // can only ever identify a record via the (repo, collection, rkey) triple
