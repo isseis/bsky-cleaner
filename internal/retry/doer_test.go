@@ -560,9 +560,8 @@ func TestDoer_Do_LogsRetryAttempt(t *testing.T) {
 	assert.Contains(t, logged, "wait=1s")
 }
 
-// TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay guards the
-// strconv.Atoi branch of parseRetryAfter: Retry-After: 5 must produce a
-// 5-second delay.
+// TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay guards RFC 9110
+// delta-seconds parsing: Retry-After: 5 must produce a 5-second delay.
 func TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay(t *testing.T) {
 	clock := &fakeClock{}
 	policy := Policy{MaxRetries: 1, BaseDelay: time.Second, MaxDelay: 30 * time.Second}
