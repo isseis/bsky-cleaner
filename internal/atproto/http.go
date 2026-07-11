@@ -181,6 +181,18 @@ func (d *restrictedDoer) Do(req *http.Request) (*http.Response, error) {
 	return d.client.Do(req) //nolint:gosec // req.URL.Host is pinned to an address validatePDSEndpoint already verified, not an attacker-controlled URL
 }
 
+// NewRedirectRejectingHTTPClient returns the shared outbound *http.Client
+// cmd/main.go injects for both DID resolution and Slack webhook delivery. It
+// rejects every HTTP redirect (reusing rejectRedirect, the same policy
+// restrictedDoer applies to PDS traffic) so a handle server or did:web
+// document host cannot redirect an unauthenticated resolution GET to an
+// internal address; the same policy is harmless for Slack (which does not
+// redirect). Transport and timeout otherwise match http.DefaultClient's
+// defaults, preserving existing behavior.
+func NewRedirectRejectingHTTPClient() *http.Client {
+	return &http.Client{CheckRedirect: rejectRedirect}
+}
+
 // rejectRedirect is an http.Client.CheckRedirect policy that always
 // refuses to follow a redirect: XRPC calls never expect a 3xx response,
 // and the default http.Client behavior of following same-host redirects

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -330,7 +329,7 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 // run performs one full wiring pass: load configuration, build the
 // AT Protocol client, run the cleanup pass, and render the result. It
 // takes httpDoer/stdout/stderr as parameters (rather than reaching for
-// http.DefaultClient/os.Stdout/os.Stderr directly) so tests can drive it
+// atproto.NewRedirectRejectingHTTPClient/os.Stdout/os.Stderr directly) so tests can drive it
 // without real network I/O or an os.Exit call.
 func run(configPath string, apply bool, now time.Time, httpDoer atproto.HTTPDoer, stdout, stderr io.Writer) int {
 	ctx := context.Background()
@@ -486,5 +485,5 @@ func main() {
 	}
 
 	now := time.Now()
-	os.Exit(run(configPath, apply, now, http.DefaultClient, os.Stdout, os.Stderr))
+	os.Exit(run(configPath, apply, now, atproto.NewRedirectRejectingHTTPClient(), os.Stdout, os.Stderr))
 }
