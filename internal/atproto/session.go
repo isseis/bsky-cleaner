@@ -90,6 +90,10 @@ func (c *Client) Login(ctx context.Context, appPassword config.SecretString) err
 		return fmt.Errorf("login: %w", err)
 	}
 
+	if respBody.DID != c.did {
+		return fmt.Errorf("login: session DID %q does not match resolved DID %q: %w", respBody.DID, c.did, ErrSessionDIDMismatch)
+	}
+
 	c.session = &Session{
 		DID:       respBody.DID,
 		AccessJWT: newSecretString(respBody.AccessJWT),
