@@ -10,6 +10,8 @@
 | Reviewer | - |
 | Comments | - |
 
+関連ドキュメント: [要件定義書](01_requirements.md)
+
 ## 1. 設計の全体像
 
 ### 1.1 設計原則
@@ -161,9 +163,9 @@ type Client interface {
 }
 ```
 
-`collectionForPostType` は既知の4種別を明示的に扱う。`PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` は `app.bsky.feed.post`、`PostTypeRepost` は `app.bsky.feed.repost` を返す。未知種別（`cleanup.SelectDeletionTargets` が既に削除対象から除外しているため通常は到達しない）に対しては、既定コレクションを推測して削除を実行するのではなく **fail-closed**（エラーを返し `DeleteRecord` がそのレコードを削除しない）とする。既定値として実在の書き込み可能コレクション（`app.bsky.feed.post`）を返す設計は、将来 `PostType` の追加や分類バグで未知種別が到達した場合に「推測したコレクションへ削除を送る」ことになり、本タスクが是正しようとしている F-001 そのもの（コレクション取り違えによる誤削除）を再導入してしまう。したがって `collectionForPostType` は `(collection string, err error)` を返し、未知種別ではエラーを返す（[CLAUDE.md](../../../CLAUDE.md) の Fail-closed 原則）。この失敗は当該1件の削除失敗として `report.Result.Failed` に計上され、他の削除対象の処理は継続する（`runner.Run` の既存の「個別失敗を継続」挙動）。
+`collectionForPostType` は既知の4種別を明示的に扱う。`PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` は `app.bsky.feed.post`、`PostTypeRepost` は `app.bsky.feed.repost` を返す。未知種別（`cleanup.SelectDeletionTargets` が既に削除対象から除外しているため通常は到達しない）に対しては、既定コレクションを推測して削除を実行するのではなく **fail-closed**（エラーを返し `DeleteRecord` がそのレコードを削除しない）とする。既定値として実在の書き込み可能コレクション（`app.bsky.feed.post`）を返す設計は、将来 `PostType` の追加や分類バグで未知種別が到達した場合に「推測したコレクションへ削除を送る」ことになり、本タスクが是正しようとしている F-001 そのもの（コレクション取り違えによる誤削除）を再導入してしまう。したがって `collectionForPostType` は `(collection string, err error)` を返し、未知種別ではエラーを返す（[CLAUDE.md](../../../../CLAUDE.md) の Fail-closed 原則）。この失敗は当該1件の削除失敗として `report.Result.Failed` に計上され、他の削除対象の処理は継続する（`runner.Run` の既存の「個別失敗を継続」挙動）。
 
-> **代替案の検討**: シグネチャを `DeleteRecord(ctx, rkey string, collection string)` とし、コレクション文字列を呼び出し元から渡す案も考えられる。しかしこれはコレクション lexicon 名という `atproto` 内部の知識を `runner` に漏らすことになり、[CLAUDE.md](../../../CLAUDE.md) の「Separation of Concerns」に反する。`Post` を渡す案の方が、削除対象の同定と種別からのコレクション導出を `atproto` 内に閉じられるため優れる。
+> **代替案の検討**: シグネチャを `DeleteRecord(ctx, rkey string, collection string)` とし、コレクション文字列を呼び出し元から渡す案も考えられる。しかしこれはコレクション lexicon 名という `atproto` 内部の知識を `runner` に漏らすことになり、[CLAUDE.md](../../../../CLAUDE.md) の「Separation of Concerns」に反する。`Post` を渡す案の方が、削除対象の同定と種別からのコレクション導出を `atproto` 内に閉じられるため優れる。
 
 ### 3.2 F-002: DID 解決フェーズのリダイレクト拒否
 
@@ -242,7 +244,7 @@ var ErrSessionDIDMismatch = errors.New("session DID does not match resolved DID"
 
 秒数形式のパースを `strconv.Atoi` による非負整数解釈に置き換える。整数として解釈でき正値であればその秒数を、0以下であれば0（フォールバック）を返す。整数として解釈できない値は HTTP-date として解釈を試み、それも失敗すれば0を返して既存の指数バックオフにフォールバックする。HTTP-date 分岐（`http.ParseTime`、未来なら差分秒数・過去なら0）は変更しない（AC-17）。
 
-**オーバーフロー安全性**: 現行の `time.ParseDuration` は範囲外の大きさをエラーとして拒否し、結果的に安全側（HTTP-date 試行 → 0 → 指数バックオフ）へフォールバックしていた。`strconv.Atoi` は `int` 上限までの巨大な整数を受理してしまうため、`time.Duration(seconds) * time.Second` の乗算が `int64` をオーバーフローして意図せず小さな正値になり、`backoffDelay` の `min(wait, MaxDelay)` を通過してバックオフをほぼゼロに短縮させうる（[CLAUDE.md](../../../CLAUDE.md) が挙げる「Bluesky のレート制限に対するランナウェイリトライ」リスクに直結する）。これを防ぐため、`time.Duration` への乗算の前にパース済み秒数へ妥当な上界（例えば 24 時間相当の秒数など、現実的な `MaxDelay` を十分上回りつつオーバーフローしない定数）を設けてクランプする。上界を超える値はその上界値（`backoffDelay` 側で `MaxDelay` にキャップされる）として扱い、乗算オーバーフローを構造的に排除する。この上界は `Retry-After` の現実的な値（秒〜数十分オーダー）を制約しないため、正常系の解釈には影響しない。
+**オーバーフロー安全性**: 現行の `time.ParseDuration` は範囲外の大きさをエラーとして拒否し、結果的に安全側（HTTP-date 試行 → 0 → 指数バックオフ）へフォールバックしていた。`strconv.Atoi` は `int` 上限までの巨大な整数を受理してしまうため、`time.Duration(seconds) * time.Second` の乗算が `int64` をオーバーフローして意図せず小さな正値になり、`backoffDelay` の `min(wait, MaxDelay)` を通過してバックオフをほぼゼロに短縮させうる（[CLAUDE.md](../../../../CLAUDE.md) が挙げる「Bluesky のレート制限に対するランナウェイリトライ」リスクに直結する）。これを防ぐため、`time.Duration` への乗算の前にパース済み秒数へ妥当な上界（例えば 24 時間相当の秒数など、現実的な `MaxDelay` を十分上回りつつオーバーフローしない定数）を設けてクランプする。上界を超える値はその上界値（`backoffDelay` 側で `MaxDelay` にキャップされる）として扱い、乗算オーバーフローを構造的に排除する。この上界は `Retry-After` の現実的な値（秒〜数十分オーダー）を制約しないため、正常系の解釈には影響しない。
 
 ```go
 // parseRetryAfter interprets a 429 response's Retry-After header per RFC 9110
@@ -349,7 +351,7 @@ flowchart TD
 
 ### 5.4 常設設計ノートの要否
 
-[_context.md](../../../.claude/commands/_context.md) の条件付き設計ノート方針は「AT Protocol クライアント・レート制限・認証/セッション・破壊的操作に触れる機能では、`docs/dev/architecture_design/` に専用設計ノートを追加する」ことを求める。本タスクはこれらの領域に触れるが、いずれも新規サブシステムの導入ではなく既存挙動のバグ修正であり、方針自体は既存の [セキュリティ設計](../../design/security.md) が定める SSRF・秘密漏洩・レート制限の各方針をそのまま踏襲する。したがって新規の常設設計ノートは設けず、本アーキテクチャ設計書内で個別の是正を記述するに留める（YAGNI）。
+[_context.md](../../../../.claude/commands/_context.md) の条件付き設計ノート方針は「AT Protocol クライアント・レート制限・認証/セッション・破壊的操作に触れる機能では、`docs/dev/architecture_design/` に専用設計ノートを追加する」ことを求める。本タスクはこれらの領域に触れるが、いずれも新規サブシステムの導入ではなく既存挙動のバグ修正であり、方針自体は既存の [セキュリティ設計](../../design/security.md) が定める SSRF・秘密漏洩・レート制限の各方針をそのまま踏襲する。したがって新規の常設設計ノートは設けず、本アーキテクチャ設計書内で個別の是正を記述するに留める（YAGNI）。
 
 ## 6. 処理フロー詳細
 
