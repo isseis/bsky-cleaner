@@ -329,7 +329,7 @@ func parseFlags(args []string, out io.Writer) (configPath string, apply bool, er
 // run performs one full wiring pass: load configuration, build the
 // AT Protocol client, run the cleanup pass, and render the result. It takes
 // httpDoer/stdout/stderr as parameters -- rather than constructing the
-// HTTPDoer (atproto.NewRedirectRejectingHTTPClient) or reaching for
+// HTTPDoer (atproto.NewRedirectRejectingHTTPClient()) or reaching for
 // os.Stdout/os.Stderr directly -- so tests can drive it without real network
 // I/O or an os.Exit call, and so main retains sole control over how the
 // HTTPDoer is built.
