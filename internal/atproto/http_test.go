@@ -291,8 +291,7 @@ func TestDoXRPC_RequestTimeout(t *testing.T) {
 
 // TestNewRedirectRejectingHTTPClient_RejectsRedirect verifies that the
 // client returned by NewRedirectRejectingHTTPClient refuses to follow an
-// HTTP 3xx redirect, returning *SSRFError with stage DialRevalidation
-// (AC-05).
+// HTTP 3xx redirect, returning *SSRFError with stage DialRevalidation.
 func TestNewRedirectRejectingHTTPClient_RejectsRedirect(t *testing.T) {
 	var redirectReached bool
 	var srvURL string
@@ -322,8 +321,7 @@ func TestNewRedirectRejectingHTTPClient_RejectsRedirect(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, redirectReached, "redirect target must not be reached")
 
-	var ssrfErr *SSRFError
-	ok := errors.As(err, &ssrfErr)
+	ssrfErr, ok := errors.AsType[*SSRFError](err)
 	require.True(t, ok, "error must be *SSRFError")
 	assert.Equal(t, SSRFStageDialRevalidation, ssrfErr.Stage)
 

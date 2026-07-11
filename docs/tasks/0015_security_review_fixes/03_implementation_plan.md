@@ -166,8 +166,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/144）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### 4.4 完了基準
 
@@ -186,26 +186,26 @@
 
 **実装項目**:
 
-- [ ] `internal/atproto/http.go` に `func NewRedirectRejectingHTTPClient() *http.Client` を追加する。`&http.Client{CheckRedirect: rejectRedirect}` を返す（[02_architecture.md](02_architecture.md) 3.2 のとおり、Transport・Timeout は `http.DefaultClient` の既定値のまま変更しない）。doc コメントは [02_architecture.md](02_architecture.md) 3.2 に掲載のものを使用する。
-- [ ] `cmd/main.go` の `main()` 内、`os.Exit(run(configPath, apply, now, http.DefaultClient, os.Stdout, os.Stderr))`（489行目）の `http.DefaultClient` を `atproto.NewRedirectRejectingHTTPClient()` に置き換える。
-- [ ] `cmd/main.go` の `import` から `"net/http"`（15行目）を削除する（他に使用箇所がないため、置き換え後は未使用インポートになる）。
-- [ ] `cmd/main.go` の `run` 関数の doc コメント（330-334行目）を更新する。「rather than reaching for http.DefaultClient/os.Stdout/os.Stderr directly」という記述を、`main` が具体的な `HTTPDoer` の構築方法（`atproto.NewRedirectRejectingHTTPClient()`）を選べることが `run` のテスト容易性の理由である旨に改め、`http.DefaultClient` という具体名は削除する。
+- [x] `internal/atproto/http.go` に `func NewRedirectRejectingHTTPClient() *http.Client` を追加する。`&http.Client{CheckRedirect: rejectRedirect}` を返す（[02_architecture.md](02_architecture.md) 3.2 のとおり、Transport・Timeout は `http.DefaultClient` の既定値のまま変更しない）。doc コメントは [02_architecture.md](02_architecture.md) 3.2 に掲載のものを使用する。
+- [x] `cmd/main.go` の `main()` 内、`os.Exit(run(configPath, apply, now, http.DefaultClient, os.Stdout, os.Stderr))`（489行目）の `http.DefaultClient` を `atproto.NewRedirectRejectingHTTPClient()` に置き換える。
+- [x] `cmd/main.go` の `import` から `"net/http"`（15行目）を削除する（他に使用箇所がないため、置き換え後は未使用インポートになる）。
+- [x] `cmd/main.go` の `run` 関数の doc コメント（330-334行目）を更新する。「rather than reaching for http.DefaultClient/os.Stdout/os.Stderr directly」という記述を、`main` が具体的な `HTTPDoer` の構築方法（`atproto.NewRedirectRejectingHTTPClient()`）を選べることが `run` のテスト容易性の理由である旨に改め、`http.DefaultClient` という具体名は削除する。
 
 **スコープ注記**: `internal/notify/notifypreview/main.go`（`//go:build test` の開発者向けプレビューツール、[test_organization.md](../../dev/developer_guide/test_organization.md) の対象外である独立した `main` パッケージ）も `notify.Send` の呼び出しに `http.DefaultClient` を直接使っている。これは本番のリクエスト経路ではなく、テストビルドタグでゲートされた開発者向けローカルツールであり、[01_requirements.md](01_requirements.md) の In Scope（F-002: DID 解決フェーズおよび `cmd/main.go` が構築する共有クライアント）にも含まれないため、本タスクでは変更しない。
 
 ### 5.2 テスト内容
 
-- [ ] `internal/atproto/http_test.go::TestNewRedirectRejectingHTTPClient_RejectsRedirect` — `http_test.go` は `package atproto`（内部テスト）である。`httptest.NewServer` で3xxを返すハンドラを用意し、`NewRedirectRejectingHTTPClient()` が返す `*http.Client` で直接 `Do` した結果が `*SSRFError`（`errors.AsType[*SSRFError]` で判別、`Stage == SSRFStageDialRevalidation`）であり、リダイレクト先へは到達しない（サーバ側でリダイレクト先パスへのアクセスがないことをハンドラ内のフラグで確認する）ことを検証する（AC-05）。
-- [ ] AC-06 は既存の `internal/atproto/did_test.go::TestNewClient_ResolvesHandleToDIDAndPDSEndpoint` が無変更で再実行されることで検証する。
-- [ ] AC-07 は既存の `internal/atproto/did_test.go::TestResolveHandle_DNSSucceeds_DoesNotCallHTTPS`・`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` が無変更で再実行されることで検証する。
+- [x] `internal/atproto/http_test.go::TestNewRedirectRejectingHTTPClient_RejectsRedirect` — `http_test.go` は `package atproto`（内部テスト）である。`httptest.NewServer` で3xxを返すハンドラを用意し、`NewRedirectRejectingHTTPClient()` が返す `*http.Client` で直接 `Do` した結果が `*SSRFError`（`errors.AsType[*SSRFError]` で判別、`Stage == SSRFStageDialRevalidation`）であり、リダイレクト先へは到達しない（サーバ側でリダイレクト先パスへのアクセスがないことをハンドラ内のフラグで確認する）ことを検証する（AC-05）。
+- [x] AC-06 は既存の `internal/atproto/did_test.go::TestNewClient_ResolvesHandleToDIDAndPDSEndpoint` が無変更で再実行されることで検証する。
+- [x] AC-07 は既存の `internal/atproto/did_test.go::TestResolveHandle_DNSSucceeds_DoesNotCallHTTPS`・`TestNewClient_DNSTXTSuccess_StillGoesThroughDownstreamPipeline` が無変更で再実行されることで検証する。
 
 ### 5.3 PR-3 作成ポイント
 
 - **PR タイトル**: `fix(0015): reject HTTP redirects during DID resolution`
 - **レビュー観点**: `cmd/main.go` の配線差し替えが Slack 通知側にも意図通り及ぶこと（[02_architecture.md](02_architecture.md) 3.2 の「共有クライアント」節）、未使用インポート削除、AC-05 のテストが実際に3xxを拒否することを確認していること。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（[#145](https://github.com/isseis/bsky-cleaner/pull/145)）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -342,17 +342,17 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）は10章の実装チェ�
 ## 10. 実装チェックリスト
 
 - [x] Phase 1（F-001）完了
-- [ ] Phase 2（F-004）完了
-- [ ] Phase 3（F-002）完了
+- [x] Phase 2（F-004）完了
+- [x] Phase 3（F-002）完了
 - [ ] Phase 4（F-003）完了
 - [ ] Phase 5（F-005）完了
-- [ ] `rg -n "http.DefaultClient" cmd/main.go` の結果が0件であることを確認する（Phase 3 の置き換え漏れがないことの静的確認）
-- [ ] `rg -n "atproto.NewRedirectRejectingHTTPClient\(\)" cmd/main.go` の結果が1件（`run(...)` 呼び出し箇所）であることを確認する
-- [ ] `rg -n 'DeleteRecord\(' --type go` の全結果が `Post` 引数を渡す形（または `Post` を受け取るシグネチャ定義自体）になっていることを目視確認する（Phase 1 完了後の残存箇所チェック）
-- [ ] `make fmt` を実行し差分がないことを確認する
-- [ ] `make test` が成功する
-- [ ] `make lint` が成功する
-- [ ] `make deadcode` を実行し、新規に追加した公開シンボル（`NewRedirectRejectingHTTPClient`・`collectionForPostType` 等）が意図通り参照されている（デッドコードでない）ことを確認する
+- [x] `rg -n "http.DefaultClient" cmd/main.go` の結果が0件であることを確認する（Phase 3 の置き換え漏れがないことの静的確認）
+- [x] `rg -n "atproto.NewRedirectRejectingHTTPClient\(\)" cmd/main.go` の結果が1件（`run(...)` 呼び出し箇所）であることを確認する
+- [x] `rg -n 'DeleteRecord\(' --type go` の全結果が `Post` 引数を渡す形（または `Post` を受け取るシグネチャ定義自体）になっていることを目視確認する（Phase 1 完了後の残存箇所チェック）
+- [x] `make fmt` を実行し差分がないことを確認する
+- [x] `make test` が成功する
+- [x] `make lint` が成功する
+- [x] `make deadcode` を実行し、新規に追加した公開シンボル（`NewRedirectRejectingHTTPClient`・`collectionForPostType` 等）が意図通り参照されている（デッドコードでない）ことを確認する
 
 ## 11. 次のステップ
 
