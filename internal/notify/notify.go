@@ -64,10 +64,8 @@ var defaultRetryPolicy = retry.Policy{
 }
 
 // cancelOnCloseBody wraps an io.ReadCloser so that Close() also calls the
-// per-attempt cancel func after closing the underlying body. This lets
-// perAttemptTimeoutDoer keep the per-attempt context alive while the retry
-// loop drains the body for reuse, and only cancels once the body is fully
-// consumed.
+// per-attempt cancel func, after closing the underlying body. See
+// perAttemptTimeoutDoer for why cancellation is deferred to Close().
 type cancelOnCloseBody struct {
 	io.ReadCloser
 	cancel context.CancelFunc
