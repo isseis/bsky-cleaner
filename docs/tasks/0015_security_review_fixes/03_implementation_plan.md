@@ -346,13 +346,13 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）は10章の実装チェ�
 - [x] Phase 3（F-002）完了
 - [ ] Phase 4（F-003）完了
 - [ ] Phase 5（F-005）完了
-- [x] `rg -n "http.DefaultClient" cmd/main.go` の結果が0件であることを確認する（Phase 3 の置き換え漏れがないことの静的確認）
-- [x] `rg -n "atproto.NewRedirectRejectingHTTPClient\(\)" cmd/main.go` の結果が1件（`run(...)` 呼び出し箇所）であることを確認する
-- [x] `rg -n 'DeleteRecord\(' --type go` の全結果が `Post` 引数を渡す形（または `Post` を受け取るシグネチャ定義自体）になっていることを目視確認する（Phase 1 完了後の残存箇所チェック）
-- [x] `make fmt` を実行し差分がないことを確認する
-- [x] `make test` が成功する
-- [x] `make lint` が成功する
-- [x] `make deadcode` を実行し、新規に追加した公開シンボル（`NewRedirectRejectingHTTPClient`・`collectionForPostType` 等）が意図通り参照されている（デッドコードでない）ことを確認する
+- [ ] `rg -n "http.DefaultClient" cmd/main.go` の結果が0件であることを確認する（Phase 3 の置き換え漏れがないことの静的確認）
+- [ ] `rg -n "atproto.NewRedirectRejectingHTTPClient\(\)" cmd/main.go` の結果が1件（`run(...)` 呼び出し箇所）であることを確認する
+- [ ] `rg -n 'DeleteRecord\(' --type go` の全結果が `Post` 引数を渡す形（または `Post` を受け取るシグネチャ定義自体）になっていることを目視確認する（Phase 1 完了後の残存箇所チェック）
+- [ ] `make fmt` を実行し差分がないことを確認する
+- [ ] `make test` が成功する
+- [ ] `make lint` が成功する
+- [ ] `make deadcode` を実行し、新規に追加した公開シンボル（`NewRedirectRejectingHTTPClient`・`collectionForPostType` 等）が意図通り参照されている（デッドコードでない）ことを確認する
 
 ## 11. 次のステップ
 
