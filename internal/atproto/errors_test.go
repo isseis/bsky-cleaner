@@ -29,7 +29,7 @@ func TestHTTPError_AsType(t *testing.T) {
 	assert.Equal(t, "com.atproto.repo.deleteRecord", httpErr.Method)
 }
 
-// TestErrors_NoSecretLeakage verifies AC-15 across the client's error
+// TestErrors_NoSecretLeakage verifies no secret leakage across the client's error
 // paths: a timeout (transport failure), a 5xx response, a 4xx response,
 // and a login failure. Each case scripts a mock that carries a known app
 // password/session JWT value somewhere in the request/response cycle, and
@@ -55,7 +55,7 @@ func TestErrors_NoSecretLeakage(t *testing.T) {
 						return nil, fmt.Errorf("dial tcp: i/o timeout")
 					},
 				}
-				client := loginTestClient(mock)
+				client := loginTestClient(mock, "did:plc:test123")
 				return client.Login(context.Background(), appPassword)
 			},
 		},
@@ -94,7 +94,7 @@ func TestErrors_NoSecretLeakage(t *testing.T) {
 						return atprototestutil.JSONResponse(http.StatusUnauthorized, `{"error":"AuthenticationRequired","accessJwt":"`+accessJwt+`"}`), nil
 					},
 				}
-				client := loginTestClient(mock)
+				client := loginTestClient(mock, "did:plc:test123")
 				return client.Login(context.Background(), appPassword)
 			},
 		},

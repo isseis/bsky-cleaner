@@ -33,8 +33,40 @@ func testAppPassword(t *testing.T, value string) config.SecretString {
 	return creds.AppPassword
 }
 
-func loginTestClient(mock *atprototestutil.MockHTTPDoer) *Client {
-	return newTestClient(mock, &url.URL{Scheme: "https", Host: "pds.test"}, testHandle, "", nil)
+func TestClient_Login_SessionDIDMismatch_ReturnsErrorWithoutSettingSession(t *testing.T) {
+	appPassword := testAppPassword(t, "correct-horse-battery-staple")
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(_ *http.Request) (*http.Response, error) {
+			return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.CreateSessionResponseJSON("did:plc:different", "some-access-jwt")), nil
+		},
+	}
+	client := loginTestClient(mock, "did:plc:resolved")
+
+	err := client.Login(context.Background(), appPassword)
+
+	require.Error(t, err)
+	assert.Nil(t, client.session)
+}
+
+func TestClient_Login_SessionDIDMismatch_ErrorIsSentinelAndOmitsAccessJWT(t *testing.T) {
+	const accessJwt = "should-not-appear-in-error"
+	appPassword := testAppPassword(t, "correct-horse-battery-staple")
+	mock := &atprototestutil.MockHTTPDoer{
+		Handler: func(_ *http.Request) (*http.Response, error) {
+			return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.CreateSessionResponseJSON("did:plc:different", accessJwt)), nil
+		},
+	}
+	client := loginTestClient(mock, "did:plc:resolved")
+
+	err := client.Login(context.Background(), appPassword)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrSessionDIDMismatch)
+	assert.NotContains(t, err.Error(), accessJwt)
+}
+
+func loginTestClient(mock *atprototestutil.MockHTTPDoer, did string) *Client {
+	return newTestClient(mock, &url.URL{Scheme: "https", Host: "pds.test"}, testHandle, did, nil)
 }
 
 func TestClient_Login_Success(t *testing.T) {
@@ -46,7 +78,7 @@ func TestClient_Login_Success(t *testing.T) {
 			return atprototestutil.JSONResponse(http.StatusOK, atprototestutil.CreateSessionResponseJSON("did:plc:test123", "secret-access-jwt")), nil
 		},
 	}
-	client := loginTestClient(mock)
+	client := loginTestClient(mock, "did:plc:test123")
 
 	err := client.Login(context.Background(), appPassword)
 
@@ -70,7 +102,7 @@ func TestClient_Login_InvalidCredentials_NoFurtherCalls(t *testing.T) {
 			return atprototestutil.JSONResponse(http.StatusUnauthorized, `{"error":"AuthenticationRequired"}`), nil
 		},
 	}
-	client := loginTestClient(mock)
+	client := loginTestClient(mock, "did:plc:test123")
 
 	err := client.Login(context.Background(), appPassword)
 
@@ -88,7 +120,7 @@ func TestClient_Login_ErrorDoesNotLeakSecrets(t *testing.T) {
 			return atprototestutil.JSONResponse(http.StatusUnauthorized, `{"error":"AuthenticationRequired","accessJwt":"`+accessJwt+`"}`), nil
 		},
 	}
-	client := loginTestClient(mock)
+	client := loginTestClient(mock, "did:plc:test123")
 
 	err := client.Login(context.Background(), appPassword)
 

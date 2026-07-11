@@ -33,6 +33,11 @@ var (
 	// PostType it does not recognize, so DeleteRecord fails closed instead
 	// of guessing a collection to delete from.
 	ErrUnknownPostType = errors.New("unknown post type")
+	// ErrSessionDIDMismatch reports that the DID returned by createSession
+	// does not match the DID NewClient resolved and validated for the
+	// handle, so the session must not be trusted for any authenticated
+	// (delete) call.
+	ErrSessionDIDMismatch = errors.New("session DID does not match resolved DID")
 )
 
 // SSRFStage identifies which validation step rejected a PDS endpoint, so a

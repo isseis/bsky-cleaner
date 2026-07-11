@@ -122,8 +122,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（[#143](https://github.com/isseis/bsky-cleaner/pull/143)）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### 3.4 完了基準
 
@@ -143,29 +143,29 @@
 
 **実装項目**:
 
-- [ ] `internal/atproto/errors.go` に `ErrSessionDIDMismatch = errors.New("session DID does not match resolved DID")` を追加する。
-- [ ] `internal/atproto/session.go` の `Login` に、`doXRPC` 成功後・`c.session` 代入前の位置で `respBody.DID != c.did` の検証を追加する。不一致の場合は `return fmt.Errorf("login: session DID %q does not match resolved DID %q: %w", respBody.DID, c.did, ErrSessionDIDMismatch)` を返し、`c.session` の代入は行わない。
-- [ ] `internal/atproto/session_test.go` の `loginTestClient(mock *atprototestutil.MockHTTPDoer) *Client` に `did string` 引数を追加し、`newTestClient(mock, &url.URL{...}, testHandle, did, nil)` を呼ぶように変更する。
-- [ ] 既存テストのシグネチャ追従（全5箇所）:
-  - [ ] `session_test.go` の `TestClient_Login_Success`（40行目付近）: `loginTestClient(mock, "did:plc:test123")`（レスポンスの DID と一致させる）。
-  - [ ] `session_test.go` の `TestClient_Login_InvalidCredentials_NoFurtherCalls`（66行目付近）: 401 応答で DID 検証に到達しないため任意の値（例: `"did:plc:test123"`）でよい。
-  - [ ] `session_test.go` の `TestClient_Login_ErrorDoesNotLeakSecrets`（82行目付近）: 同上。
-  - [ ] `errors_test.go` の `transport_failure` ケース: `loginTestClient(mock, "did:plc:test123")` に更新（DID 検証に到達しないケースだがシグネチャ変更に追従）。
-  - [ ] `errors_test.go` の `login_failure` ケース: 同上。
+- [x] `internal/atproto/errors.go` に `ErrSessionDIDMismatch = errors.New("session DID does not match resolved DID")` を追加する。
+- [x] `internal/atproto/session.go` の `Login` に、`doXRPC` 成功後・`c.session` 代入前の位置で `respBody.DID != c.did` の検証を追加する。不一致の場合は `return fmt.Errorf("login: session DID %q does not match resolved DID %q: %w", respBody.DID, c.did, ErrSessionDIDMismatch)` を返し、`c.session` の代入は行わない。
+- [x] `internal/atproto/session_test.go` の `loginTestClient(mock *atprototestutil.MockHTTPDoer) *Client` に `did string` 引数を追加し、`newTestClient(mock, &url.URL{...}, testHandle, did, nil)` を呼ぶように変更する。
+- [x] 既存テストのシグネチャ追従（全5箇所）:
+  - [x] `session_test.go` の `TestClient_Login_Success`（40行目付近）: `loginTestClient(mock, "did:plc:test123")`（レスポンスの DID と一致させる）。
+  - [x] `session_test.go` の `TestClient_Login_InvalidCredentials_NoFurtherCalls`（66行目付近）: 401 応答で DID 検証に到達しないため任意の値（例: `"did:plc:test123"`）でよい。
+  - [x] `session_test.go` の `TestClient_Login_ErrorDoesNotLeakSecrets`（82行目付近）: 同上。
+  - [x] `errors_test.go` の `transport_failure` ケース: `loginTestClient(mock, "did:plc:test123")` に更新（DID 検証に到達しないケースだがシグネチャ変更に追従）。
+  - [x] `errors_test.go` の `login_failure` ケース: 同上。
 
 ### 4.2 テスト内容
 
-- [ ] `internal/atproto/session_test.go::TestClient_Login_SessionDIDMismatch_ReturnsErrorWithoutSettingSession` — `loginTestClient(mock, "did:plc:resolved")` に対し `createSession` レスポンスの DID を `"did:plc:different"` にして `Login` を呼び、エラーが返り `client.session` が `nil` のままであることを検証する（AC-13）。
-- [ ] `internal/atproto/session_test.go::TestClient_Login_SessionDIDMismatch_ErrorIsSentinelAndOmitsAccessJWT` — 上記と同じ不一致シナリオで、返るエラーが `errors.Is(err, ErrSessionDIDMismatch)` であること、かつレスポンスに含めた `accessJwt` の値がエラーメッセージに含まれないことを検証する（AC-14）。
-- [ ] AC-12 は 4.1節で更新する `TestClient_Login_Success`（DID を一致させた状態に更新済み）がそのまま検証する。新規テストは追加しない。
+- [x] `internal/atproto/session_test.go::TestClient_Login_SessionDIDMismatch_ReturnsErrorWithoutSettingSession` — `loginTestClient(mock, "did:plc:resolved")` に対し `createSession` レスポンスの DID を `"did:plc:different"` にして `Login` を呼び、エラーが返り `client.session` が `nil` のままであることを検証する（AC-13）。
+- [x] `internal/atproto/session_test.go::TestClient_Login_SessionDIDMismatch_ErrorIsSentinelAndOmitsAccessJWT` — 上記と同じ不一致シナリオで、返るエラーが `errors.Is(err, ErrSessionDIDMismatch)` であること、かつレスポンスに含めた `accessJwt` の値がエラーメッセージに含まれないことを検証する（AC-14）。
+- [x] AC-12 は 4.1節で更新する `TestClient_Login_Success`（DID を一致させた状態に更新済み）がそのまま検証する。新規テストは追加しない。
 
 ### 4.3 PR-2 作成ポイント
 
 - **PR タイトル**: `fix(0015): verify createSession DID matches resolved DID`
 - **レビュー観点**: 不一致時に `c.session` が変更されないこと、エラーメッセージに DID 以外の機微情報が含まれないこと、既存 `loginTestClient` 呼び出し元すべての追従漏れがないこと。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（https://github.com/isseis/bsky-cleaner/pull/144）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
