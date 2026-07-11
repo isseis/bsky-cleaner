@@ -562,7 +562,7 @@ func TestDoer_Do_LogsRetryAttempt(t *testing.T) {
 
 // TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay guards the
 // strconv.Atoi branch of parseRetryAfter: Retry-After: 5 must produce a
-// 5-second delay (AC-15).
+// 5-second delay.
 func TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay(t *testing.T) {
 	clock := &fakeClock{}
 	policy := Policy{MaxRetries: 1, BaseDelay: time.Second, MaxDelay: 30 * time.Second}
@@ -582,7 +582,7 @@ func TestDoer_Do_IntegerSecondsRetryAfter_UsesExactDelay(t *testing.T) {
 // TestDoer_Do_UnitSuffixedRetryAfterIgnored_FallsBackToExponential guards
 // that a unit-suffixed value like "5m" is not interpreted as 5ms (the old
 // time.ParseDuration behavior) but instead falls back to exponential
-// backoff (AC-16).
+// backoff.
 func TestDoer_Do_UnitSuffixedRetryAfterIgnored_FallsBackToExponential(t *testing.T) {
 	clock := &fakeClock{}
 	policy := Policy{MaxRetries: 1, BaseDelay: 2 * time.Second, MaxDelay: 30 * time.Second}
