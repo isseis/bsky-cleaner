@@ -121,7 +121,7 @@
 - **レビュー観点**: `collectionForPostType` の網羅性（既知4種別＋fail-closed）、`DeleteRecord`/`runner.Client` のシグネチャ変更が呼び出し元すべてに反映されているか、AC-01〜AC-04 のテストが実際にコレクション取り違えを検出できる設計になっているか。
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（[#143](https://github.com/isseis/bsky-cleaner/pull/143)）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
