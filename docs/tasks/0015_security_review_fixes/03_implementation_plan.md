@@ -262,8 +262,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### 6.4 完了基準
 
@@ -344,7 +344,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）は10章の実装チェ�
 - [x] Phase 1（F-001）完了
 - [x] Phase 2（F-004）完了
 - [x] Phase 3（F-002）完了
-- [ ] Phase 4（F-003）完了
+- [x] Phase 4（F-003）完了
 - [ ] Phase 5（F-005）完了
 - [ ] `rg -n "http.DefaultClient" cmd/main.go` の結果が0件であることを確認する（Phase 3 の置き換え漏れがないことの静的確認）
 - [ ] `rg -n "atproto.NewRedirectRejectingHTTPClient\(\)" cmd/main.go` の結果が1件（`run(...)` 呼び出し箇所）であることを確認する
