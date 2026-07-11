@@ -164,7 +164,7 @@
 - **PR タイトル**: `fix(0015): verify createSession DID matches resolved DID`
 - **レビュー観点**: 不一致時に `c.session` が変更されないこと、エラーメッセージに DID 以外の機微情報が含まれないこと、既存 `loginTestClient` 呼び出し元すべての追従漏れがないこと。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [ ] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
