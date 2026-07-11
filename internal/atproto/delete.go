@@ -18,9 +18,10 @@ type deleteRecordRequest struct {
 }
 
 // DeleteRecord deletes post from the authenticated account's own
-// repository, choosing the collection from post.Type (reposts live in
-// app.bsky.feed.repost, everything else in app.bsky.feed.post). repo is
-// always c.session.DID (the DID Login obtained for this account), never a
+// repository, choosing the collection from post.Type (PostTypeRepost ->
+// app.bsky.feed.repost; PostTypeOriginal/PostTypeReply/PostTypeQuote ->
+// app.bsky.feed.post). Unrecognized PostType values return an error and
+// send no request. repo is
 // caller-supplied value, so a caller cannot direct a deletion at another
 // account's repository (AC-13). Unlike ListPosts's read endpoints,
 // deleteRecord requires auth per the AT Protocol lexicon, so the request
