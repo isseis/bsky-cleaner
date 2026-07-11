@@ -16,7 +16,7 @@
 
 `internal/retry` の `Doer`（[0005_retry_timeout](../0005_retry_timeout/01_requirements.md)）は、一過性の失敗（トランスポートエラー・HTTP 429・5xx）を指数バックオフでリトライする一方、非公開インターフェース `permanentError`（`Permanent() bool`）を満たすエラーは「リトライしても解決しない永続的な失敗」として即座にリトライを打ち切る。現在このインターフェースを実装するのは `*atproto.SSRFError`（`Permanent()` は常に `true`、`internal/atproto/errors.go`）のみで、SSRF 拒否（意図しないホストへの接続の拒否）は再試行しても同じ検証で同じく拒否されるため、リトライしない設計になっている。
 
-しかし `classify`（`internal/retry/doer.go`）が永続判定に用いているのは、エラーチェーンの**トップレベル**だけを見る素の型アサーション（`doErr.(permanentError)`）である。このため、`*SSRFError` が別のエラーでラップされていると永続と判定されず、リトライ対象に分類されてしまう。
+しかし `classify`（`internal/retry/doer.go`）が永続判定に用いているのは、エラーチェーンの**トップレベル**だけを見る素の型アサーション（`doErr.(permanentError)`）である。このため、`*atproto.SSRFError` が別のエラーでラップされていると永続と判定されず、リトライ対象に分類されてしまう。
 
 この差異は [0015_security_review_fixes](../0015_security_review_fixes/01_requirements.md) の F-002（DID 解決フェーズのリダイレクト拒否）の設計過程で顕在化した。`CheckRedirect` に設定した `rejectRedirect` が返す `*SSRFError` は、`http.Client.Do` によって `*url.Error` でラップされて返る。トップレベルは `*url.Error` であり `permanentError` を満たさないため、リダイレクト拒否は「リトライ可能」と分類され、`defaultRetryPolicy`（`MaxRetries: 5`）の回数だけ再試行されてから最終的に `*SSRFError` として浮上する。各試行とも `rejectRedirect` が追従を拒むため内部アドレスへは一度も接続されず、セキュリティ上の結果（SSRF の阻止）は保たれる。しかし外部から観測される挙動は「即座の中断」ではなく「リトライ予算（1+2+4+8+16 ≒ 31 秒）を消費してからの中断」となる。この待ち時間は DID 解決の2箇所（ハンドル解決・DID ドキュメント取得）で発生しうる。
 
