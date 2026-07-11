@@ -250,9 +250,9 @@
 
 ### 6.2 テスト内容
 
-- [ ] `internal/notify/notify_test.go::TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — `scriptedDoer` で1回目は429（ボディは `ctxSensitiveBody`）、2回目は200を返すよう設定し、`send` が `nil` エラーを返すことを検証する（AC-08）。修正前の実装（`Do` 戻り時キャンセル）では1回目の `drainAndClose` が `context.Canceled` を検知してリトライループごと中断し `SendError` になるため、本テストで確定的に差分が出る（[02_architecture.md](02_architecture.md) 7.3 のとおり）。
-- [ ] `internal/notify/notify_test.go::TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — AC-08 のテストと同様の構成で1回目のステータスを5xxに変え、AC-09 を検証する。
-- [ ] `internal/notify/notify_test.go::TestSend_PerAttemptTimeout_BoundsHangingBodyRead` — 1回目のレスポンスを429・ボディを `blockingUntilCtxDoneBody`（per-attempt コンテキストの完了までブロックしてから `ctx.Err()` を返す）として構成し、`send` の全体所要時間が `requestTimeout` を大きく超えない（例: `requestTimeout` の3倍未満）ことをアサートする（AC-11。既存の `TestSend_HTTPTimeout_ReturnsSendError` と同様の実時間ベースのテストであり、同じ Wall-clock cost note を付す）。
+- [x] `internal/notify/notify_test.go::TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — `scriptedDoer` で1回目は429（ボディは `ctxSensitiveBody`）、2回目は200を返すよう設定し、`send` が `nil` エラーを返すことを検証する（AC-08）。修正前の実装（`Do` 戻り時キャンセル）では1回目の `drainAndClose` が `context.Canceled` を検知してリトライループごと中断し `SendError` になるため、本テストで確定的に差分が出る（[02_architecture.md](02_architecture.md) 7.3 のとおり）。
+- [x] `internal/notify/notify_test.go::TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — AC-08 のテストと同様の構成で1回目のステータスを5xxに変え、AC-09 を検証する。
+- [x] `internal/notify/notify_test.go::TestSend_PerAttemptTimeout_BoundsHangingBodyRead` — 1回目のレスポンスを429・ボディを `blockingUntilCtxDoneBody`（per-attempt コンテキストの完了までブロックしてから `ctx.Err()` を返す）として構成し、`send` の全体所要時間が `requestTimeout` を大きく超えない（例: `requestTimeout` の3倍未満）ことをアサートする（AC-11。既存の `TestSend_HTTPTimeout_ReturnsSendError` と同様の実時間ベースのテストであり、同じ Wall-clock cost note を付す）。
 - [ ] AC-10 は既存の `internal/notify/notify_test.go::TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` が無変更で再実行されることで検証する。新規テストは追加しない。
 
 ### 6.3 PR-4 作成ポイント
