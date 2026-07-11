@@ -99,13 +99,8 @@ type perAttemptTimeoutDoer struct {
 	timeout time.Duration
 }
 
-func (d perAttemptTimeoutDoer) Do(req *http.Request) (_ *http.Response, retErr error) {
+func (d perAttemptTimeoutDoer) Do(req *http.Request) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(req.Context(), d.timeout)
-	defer func() {
-		if retErr != nil {
-			cancel()
-		}
-	}()
 
 	resp, err := d.inner.Do(req.Clone(ctx))
 	if err != nil || resp == nil || resp.Body == nil {
