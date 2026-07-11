@@ -63,6 +63,20 @@ var defaultRetryPolicy = retry.Policy{
 	MaxDelay:   4 * time.Second,
 }
 
+// cancelOnCloseBody wraps an io.ReadCloser so that Close() also calls the
+// per-attempt cancel func, after closing the underlying body. See
+// perAttemptTimeoutDoer for why cancellation is deferred to Close().
+type cancelOnCloseBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *cancelOnCloseBody) Close() error {
+	err := b.ReadCloser.Close()
+	b.cancel()
+	return err
+}
+
 // perAttemptTimeoutDoer gives every attempt its own fresh requestTimeout
 // deadline, derived from the attempt request's context. internal/retry's
 // Doer clones the same original request (and its context) for every retry
@@ -74,6 +88,12 @@ var defaultRetryPolicy = retry.Policy{
 // a ctx error instead of getting its own chance to succeed, defeating the
 // "requestTimeout per attempt" worst-case model in the architecture doc
 // (section 3.6).
+//
+// Cancellation is tied to the response body's Close(), not to Do's return:
+// the per-attempt context stays alive while the retry loop drains the body
+// or reads it for success/failure determination. When Do returns an error,
+// or the response/body is nil, cancellation happens immediately since there
+// is nothing to read.
 type perAttemptTimeoutDoer struct {
 	inner   HTTPDoer
 	timeout time.Duration
@@ -81,8 +101,19 @@ type perAttemptTimeoutDoer struct {
 
 func (d perAttemptTimeoutDoer) Do(req *http.Request) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(req.Context(), d.timeout)
-	defer cancel()
-	return d.inner.Do(req.Clone(ctx))
+
+	resp, err := d.inner.Do(req.Clone(ctx))
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if resp == nil || resp.Body == nil {
+		cancel()
+		return nil, fmt.Errorf("notify: inner HTTPDoer returned a nil response or body with a nil error")
+	}
+
+	resp.Body = &cancelOnCloseBody{ReadCloser: resp.Body, cancel: cancel}
+	return resp, nil
 }
 
 // Send builds a Slack payload from outcome, selects the destination

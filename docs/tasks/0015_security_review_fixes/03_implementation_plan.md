@@ -206,8 +206,8 @@
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（[#145](https://github.com/isseis/bsky-cleaner/pull/145)）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### 5.4 完了基準
 
@@ -226,7 +226,7 @@
 
 **実装項目**:
 
-- [ ] `internal/notify/notify.go` に、レスポンスボディをラップして `Close` 時に per-attempt の `cancel` を呼ぶ非公開型 `cancelOnCloseBody` を追加する。
+- [x] `internal/notify/notify.go` に、レスポンスボディをラップして `Close` 時に per-attempt の `cancel` を呼ぶ非公開型 `cancelOnCloseBody` を追加する。
 
   ```go
   type cancelOnCloseBody struct {
@@ -241,27 +241,27 @@
   }
   ```
 
-- [ ] `perAttemptTimeoutDoer.Do`（現状82-86行目）を次の内容に置き換える: `ctx, cancel := context.WithTimeout(req.Context(), d.timeout)` の後、`defer cancel()` を削除し、`resp, err := d.inner.Do(req.Clone(ctx))` の結果に応じて分岐する。`err != nil` または `resp == nil` または `resp.Body == nil` の場合は即座に `cancel()` を呼んで `resp, err` を返す。それ以外（成功かつボディあり）の場合は `resp.Body = &cancelOnCloseBody{ReadCloser: resp.Body, cancel: cancel}` としてから `resp, nil` を返す。
-- [ ] `perAttemptTimeoutDoer` 型と `Do` メソッドの doc コメント（現状66-81行目）を、キャンセルのタイミングが「`Do` の戻り時」ではなく「レスポンスボディの `Close` 時」に変わったことを反映する内容に更新する。
-- [ ] `internal/notify/test_helpers_test.go` に、本 Phase の検証テストが使うテストダブル3種を追加する（B2、ビルドタグなし、私有型のみ）:
+- [x] `perAttemptTimeoutDoer.Do`（現状82-86行目）を次の内容に置き換える: `ctx, cancel := context.WithTimeout(req.Context(), d.timeout)` の後、`defer cancel()` を削除し、`resp, err := d.inner.Do(req.Clone(ctx))` の結果に応じて分岐する。`err != nil` または `resp == nil` または `resp.Body == nil` の場合は即座に `cancel()` を呼んで `resp, err` を返す。それ以外（成功かつボディあり）の場合は `resp.Body = &cancelOnCloseBody{ReadCloser: resp.Body, cancel: cancel}` としてから `resp, nil` を返す。
+- [x] `perAttemptTimeoutDoer` 型と `Do` メソッドの doc コメント（現状66-81行目）を、キャンセルのタイミングが「`Do` の戻り時」ではなく「レスポンスボディの `Close` 時」に変わったことを反映する内容に更新する。
+- [x] `internal/notify/test_helpers_test.go` に、本 Phase の検証テストが使うテストダブル3種を追加する（B2、ビルドタグなし、私有型のみ）:
   - `ctxSensitiveBody`: `Read` 呼び出し時に自身が保持する `context.Context` の `Err()` が非 nil ならそれをそのまま返し、そうでなければ保持しているデータを1回だけ返してから `io.EOF` を返す `io.ReadCloser`。per-attempt コンテキストがまだ有効な間に読み取られたか、既にキャンセル済みの状態で読み取られたかをテストが区別できるようにする（AC-08・AC-09 用）。
   - `blockingUntilCtxDoneBody`: `Read` 呼び出し時に、自身が保持する `context.Context` が完了する（`<-ctx.Done()`）まで実際にブロックしてから `ctx.Err()` を返す `io.ReadCloser`。ハングしたレスポンスボディの読み取りが per-attempt タイムアウトで実際に打ち切られることを実時間で検証するために使う（AC-11 用。`ctxSensitiveBody` は非ブロッキングで代用できないため別型として追加する）。
   - `scriptedDoer`: `[]func(req *http.Request) (*http.Response, error)` を順番に呼び出す `notify.HTTPDoer` 実装。各要素は `req.Context()` を参照して `ctxSensitiveBody`/`blockingUntilCtxDoneBody` を組み立てられるようにする。
 
 ### 6.2 テスト内容
 
-- [ ] `internal/notify/notify_test.go::TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — `scriptedDoer` で1回目は429（ボディは `ctxSensitiveBody`）、2回目は200を返すよう設定し、`send` が `nil` エラーを返すことを検証する（AC-08）。修正前の実装（`Do` 戻り時キャンセル）では1回目の `drainAndClose` が `context.Canceled` を検知してリトライループごと中断し `SendError` になるため、本テストで確定的に差分が出る（[02_architecture.md](02_architecture.md) 7.3 のとおり）。
-- [ ] `internal/notify/notify_test.go::TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — AC-08 のテストと同様の構成で1回目のステータスを5xxに変え、AC-09 を検証する。
-- [ ] `internal/notify/notify_test.go::TestSend_PerAttemptTimeout_BoundsHangingBodyRead` — 1回目のレスポンスを429・ボディを `blockingUntilCtxDoneBody`（per-attempt コンテキストの完了までブロックしてから `ctx.Err()` を返す）として構成し、`send` の全体所要時間が `requestTimeout` を大きく超えない（例: `requestTimeout` の3倍未満）ことをアサートする（AC-11。既存の `TestSend_HTTPTimeout_ReturnsSendError` と同様の実時間ベースのテストであり、同じ Wall-clock cost note を付す）。
-- [ ] AC-10 は既存の `internal/notify/notify_test.go::TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` が無変更で再実行されることで検証する。新規テストは追加しない。
+- [x] `internal/notify/notify_test.go::TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — `scriptedDoer` で1回目は429（ボディは `ctxSensitiveBody`）、2回目は200を返すよう設定し、`send` が `nil` エラーを返すことを検証する（AC-08）。修正前の実装（`Do` 戻り時キャンセル）では1回目の `drainAndClose` が `context.Canceled` を検知してリトライループごと中断し `SendError` になるため、本テストで確定的に差分が出る（[02_architecture.md](02_architecture.md) 7.3 のとおり）。
+- [x] `internal/notify/notify_test.go::TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — AC-08 のテストと同様の構成で1回目のステータスを5xxに変え、AC-09 を検証する。
+- [x] `internal/notify/notify_test.go::TestSend_PerAttemptTimeout_BoundsHangingBodyRead` — 1回目のレスポンスを429・ボディを `blockingUntilCtxDoneBody`（per-attempt コンテキストの完了までブロックしてから `ctx.Err()` を返す）として構成し、`send` の全体所要時間が `requestTimeout` を大きく超えない（例: `requestTimeout` の3倍未満）ことをアサートする（AC-11。既存の `TestSend_HTTPTimeout_ReturnsSendError` と同様の実時間ベースのテストであり、同じ Wall-clock cost note を付す）。
+- [x] AC-10 は既存の `internal/notify/notify_test.go::TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` が無変更で再実行されることで検証する。新規テストは追加しない。
 
 ### 6.3 PR-4 作成ポイント
 
 - **PR タイトル**: `fix(0015): cancel notify per-attempt context on body close, not Do return`
 - **レビュー観点**: `cancelOnCloseBody` がすべての戻り経路（成功・エラー・ボディ nil）で確実に `cancel` を呼ぶこと（コンテキストリーク防止）、AC-08/AC-09 のテストがループバック環境でのマスキング（アーキテクチャ3.3の引用ブロック参照）を回避した設計になっていること。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
