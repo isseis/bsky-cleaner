@@ -152,11 +152,12 @@ session used a lower-capability model, regardless of which tool ran it.
 ## 4. Bilingual documentation handling
 
 Some documents exist as an English/Japanese pair (`foo.md` + `foo.ja.md`) —
-currently `README`, `docs/overview`, and `docs/design/*`. Files under
-`docs/dev/developer_guide/` and `docs/tasks/XXXX_feature/` are **not**
-bilingual pairs: the developer guide is English-only, and task documents
-(`01_requirements.md`/`02_architecture.md`/`03_implementation_plan.md`) are
-Japanese-primary working documents with no translation counterpart.
+currently `README`, `docs/overview`, `docs/design/*`, and this document
+(`development_workflow.md` / `development_workflow.ja.md`). The rest of
+`docs/dev/developer_guide/` and all of `docs/tasks/XXXX_feature/` are **not**
+bilingual pairs: the other developer guides are English-only, and task
+documents (`01_requirements.md`/`02_architecture.md`/`03_implementation_plan.md`)
+are Japanese-primary working documents with no translation counterpart.
 
 For an actual bilingual pair, the rule is: **update one language first, then
 translate with `/mktrans`.**
