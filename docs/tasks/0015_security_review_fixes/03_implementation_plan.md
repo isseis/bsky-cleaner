@@ -253,15 +253,15 @@
 - [x] `internal/notify/notify_test.go::TestSend_429ThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — `scriptedDoer` で1回目は429（ボディは `ctxSensitiveBody`）、2回目は200を返すよう設定し、`send` が `nil` エラーを返すことを検証する（AC-08）。修正前の実装（`Do` 戻り時キャンセル）では1回目の `drainAndClose` が `context.Canceled` を検知してリトライループごと中断し `SendError` になるため、本テストで確定的に差分が出る（[02_architecture.md](02_architecture.md) 7.3 のとおり）。
 - [x] `internal/notify/notify_test.go::TestSend_5xxThenSuccess_DrainsUnderLivePerAttemptContext_RetriesSuccessfully` — AC-08 のテストと同様の構成で1回目のステータスを5xxに変え、AC-09 を検証する。
 - [x] `internal/notify/notify_test.go::TestSend_PerAttemptTimeout_BoundsHangingBodyRead` — 1回目のレスポンスを429・ボディを `blockingUntilCtxDoneBody`（per-attempt コンテキストの完了までブロックしてから `ctx.Err()` を返す）として構成し、`send` の全体所要時間が `requestTimeout` を大きく超えない（例: `requestTimeout` の3倍未満）ことをアサートする（AC-11。既存の `TestSend_HTTPTimeout_ReturnsSendError` と同様の実時間ベースのテストであり、同じ Wall-clock cost note を付す）。
-- [ ] AC-10 は既存の `internal/notify/notify_test.go::TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` が無変更で再実行されることで検証する。新規テストは追加しない。
+- [x] AC-10 は既存の `internal/notify/notify_test.go::TestSend_MaxRetriesExceeded_ReturnsSendError_BoundedAttempts` が無変更で再実行されることで検証する。新規テストは追加しない。
 
 ### 6.3 PR-4 作成ポイント
 
 - **PR タイトル**: `fix(0015): cancel notify per-attempt context on body close, not Do return`
 - **レビュー観点**: `cancelOnCloseBody` がすべての戻り経路（成功・エラー・ボディ nil）で確実に `cancel` を呼ぶこと（コンテキストリーク防止）、AC-08/AC-09 のテストがループバック環境でのマスキング（アーキテクチャ3.3の引用ブロック参照）を回避した設計になっていること。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
