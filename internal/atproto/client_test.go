@@ -55,7 +55,7 @@ func TestClient_DeleteRecord_CtxDeadlineDuringRetry_ReturnsCtxErrWithoutFullBack
 	defer cancel()
 
 	start := time.Now()
-	err := client.DeleteRecord(ctx, "abc123")
+	err := client.DeleteRecord(ctx, Post{RKey: "abc123", Type: PostTypeOriginal})
 	elapsed := time.Since(start)
 
 	require.Error(t, err)

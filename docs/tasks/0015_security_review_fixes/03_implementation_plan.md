@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-11 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-11 |
+| Reviewer | isseis |
 | Comments | - |
 
 関連ドキュメント: [要件定義書](01_requirements.md) / [アーキテクチャ設計書](02_architecture.md)
@@ -92,36 +92,36 @@
 
 **実装項目**:
 
-- [ ] `internal/atproto/errors.go` に `ErrUnknownPostType = errors.New("unknown post type")` を、既存のセンチネルエラー群（`ErrDIDResolutionFailed` 等）と同じ `var (...)` ブロック内に追加する。
-- [ ] `internal/atproto/posts.go` に `collectionForPostType(t PostType) (string, error)` を追加する。`PostTypeOriginal`・`PostTypeReply`・`PostTypeQuote` は `collectionFeedPost` を、`PostTypeRepost` は `collectionRepost` を返す。それ以外の値は `("", fmt.Errorf("collection for post type: %w", ErrUnknownPostType))` を返す（[02_architecture.md](02_architecture.md) 3.1 の fail-closed 設計）。
-- [ ] `internal/atproto/delete.go` の `DeleteRecord` のシグネチャを `func (c *Client) DeleteRecord(ctx context.Context, post Post) error` に変更する。関数内で `collectionForPostType(post.Type)` を呼び、エラーが返れば `fmt.Errorf("delete record: %w", err)` でラップして返す（HTTP リクエストは送信しない）。成功した場合は `deleteRecordRequest.Collection` にその結果を設定し、`RKey` は `post.RKey` を使う。
-- [ ] `DeleteRecord` の doc コメント（現状20-34行目）を更新する。「the app.bsky.feed.post record identified by rkey」という記述を、コレクションが `post.Type` から選択される旨に改める。
-- [ ] `internal/runner/runner.go` の `Client` インターフェースの `DeleteRecord(ctx context.Context, rkey string) error` を `DeleteRecord(ctx context.Context, post atproto.Post) error` に変更する。
-- [ ] `internal/runner/runner.go` の `Run` 内の呼び出し `client.DeleteRecord(ctx, post.RKey)`（49行目）を `client.DeleteRecord(ctx, post)` に変更する。
-- [ ] `internal/runner/test_helpers_test.go` の `fakeClient.DeleteRecord(_ context.Context, rkey string) error` を `func (c *fakeClient) DeleteRecord(_ context.Context, post atproto.Post) error { c.DeleteRecordCalls = append(c.DeleteRecordCalls, post.RKey); return c.DeleteRecordErrs[post.RKey] }` に変更する（`DeleteRecordCalls`/`DeleteRecordErrs` のフィールド定義・型は変更しない）。
-- [ ] `internal/atproto/delete_test.go` の既存呼び出し5箇所（`client.DeleteRecord(context.Background(), "abc123")` など、38・56・66・84・96行目）を、対応する `Post{RKey: "<元のrkey文字列>", Type: PostTypeOriginal}` 引数に置き換える。
-- [ ] `internal/atproto/errors_test.go` の既存呼び出し2箇所（70・84行目、いずれも `client.DeleteRecord(context.Background(), "abc123")`）を `client.DeleteRecord(context.Background(), Post{RKey: "abc123", Type: PostTypeOriginal})` に置き換える。
-- [ ] `internal/atproto/client_test.go` の既存呼び出し1箇所（58行目、`client.DeleteRecord(ctx, "abc123")`）を `client.DeleteRecord(ctx, Post{RKey: "abc123", Type: PostTypeOriginal})` に置き換える。
+- [x] `internal/atproto/errors.go` に `ErrUnknownPostType = errors.New("unknown post type")` を、既存のセンチネルエラー群（`ErrDIDResolutionFailed` 等）と同じ `var (...)` ブロック内に追加する。
+- [x] `internal/atproto/posts.go` に `collectionForPostType(t PostType) (string, error)` を追加する。`PostTypeOriginal`・`PostTypeReply`・`PostTypeQuote` は `collectionFeedPost` を、`PostTypeRepost` は `collectionRepost` を返す。それ以外の値は `("", fmt.Errorf("collection for post type: %w", ErrUnknownPostType))` を返す（[02_architecture.md](02_architecture.md) 3.1 の fail-closed 設計）。
+- [x] `internal/atproto/delete.go` の `DeleteRecord` のシグネチャを `func (c *Client) DeleteRecord(ctx context.Context, post Post) error` に変更する。関数内で `collectionForPostType(post.Type)` を呼び、エラーが返れば `fmt.Errorf("delete record: %w", err)` でラップして返す（HTTP リクエストは送信しない）。成功した場合は `deleteRecordRequest.Collection` にその結果を設定し、`RKey` は `post.RKey` を使う。
+- [x] `DeleteRecord` の doc コメント（現状20-34行目）を更新する。「the app.bsky.feed.post record identified by rkey」という記述を、コレクションが `post.Type` から選択される旨に改める。
+- [x] `internal/runner/runner.go` の `Client` インターフェースの `DeleteRecord(ctx context.Context, rkey string) error` を `DeleteRecord(ctx context.Context, post atproto.Post) error` に変更する。
+- [x] `internal/runner/runner.go` の `Run` 内の呼び出し `client.DeleteRecord(ctx, post.RKey)`（49行目）を `client.DeleteRecord(ctx, post)` に変更する。
+- [x] `internal/runner/test_helpers_test.go` の `fakeClient.DeleteRecord(_ context.Context, rkey string) error` を `func (c *fakeClient) DeleteRecord(_ context.Context, post atproto.Post) error { c.DeleteRecordCalls = append(c.DeleteRecordCalls, post.RKey); return c.DeleteRecordErrs[post.RKey] }` に変更する（`DeleteRecordCalls`/`DeleteRecordErrs` のフィールド定義・型は変更しない）。
+- [x] `internal/atproto/delete_test.go` の既存呼び出し5箇所（`client.DeleteRecord(context.Background(), "abc123")` など、38・56・66・84・96行目）を、対応する `Post{RKey: "<元のrkey文字列>", Type: PostTypeOriginal}` 引数に置き換える。
+- [x] `internal/atproto/errors_test.go` の既存呼び出し2箇所（70・84行目、いずれも `client.DeleteRecord(context.Background(), "abc123")`）を `client.DeleteRecord(context.Background(), Post{RKey: "abc123", Type: PostTypeOriginal})` に置き換える。
+- [x] `internal/atproto/client_test.go` の既存呼び出し1箇所（58行目、`client.DeleteRecord(ctx, "abc123")`）を `client.DeleteRecord(ctx, Post{RKey: "abc123", Type: PostTypeOriginal})` に置き換える。
 
 ### 3.2 テスト内容
 
 **テストファイルの配置**: テストは各対象ファイルと同じパッケージ内の `*_test.go` に追加する。テストヘルパーは既存ファイル内に置く私有（Classification B2）ヘルパーのみを追加し、新規ファイル・cross-package ヘルパー（`testutil/`）は不要である。
 
-- [ ] `internal/atproto/posts_test.go::TestCollectionForPostType_KnownTypes_ReturnsExpectedCollection` — `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` → `app.bsky.feed.post`、`PostTypeRepost` → `app.bsky.feed.repost` をテーブル駆動で検証する。
-- [ ] `internal/atproto/posts_test.go::TestCollectionForPostType_UnknownType_ReturnsErrUnknownPostType` — `PostType(99)` のような未知値を渡すと `errors.Is(err, ErrUnknownPostType)` になり、返る collection 文字列が空であることを検証する。
-- [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_Repost_UsesRepostCollection` — `Post{RKey: "abc123", Type: PostTypeRepost}` を渡し、送信された `deleteRecordRequest.Collection` が `app.bsky.feed.repost` であることを検証する（AC-01）。
-- [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_NonRepostTypes_UsesFeedPostCollection` — `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` をテーブル駆動で渡し、いずれも `Collection` が `app.bsky.feed.post` であることを検証する（AC-02）。
-- [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_Repost_SendsOnlyRepostCollection_NotFeedPost` — `Post{RKey: "shared-rkey", Type: PostTypeRepost}` を渡し、`mock.CallCount()` が1、かつその唯一のリクエストの `deleteRecordRequest.Collection` が `app.bsky.feed.repost` であることを検証する（AC-03）。`com.atproto.repo.deleteRecord` は `(repo, collection, rkey)` の3つ組でしか対象レコードを特定できない AT Protocol の lexicon 仕様上、`collection=app.bsky.feed.repost` を指定した削除リクエストは `app.bsky.feed.post` 側に実在する同名 rkey のレコードに一切作用し得ない。したがって「送信された唯一のリクエストの `collection` が `app.bsky.feed.repost` である」ことの検証は、`MockHTTPDoer` にコレクション別の実データ状態を持たせずとも、AC-03 が求める「コレクションを跨いだ誤削除が発生しないこと」の証明として十分である。この論拠をテスト本体のコメントとして明記する（`app.bsky.feed.post` 側に同一 rkey のレコードが実在するという前提部分は、テストの前提コメントとして記述するに留め、実際の HTTP 応答スクリプトとしては用意しない）。
-- [ ] `internal/atproto/delete_test.go::TestClient_DeleteRecord_UnknownPostType_NoRequestSent` — 未知の `PostType` を渡すと `errors.Is(err, ErrUnknownPostType)` になり、`mock.CallCount()` が0（HTTPリクエストが一切送信されない = fail-closed）であることを検証する。
-- [ ] `internal/atproto/runner_integration_test.go::TestRunnerRun_RepostDeleteSuccessAndFailure_MapsToDeletedAndFailed` — `runner.Run` に2件のリポスト投稿を目標として与え、モックが一方に2xx・他方に5xxを返すよう設定した上で、`result.Deleted`/`result.Failed` への振り分けが HTTP 応答の成否と一致することを検証する（AC-04）。モックのハンドラでリクエストボディの JSON をデコードして `Collection` フィールドが `app.bsky.feed.repost` であることも併せて確認し、コレクション選択とHTTP成否判定が両方正しいことを1テストで確認する。
+- [x] `internal/atproto/posts_test.go::TestCollectionForPostType_KnownTypes_ReturnsExpectedCollection` — `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` → `app.bsky.feed.post`、`PostTypeRepost` → `app.bsky.feed.repost` をテーブル駆動で検証する。
+- [x] `internal/atproto/posts_test.go::TestCollectionForPostType_UnknownType_ReturnsErrUnknownPostType` — `PostType(99)` のような未知値を渡すと `errors.Is(err, ErrUnknownPostType)` になり、返る collection 文字列が空であることを検証する。
+- [x] `internal/atproto/delete_test.go::TestClient_DeleteRecord_Repost_UsesRepostCollection` — `Post{RKey: "abc123", Type: PostTypeRepost}` を渡し、送信された `deleteRecordRequest.Collection` が `app.bsky.feed.repost` であることを検証する（AC-01）。
+- [x] `internal/atproto/delete_test.go::TestClient_DeleteRecord_NonRepostTypes_UsesFeedPostCollection` — `PostTypeOriginal`/`PostTypeReply`/`PostTypeQuote` をテーブル駆動で渡し、いずれも `Collection` が `app.bsky.feed.post` であることを検証する（AC-02）。
+- [x] `internal/atproto/delete_test.go::TestClient_DeleteRecord_Repost_SendsOnlyRepostCollection_NotFeedPost` — `Post{RKey: "shared-rkey", Type: PostTypeRepost}` を渡し、`mock.CallCount()` が1、かつその唯一のリクエストの `deleteRecordRequest.Collection` が `app.bsky.feed.repost` であることを検証する（AC-03）。`com.atproto.repo.deleteRecord` は `(repo, collection, rkey)` の3つ組でしか対象レコードを特定できない AT Protocol の lexicon 仕様上、`collection=app.bsky.feed.repost` を指定した削除リクエストは `app.bsky.feed.post` 側に実在する同名 rkey のレコードに一切作用し得ない。したがって「送信された唯一のリクエストの `collection` が `app.bsky.feed.repost` である」ことの検証は、`MockHTTPDoer` にコレクション別の実データ状態を持たせずとも、AC-03 が求める「コレクションを跨いだ誤削除が発生しないこと」の証明として十分である。この論拠をテスト本体のコメントとして明記する（`app.bsky.feed.post` 側に同一 rkey のレコードが実在するという前提部分は、テストの前提コメントとして記述するに留め、実際の HTTP 応答スクリプトとしては用意しない）。
+- [x] `internal/atproto/delete_test.go::TestClient_DeleteRecord_UnknownPostType_NoRequestSent` — 未知の `PostType` を渡すと `errors.Is(err, ErrUnknownPostType)` になり、`mock.CallCount()` が0（HTTPリクエストが一切送信されない = fail-closed）であることを検証する。
+- [x] `internal/atproto/runner_integration_test.go::TestRunnerRun_RepostDeleteSuccessAndFailure_MapsToDeletedAndFailed` — `runner.Run` に2件のリポスト投稿を目標として与え、モックが一方に2xx・他方に5xxを返すよう設定した上で、`result.Deleted`/`result.Failed` への振り分けが HTTP 応答の成否と一致することを検証する（AC-04）。モックのハンドラでリクエストボディの JSON をデコードして `Collection` フィールドが `app.bsky.feed.repost` であることも併せて確認し、コレクション選択とHTTP成否判定が両方正しいことを1テストで確認する。
 
 ### 3.3 PR-1 作成ポイント
 
 - **PR タイトル**: `fix(0015): send repost deletions to app.bsky.feed.repost collection`
 - **レビュー観点**: `collectionForPostType` の網羅性（既知4種別＋fail-closed）、`DeleteRecord`/`runner.Client` のシグネチャ変更が呼び出し元すべてに反映されているか、AC-01〜AC-04 のテストが実際にコレクション取り違えを検出できる設計になっているか。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（[#143](https://github.com/isseis/bsky-cleaner/pull/143)）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -341,7 +341,7 @@ NF-001（`make fmt`/`make test`/`make lint` の成功）は10章の実装チェ�
 
 ## 10. 実装チェックリスト
 
-- [ ] Phase 1（F-001）完了
+- [x] Phase 1（F-001）完了
 - [ ] Phase 2（F-004）完了
 - [ ] Phase 3（F-002）完了
 - [ ] Phase 4（F-003）完了

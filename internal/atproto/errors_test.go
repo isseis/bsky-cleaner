@@ -67,7 +67,7 @@ func TestErrors_NoSecretLeakage(t *testing.T) {
 					assert.Equal(t, "Bearer "+accessJwt, req.Header.Get("Authorization"))
 					return atprototestutil.JSONResponse(http.StatusInternalServerError, `{"error":"InternalServerError"}`), nil
 				})
-				return client.DeleteRecord(context.Background(), "abc123")
+				return client.DeleteRecord(context.Background(), Post{RKey: "abc123", Type: PostTypeOriginal})
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestErrors_NoSecretLeakage(t *testing.T) {
 				client, _ := newDeleteTestClient(&Session{DID: "did:plc:test123", AccessJWT: newSecretString(accessJwt)}, func(_ *http.Request) (*http.Response, error) {
 					return atprototestutil.JSONResponse(http.StatusForbidden, `{"error":"Forbidden"}`), nil
 				})
-				return client.DeleteRecord(context.Background(), "abc123")
+				return client.DeleteRecord(context.Background(), Post{RKey: "abc123", Type: PostTypeOriginal})
 			},
 		},
 		{

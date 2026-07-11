@@ -37,7 +37,7 @@ func (c *fakeClient) ListPosts(_ context.Context) ([]atproto.Post, error) {
 	return c.ListPostsResult, c.ListPostsErr
 }
 
-func (c *fakeClient) DeleteRecord(_ context.Context, rkey string) error {
-	c.DeleteRecordCalls = append(c.DeleteRecordCalls, rkey)
-	return c.DeleteRecordErrs[rkey]
+func (c *fakeClient) DeleteRecord(_ context.Context, post atproto.Post) error {
+	c.DeleteRecordCalls = append(c.DeleteRecordCalls, post.RKey)
+	return c.DeleteRecordErrs[post.RKey]
 }

@@ -18,7 +18,7 @@ import (
 type Client interface {
 	Login(ctx context.Context, appPassword config.SecretString) error
 	ListPosts(ctx context.Context) ([]atproto.Post, error)
-	DeleteRecord(ctx context.Context, rkey string) error
+	DeleteRecord(ctx context.Context, post atproto.Post) error
 }
 
 // Run performs one wiring pass: login, list posts, judge deletion targets
@@ -46,7 +46,7 @@ func Run(ctx context.Context, client Client, appPassword config.SecretString, re
 
 	result := &report.Result{Mode: report.ModeApply, Targets: targets}
 	for _, post := range targets {
-		if err := client.DeleteRecord(ctx, post.RKey); err != nil {
+		if err := client.DeleteRecord(ctx, post); err != nil {
 			slog.Default().Error("delete post failed", "rkey", post.RKey, "error", err)
 			result.Failed = append(result.Failed, report.DeleteFailure{Post: post, Err: err})
 			continue

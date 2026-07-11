@@ -384,3 +384,32 @@ func TestClient_ListPosts_TotalRecordsLimit(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPaginationLimitExceeded)
 }
+
+func TestCollectionForPostType_KnownTypes_ReturnsExpectedCollection(t *testing.T) {
+	tests := []struct {
+		name           string
+		postType       PostType
+		wantCollection string
+	}{
+		{"original", PostTypeOriginal, collectionFeedPost},
+		{"reply", PostTypeReply, collectionFeedPost},
+		{"quote", PostTypeQuote, collectionFeedPost},
+		{"repost", PostTypeRepost, collectionRepost},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := collectionForPostType(tt.postType)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantCollection, got)
+		})
+	}
+}
+
+func TestCollectionForPostType_UnknownType_ReturnsErrUnknownPostType(t *testing.T) {
+	got, err := collectionForPostType(PostType(99))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrUnknownPostType)
+	assert.Empty(t, got)
+}
