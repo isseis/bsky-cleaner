@@ -98,7 +98,7 @@ var cronRanges = []cronField{
 // conventional cron ranges. It also rejects any value containing a newline
 // (crontab injection prevention).
 func validateSchedule(s string) error {
-	// Reject newlines (crontab injection prevention, AC-02).
+	// Reject newlines (crontab injection prevention).
 	for _, r := range s {
 		if r == '\n' || r == '\r' {
 			return &ScheduleValidationError{Reason: "schedule value contains newline"}

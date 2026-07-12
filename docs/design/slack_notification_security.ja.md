@@ -3,7 +3,8 @@
 # Slack 通知のセキュリティ設計
 
 - 作成日: 2026-07-09
-- ステータス: Draft
+- 最終更新日: 2026-07-12
+- ステータス: Final
 - 関連ドキュメント: [プロジェクト概要](../overview.ja.md), [設定リファレンス](configuration.ja.md)
 
 ## 位置付け
@@ -90,11 +91,14 @@ TOML 設定ファイルの `slack_allowed_host` フィールドで許可する�
 Slack 通知ペイロードには以下の情報のみを含め、投稿本文は一切含めない。
 
 - 実行結果（成功/失敗）の種別
-- 削除件数・失敗件数
-- 削除に失敗した投稿の rkey
-- エラー種別（`errorKind` による分類テキスト）
+- 実行ホスト名（`Host`。TOML の `hostname` フィールド、または当該フィールドが空文字もしくは空白のみの場合は `os.Hostname()`）
+- 認証に使用した Bluesky ハンドル（`Account`）
+- 削除対象数・削除件数・実行時間（`Targets`/`Deleted`/`Duration`。`report.Result` を生成できた実行でのみ付与）
+- 削除に失敗した投稿の rkey とエラー種別、または実行自体を中断させたエラー種別（`errorKind` による分類テキスト）
 
-`atproto.Post` は投稿本文のフィールドを持たない設計としており、コードレベルで投稿本文がペイロードに含まれる経路が存在しない。
+Host・Account・Targets/Deleted/Duration はいずれも秘密情報ではないが、外部由来の値（ホスト名、ハンドル、rkey、エラーテキスト）は他のフィールドと同様にサニタイズ・エスケープの対象となる（後述）。
+
+`atproto.Post` は投稿本文のフィールドを持たない設計としており、コードレベルで投稿本文がペイロードに含まれる経路が存在しない（`internal/atproto/posts.go` の `Post` 構造体、`internal/notify/payload.go` の `buildPayload` で確認）。
 
 ### ペイロードサイズの制限
 

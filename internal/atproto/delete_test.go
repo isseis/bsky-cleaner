@@ -41,7 +41,7 @@ func TestClient_DeleteRecord_Success(t *testing.T) {
 	assert.Equal(t, 1, mock.CallCount())
 }
 
-// TestClient_DeleteRecord_AlreadyDeleted_Idempotent verifies AC-12: deleting
+// TestClient_DeleteRecord_AlreadyDeleted_Idempotent verifies that deleting
 // an already-absent rkey does not crash and is treated as success. Per the
 // com.atproto.repo.deleteRecord lexicon ("Delete a repository record, or
 // ensure it doesn't exist"), the PDS responds 200 in this case exactly as

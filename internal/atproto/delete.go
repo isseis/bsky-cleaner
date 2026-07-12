@@ -21,12 +21,12 @@ type deleteRecordRequest struct {
 // repository, choosing the collection from post.Type (PostTypeRepost ->
 // app.bsky.feed.repost; PostTypeOriginal/PostTypeReply/PostTypeQuote ->
 // app.bsky.feed.post). Unrecognized PostType values return an error and
-// send no request. repo is
+// send no request. repo is always c.session.DID rather than a
 // caller-supplied value, so a caller cannot direct a deletion at another
-// account's repository (AC-13). Unlike ListPosts's read endpoints,
+// account's repository. Unlike ListPosts's read endpoints,
 // deleteRecord requires auth per the AT Protocol lexicon, so the request
 // carries c.session.AccessJWT as a Bearer Authorization header; if Login
-// has not succeeded (c.session is nil), no request is sent at all (AC-05).
+// has not succeeded (c.session is nil), no request is sent at all.
 //
 // Per the com.atproto.repo.deleteRecord lexicon ("Delete a repository
 // record, or ensure it doesn't exist"), deleting an already-absent rkey

@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess verifies AC-05:
+// TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess verifies that
 // when all target posts are already deleted before the delete phase, the
 // runner treats this as success (all rkeys in Deleted, none in Failed).
 //
@@ -99,7 +99,7 @@ func TestRunnerRun_AllTargetsAlreadyDeleted_TreatedAsSuccess(t *testing.T) {
 	assert.Equal(t, len(postRkeys), deleteCallCount)
 }
 
-// TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe verifies AC-06:
+// TestRunnerRun_CancelMidDelete_RemainingFailedThenReRunSafe verifies that
 // when execution is cancelled mid-delete, deleted items go to Deleted,
 // remaining items go to Failed, and a second run successfully deletes the
 // remaining items (idempotency).

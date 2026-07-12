@@ -3,7 +3,8 @@ English | [Japanese](slack_notification_security.ja.md)
 # Slack Notification Security Design
 
 - Created: 2026-07-09
-- Status: Draft
+- Last updated: 2026-07-12
+- Status: Final
 - Related documents: [Project overview](../overview.md), [Configuration reference](configuration.md)
 
 ## Positioning
@@ -90,11 +91,14 @@ The escape order is as follows:
 The Slack notification payload includes only the following information, and does not include any message body:
 
 - Execution result type (success/failure)
-- Deletion count and failure count
-- rkey of posts that failed to delete
-- Error type (classification text by `errorKind`)
+- Execution host name (`Host`; the TOML `hostname` field, or `os.Hostname()` if that field is empty or whitespace-only)
+- The Bluesky handle used for authentication (`Account`)
+- Target count, deletion count, and execution time (`Targets`/`Deleted`/`Duration`; included only for a run that produced a `report.Result`)
+- The rkey and error type of posts that failed to delete, or the error type that aborted the run itself (classification text by `errorKind`)
 
-`atproto.Post` is designed without a message body field, and there is no code path where a message body is included in the payload.
+None of Host, Account, or Targets/Deleted/Duration is sensitive information, but externally-sourced values (host name, handle, rkey, error text) are subject to the same sanitization/escaping as the other fields (described below).
+
+`atproto.Post` is designed without a message body field, and there is no code path where a message body is included in the payload (confirmed via the `Post` struct in `internal/atproto/posts.go` and `buildPayload` in `internal/notify/payload.go`).
 
 ### Payload Size Limit
 

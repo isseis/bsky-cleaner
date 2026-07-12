@@ -24,7 +24,7 @@ Use the cylinder shape `[(label)]` for nodes that represent "data" such as confi
 
 ```
 A[("TOML config file")]
-B[("Environment variable<br>GSCR_SLACK_WEBHOOK_URL")]
+B[("Environment variable<br>BSKY_SLACK_WEBHOOK_URL_SUCCESS")]
 ```
 
 ---
