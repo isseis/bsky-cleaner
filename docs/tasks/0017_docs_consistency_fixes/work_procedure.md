@@ -5,9 +5,9 @@
 | 項目 | 値 |
 |---|---|
 | 種別 | 軽量作業手順書（フルスペックの要件/設計/計画文書は作成しない） |
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-12 |
-| Reviewer | - |
+| Reviewer | isesis |
 | Comments | - |
 
 ## 1. 背景と目的
@@ -68,7 +68,7 @@
 
 ### Step 0: 準備
 
-- [ ] 作業ブランチを作成（`main` から分岐）。
+- [ ] 作業ブランチにいることを確認（`issei/0017-docs-consistency-fixes-01`）。
 - [ ] `make test` / `make lint` が現状 green であることを確認（ベースライン）。
 
 ### Step 1 (F-8): `mermaid_reference.md` の環境変数名修正 ※英語のみ・独立
