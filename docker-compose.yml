@@ -17,7 +17,7 @@ services:
     # image: ghcr.io/isseis/bsky-cleaner@sha256:<digest>
     # `latest` tracks the newest patch release; use it only to try the
     # latest build, not as the default for normal operation.
-    image: ghcr.io/isseis/bsky-cleaner:v1.1.0
+    image: ghcr.io/isseis/bsky-cleaner:v1.2.0
     restart: unless-stopped
     environment:
       BSKY_HANDLE: ${BSKY_HANDLE}
