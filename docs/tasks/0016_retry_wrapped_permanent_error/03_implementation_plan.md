@@ -49,7 +49,7 @@
 
 **対象ファイル**: `internal/retry/doer.go`
 
-- [ ] `classify` の `doErr != nil` 分岐（現154行目）の永続判定を、トップレベル型アサーション `doErr.(permanentError)` からチェーン走査へ変更する。具体的には `var permErr permanentError` を宣言し `if errors.As(doErr, &permErr) && permErr.Permanent()` で判定する（`errors.As` はポインタ経由でインターフェース型ターゲットを受け付け、チェーンを走査して最初に代入可能な要素を検出する）。判定が真のときは従来どおり `return false, 0, nil, doErr`（受け取ったエラーをそのまま返す）とし、戻り値の形（`(nil, err)`）は変更しない。
+- [x] `classify` の `doErr != nil` 分岐（現154行目）の永続判定を、トップレベル型アサーション `doErr.(permanentError)` からチェーン走査へ変更する。具体的には `var permErr permanentError` を宣言し `if errors.As(doErr, &permErr) && permErr.Permanent()` で判定する（`errors.As` はポインタ経由でインターフェース型ターゲットを受け付け、チェーンを走査して最初に代入可能な要素を検出する）。判定が真のときは従来どおり `return false, 0, nil, doErr`（受け取ったエラーをそのまま返す）とし、戻り値の形（`(nil, err)`）は変更しない。
 
 **完了基準**: `make test` で AC-01〜AC-05 の関連テストが緑。トップレベル永続・ラップ永続の双方が初回試行のみで中断し、非永続はリトライされる。
 
@@ -57,9 +57,9 @@
 
 **対象ファイル**: `internal/retry/doer.go`
 
-- [ ] `permanentError` インターフェースのコメント（32〜36行目）の「plain type assertion」の記述を、チェーン全体を走査して判定する旨の英語表現へ更新する。構造的型付けの利点（呼び出し元がこのパッケージの型をインポートせずにオプトアウトできる）を述べた末尾の一文はそのまま残す。
-- [ ] `Doer` 型のコメント（53〜56行目）の永続エラー判定の説明を、ラップされていてもチェーン内に永続エラーがあればリトライしない旨へ英語で整合させる。
-- [ ] `classify` のコメント（147〜151行目）の永続エラー判定の説明を、チェーン走査で永続エラーを検出する旨へ英語で整合させる。
+- [x] `permanentError` インターフェースのコメント（32〜36行目）の「plain type assertion」の記述を、チェーン全体を走査して判定する旨の英語表現へ更新する。構造的型付けの利点（呼び出し元がこのパッケージの型をインポートせずにオプトアウトできる）を述べた末尾の一文はそのまま残す。
+- [x] `Doer` 型のコメント（53〜56行目）の永続エラー判定の説明を、ラップされていてもチェーン内に永続エラーがあればリトライしない旨へ英語で整合させる。
+- [x] `classify` のコメント（147〜151行目）の永続エラー判定の説明を、チェーン走査で永続エラーを検出する旨へ英語で整合させる。
 
 **完了基準**: `doer.go` 内に「plain type assertion」等のトップレベル判定を示す記述が残っていない（後述 §7 の静的検証で確認）。
 
@@ -67,10 +67,10 @@
 
 **対象ファイル**: `internal/retry/doer_test.go`
 
-- [ ] ラップされた永続エラーが初回試行のみで中断することを検証する新規テスト関数 `TestDoer_Do_WrappedPermanentError_NotRetried` を追加する。既存の `permanentTestError`（231行目）・`fakeClock`・`mockDoerFunc` を再利用する。以下2ケースをテーブル駆動で検証する。
+- [x] ラップされた永続エラーが初回試行のみで中断することを検証する新規テスト関数 `TestDoer_Do_WrappedPermanentError_NotRetried` を追加する。既存の `permanentTestError`（231行目）・`fakeClock`・`mockDoerFunc` を再利用する。以下2ケースをテーブル駆動で検証する。
   - `fmt.Errorf("...: %w", &permanentTestError{...})` で1段ラップしたケース（単一の `Unwrap() error` を持つラップの代表例）。
   - 実運用の発生源に合わせた `&url.Error{Op: "Get", URL: "...", Err: &permanentTestError{...}}` でラップしたケース（`retry.Doer` 経由の検出を直接検証）。
-- [ ] 各ケースで次を assert する。
+- [x] 各ケースで次を assert する。
   - `inner.Do` の呼び出し回数 == 1（初回試行のみ）。
   - `fakeClock.SleepCalls` が空（バックオフ待機が発生しない、AC-02）。
   - 戻り値が `(nil, err)` すなわち `resp == nil` かつ `err != nil`（戻り値契約、AC-05）。
@@ -80,9 +80,9 @@
 
 ### ステップ4: ビルドチェック（NF-001・NF-005）
 
-- [ ] `make fmt` を実行しフォーマットを整える。
-- [ ] `make test` を実行し全テストが緑であることを確認する。
-- [ ] `make lint` を実行し警告がないことを確認する。
+- [x] `make fmt` を実行しフォーマットを整える。
+- [x] `make test` を実行し全テストが緑であることを確認する。
+- [x] `make lint` を実行し警告がないことを確認する。
 
 ## 3. 実装順序とマイルストーン
 
@@ -114,12 +114,12 @@
 
 ## 6. 実装チェックリスト
 
-- [ ] ステップ1: `classify` の永続判定をチェーン走査へ変更（`internal/retry/doer.go`）
-- [ ] ステップ2a: `permanentError` インターフェースのコメント整合
-- [ ] ステップ2b: `Doer` 型のコメント整合
-- [ ] ステップ2c: `classify` のコメント整合
-- [ ] ステップ3: `TestDoer_Do_WrappedPermanentError_NotRetried` を追加（`internal/retry/doer_test.go`）
-- [ ] ステップ4: `make fmt` → `make test` → `make lint` が緑
+- [x] ステップ1: `classify` の永続判定をチェーン走査へ変更（`internal/retry/doer.go`）
+- [x] ステップ2a: `permanentError` インターフェースのコメント整合
+- [x] ステップ2b: `Doer` 型のコメント整合
+- [x] ステップ2c: `classify` のコメント整合
+- [x] ステップ3: `TestDoer_Do_WrappedPermanentError_NotRetried` を追加（`internal/retry/doer_test.go`）
+- [x] ステップ4: `make fmt` → `make test` → `make lint` が緑
 
 ## 7. 受け入れ基準の検証
 
@@ -148,5 +148,5 @@
 
 `make lint`・`make test` では検出できない、削除・変更した記述の残存確認。
 
-- [ ] `rg -n "plain type assertion" internal/retry/` — 0件（旧コメント記述が残っていないこと。AC-06 と同一のため §7 の検証で兼ねる）。
-- [ ] `rg -n "doErr\.\(permanentError\)" internal/retry/` — 0件（旧トップレベル型アサーションが残っていないこと）。
+- [x] `rg -n "plain type assertion" internal/retry/` — 0件（旧コメント記述が残っていないこと。AC-06 と同一のため §7 の検証で兼ねる）。
+- [x] `rg -n "doErr\.\(permanentError\)" internal/retry/` — 0件（旧トップレベル型アサーションが残っていないこと）。
