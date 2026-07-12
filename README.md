@@ -51,6 +51,7 @@ retention_days = 30
 schedule = "0 3 * * *"  # Runs daily at 3:00 (order: minute hour day month weekday; * means "every")
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"  # Only needed if you use Slack notifications
+hostname = "worker-1"  # Optional. Identifier used in the Host field of Slack notifications (falls back to os.Hostname() if omitted)
 ```
 
 See [TOML Configuration File](#toml-configuration-file) below for details on each field.
@@ -134,6 +135,7 @@ retention_days = 30
 schedule = "0 3 * * *"  # Runs daily at 3:00
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
+hostname = "worker-1"
 ```
 
 | Field | Type | Required | Description |
@@ -142,6 +144,7 @@ slack_allowed_host = "hooks.slack.com"
 | `execution_timeout_seconds` | int | Yes | Maximum execution time (seconds). 1–86400 |
 | `schedule` | string | No | Specify the time for periodic execution in [cron format](https://en.wikipedia.org/wiki/Cron#Overview) (5 fields: `minute hour day month weekday`; `*` means "every" value for the field. Example: `0 3 * * *` = daily at 3:00). Only required when using scheduled execution via the container's built-in scheduler (supercronic). Omit when using direct execution or system crontab |
 | `slack_allowed_host` | string | Conditional | Required when setting a Slack webhook URL. Validates that the webhook URL points to this host (e.g., `hooks.slack.com`) |
+| `hostname` | string | No | Name identifying the machine running bsky-cleaner, shown in the `Host` field of Slack notifications. Falls back to the result of `os.Hostname()` if omitted, empty, or whitespace-only |
 
 See [Configuration Reference](docs/design/configuration.md) for details.
 
@@ -189,10 +192,15 @@ bsky-cleaner --config config.toml --apply
 # Display version information
 bsky-cleaner --version
 # Example output: v1.2.3 (a1b2c3d)
-
-# Display the cron schedule (for scheduled execution via Docker/cron)
-bsky-cleaner print-schedule --config config.toml
 ```
+
+> **About the `print-schedule` subcommand**: an internal subcommand
+> `bsky-cleaner print-schedule --config config.toml` exists, but it is a
+> hidden command used by the Docker image's built-in cron (entrypoint
+> script) to bridge the TOML `schedule` field into crontab; it does not
+> appear in the `--help` listing. End users do not need to run it directly
+> in normal operation (see the [Docker Deployment Design](docs/design/docker_deployment.md)
+> for details).
 
 ### Exit Codes
 
