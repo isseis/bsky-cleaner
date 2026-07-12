@@ -1,8 +1,8 @@
 # bsky-cleaner Project Overview
 
 - Created: 2026-07-02
-- Last updated: 2026-07-02
-- Status: Draft
+- Last updated: 2026-07-12
+- Status: Final
 
 ## Overview
 
@@ -94,9 +94,17 @@ Since deletion is an irreversible operation, the following basic policies apply.
 
 No deletion logs are written to files. Since execution results can be confirmed via Slack notification (described below), separate log recording is deemed unnecessary.
 
+## CLI Contract
+
+For CLI usage (specific flags and command examples), see the [README](../README.md#usage). This section only records the design decision behind exit code semantics.
+
+- **Four exit codes are distinguished**: `0` (success), `1` (setup/execution failure), `2` (usage error), and `3` (partial failure). The reason for separating a failure that never reached the deletion process (`1` -- configuration error, login failure, network error, etc.) from a partial failure where deletion started but some posts failed to delete (`3`) is so that, in cron-driven operation, the latter can be distinguished as "needs investigation but not fatal"
+- **Deletion of the remaining posts continues even on partial failure**: a single deletion failure does not abort the whole run; deletion is attempted through to the end before returning exit code `3` (see [0004_cli_entrypoint](tasks/0004_cli_entrypoint/01_requirements.md) AC-10/AC-11 for details)
+- Exit code `3` (partial failure) is also used to decide Slack failure-channel routing (see "Execution Result Notification" below)
+
 ## Retry Policy
 
-If an API call results in an error, it is retried several times with exponential backoff. The defaults are a maximum of 5 retries, an initial backoff of 1 second, and a maximum backoff of 30 seconds. The worst-case wait time for a single API call that encounters persistent temporary errors is approximately 31 seconds. See the [Configuration Reference](design/configuration.md#notes-on-setting-execution_timeout_seconds) for parameter details.
+If an API call results in an error, it is retried a bounded number of times with exponential backoff. See the [Configuration Reference](design/configuration.md#notes-on-setting-execution_timeout_seconds) as the canonical source for the specific defaults (maximum retry count, initial/maximum backoff, worst-case wait time); they are not duplicated here.
 
 The cumulative retry time is designed to stay within the execution timeout (described below) that is set as a measure against concurrent executions. When deleting a large number of posts, the per-post retries can accumulate and potentially exceed the timeout; therefore, the timeout value should be determined taking the worst-case retry time into account.
 
@@ -112,6 +120,10 @@ Notification delivery is best-effort and does not guarantee at-least-once
 delivery. If notification sending fails for any reason (including a process
 crash after runner.Run() completes), the run's result -- in particular an
 already-completed deletion -- may never be reported via Slack.
+
+### Notification Message Content
+
+The Slack notification always includes the execution host name (Host) and the Bluesky handle used for authentication (Account). In addition, for a run that reached the point of judging deletion targets, it includes the target count, deleted count, and execution time (Targets/Deleted/Duration); for a failed run, it includes failure details (the category of the error that aborted the run, or the rkey and error category of each post that failed to delete). Post body content is never included. For implementation-level detail on the field layout, see [Slack Notification Security Design](design/slack_notification_security.md#restriction-of-information-included-in-the-payload).
 
 ### Information Leakage Protection in Slack Notifications
 
