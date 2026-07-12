@@ -3,7 +3,8 @@ English | [Japanese](security.ja.md)
 # Security Design
 
 - Created: 2026-07-02
-- Status: Draft
+- Last updated: 2026-07-12
+- Status: Final
 - Related Documents: [Project Overview](../overview.md)
 
 ## Position
