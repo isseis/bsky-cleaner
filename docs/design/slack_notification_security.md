@@ -91,7 +91,7 @@ The escape order is as follows:
 The Slack notification payload includes only the following information, and does not include any message body:
 
 - Execution result type (success/failure)
-- Execution host name (`Host`; the TOML `hostname` field, or `os.Hostname()` if unset)
+- Execution host name (`Host`; the TOML `hostname` field, or `os.Hostname()` if that field is empty or whitespace-only)
 - The Bluesky handle used for authentication (`Account`)
 - Target count, deletion count, and execution time (`Targets`/`Deleted`/`Duration`; included only for a run that produced a `report.Result`)
 - The rkey and error type of posts that failed to delete, or the error type that aborted the run itself (classification text by `errorKind`)

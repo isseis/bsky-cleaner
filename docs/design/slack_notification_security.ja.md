@@ -91,7 +91,7 @@ TOML 設定ファイルの `slack_allowed_host` フィールドで許可する�
 Slack 通知ペイロードには以下の情報のみを含め、投稿本文は一切含めない。
 
 - 実行結果（成功/失敗）の種別
-- 実行ホスト名（`Host`。TOML の `hostname` フィールド、または未設定時は `os.Hostname()`）
+- 実行ホスト名（`Host`。TOML の `hostname` フィールド、または当該フィールドが空文字もしくは空白のみの場合は `os.Hostname()`）
 - 認証に使用した Bluesky ハンドル（`Account`）
 - 削除対象数・削除件数・実行時間（`Targets`/`Deleted`/`Duration`。`report.Result` を生成できた実行でのみ付与）
 - 削除に失敗した投稿の rkey とエラー種別、または実行自体を中断させたエラー種別（`errorKind` による分類テキスト）
