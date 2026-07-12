@@ -51,6 +51,7 @@ retention_days = 30
 schedule = "0 3 * * *"  # 毎日 3:00 に実行（分 時 日 月 曜日 の順。* は「毎回（すべて）」を表す）
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"  # Slack 通知を使う場合のみ設定する
+hostname = "worker-1"  # 省略可。Slack 通知の Host 欄に使う識別名（省略時は os.Hostname() にフォールバック）
 ```
 
 各フィールドの詳細は後述の[TOML 設定ファイル](#toml-設定ファイル)を参照。
@@ -133,6 +134,7 @@ retention_days = 30
 schedule = "0 3 * * *"  # 毎日 3:00 に実行
 execution_timeout_seconds = 3600
 slack_allowed_host = "hooks.slack.com"
+hostname = "worker-1"
 ```
 
 | フィールド | 型 | 必須 | 説明 |
@@ -141,6 +143,7 @@ slack_allowed_host = "hooks.slack.com"
 | `execution_timeout_seconds` | int | Yes | 最大実行時間（秒）。1〜86400 |
 | `schedule` | string | No | 定期実行する時刻を [cron 形式](https://en.wikipedia.org/wiki/Cron#Overview)（`分 時 日 月 曜日` の5項目、`*` は「毎回（すべて）」を表す。例: `0 3 * * *` = 毎日 3:00）で指定する。コンテナ内蔵のスケジューラー（supercronic）での定期実行を使う場合にのみ必要。直接実行やシステム crontab を使う場合は省略する |
 | `slack_allowed_host` | string | 条件付き | Slack webhook URL を設定する場合は必須。webhook URL がこのホスト（例: `hooks.slack.com`）を指しているか検証する |
+| `hostname` | string | No | Slack 通知の `Host` 欄に表示する、実行マシンを識別する名前。省略・空文字・空白のみの場合は `os.Hostname()` の結果にフォールバックする |
 
 詳細は[設定リファレンス](docs/design/configuration.ja.md)を参照。
 
@@ -186,10 +189,15 @@ bsky-cleaner --config config.toml --apply
 # バージョン情報を表示する
 bsky-cleaner --version
 # 出力例: v1.2.3 (a1b2c3d)
-
-# cron スケジュールを表示する（Docker/cron での定期実行用）
-bsky-cleaner print-schedule --config config.toml
 ```
+
+> **`print-schedule` サブコマンドについて**: `bsky-cleaner print-schedule
+> --config config.toml` という内部サブコマンドが存在するが、これは
+> Docker イメージ内蔵の cron（entrypoint スクリプト）が TOML の
+> `schedule` フィールドを crontab へ橋渡しするための隠しコマンドであり、
+> `--help` の一覧にも表示されない。エンドユーザーが通常の運用で直接
+> 実行する必要はない（詳細は [Docker Deployment Design](docs/design/docker_deployment.md)
+> を参照）。
 
 ### 終了コード
 
