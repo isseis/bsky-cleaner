@@ -3,7 +3,8 @@ English | [Japanese](configuration.ja.md)
 # Configuration Reference
 
 - Created: 2026-07-02
-- Status: Draft
+- Last updated: 2026-07-12
+- Status: Final
 - Related documents: [Project Overview](../overview.md), [Configuration Management Task](../tasks/0001_config/01_requirements.md)
 
 ## Position
