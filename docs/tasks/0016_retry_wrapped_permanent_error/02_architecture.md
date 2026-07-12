@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-12 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-12 |
+| Reviewer | isseis |
 | Comments | - |
 
 ## 1. 設計の全体像
@@ -87,7 +87,7 @@ flowchart LR
     ATP["internal/atproto<br>*SSRFError（Permanent）"]
     NTF["internal/notify"]
     DOER["internal/retry/doer.go<br>classify / permanentError"]
-    STD["標準ライブラリ errors<br>（errors.AsType）"]
+    STD["標準ライブラリ errors<br>（errors.As）"]
 
     ATP -.->|"構造的型付けで満たす"| DOER
     NTF --> DOER
@@ -116,13 +116,13 @@ flowchart LR
 
 ### 2.2 依存関係への影響
 
-`internal/retry` は引き続き標準ライブラリのみに依存する（NF-003）。判定に用いる `errors.AsType[permanentError]` は標準ライブラリ `errors` の機能であり、新規外部依存を導入しない（NF-002）。
+`internal/retry` は引き続き標準ライブラリのみに依存する（NF-003）。判定に用いる `errors.As` は標準ライブラリ `errors` の機能であり、新規外部依存を導入しない（NF-002）。
 
 ## 3. コンポーネント設計
 
 ### 3.1 永続エラー判定の変更（F-001）
 
-判定を担うのは `classify`（`internal/retry/doer.go`）である。現状はトップレベルの素の型アサーションで永続エラーを検出しているが、これをエラーチェーン全体の走査へ変更する。走査は標準ライブラリの `errors.As` 相当（Go 1.26 では `errors.AsType[permanentError]`）を用い、「チェーン先頭側から最初にマッチした1件」の `Permanent()` で判定を確定する。これは要件 F-001 が定める意味論と一致する。なお `errors.As`／`errors.AsType` はターゲットにインターフェース型を指定でき（`error` を埋め込まないインターフェースでも可）、チェーン内でそのインターフェースに代入可能な要素を探索する。本コードベースの既存の `errors.AsType` 利用は具体的なポインタ型（`*SSRFError` 等）を対象にしているが、`permanentError` のようなインターフェースを対象にする用法も標準の `errors.As` 契約で正当である。
+判定を担うのは `classify`（`internal/retry/doer.go`）である。現状はトップレベルの素の型アサーションで永続エラーを検出しているが、これをエラーチェーン全体の走査へ変更する。走査は標準ライブラリの `errors.As`（`var permErr permanentError; errors.As(doErr, &permErr)`）を用い、「チェーン先頭側から最初にマッチした1件」の `Permanent()` で判定を確定する。これは要件 F-001 が定める意味論と一致する。なお `errors.As` はターゲットにインターフェース型を指定でき（`error` を埋め込まないインターフェースでも可）、チェーン内でそのインターフェースに代入可能な要素を探索する。ここでジェネリックな `errors.AsType[permanentError]` は使えない点に注意する。`errors.AsType[E error]` の型パラメータ `E` は `error` 制約を持つため、`Error()` を持たない `permanentError` は制約を満たさず `permanentError does not satisfy error (missing method Error)` としてコンパイルできない（Go 1.26.2 で確認）。本コードベースの既存の `errors.AsType` 利用は具体的なポインタ型（`*SSRFError` 等、いずれも `error` を満たす）を対象にしており正当だが、`permanentError` のようなインターフェースを対象にする場合は非ジェネリックな `errors.As` を用いる。
 
 > **判定の一意性と誤検知の考慮**: 「最初にマッチした1件で確定」で問題ないのは、`permanentError` を実装するエラー型が現状 `*atproto.SSRFError`（`Permanent()` は常に `true`）1つだけであり、1つのチェーンに `Permanent()` の異なる複数実装が同居する状況が存在しないためである（要件 F-001 の注記・2章 Out of Scope）。また、この走査はチェーン全体（`errors.Join` による木構造の分岐も含む）を対象とするため、「本来はリトライ可能な失敗が、その内側に永続エラーをラップ／`Join` している」場合には、そのエラー全体が永続と判定される点に注意が必要である。現状はこの取り違えは起きない（`permanentError` 実装は `*SSRFError` の1つのみで、`internal/atproto` はトランスポート失敗を `ErrTransportFailure` として `*SSRFError` と構造的に区別しており（`internal/atproto/errors.go`）、リトライ可能なエラーが永続エラーをラップ／`Join` する経路は存在しない）。将来、`Permanent()` が `false` を返し得る実装や値の異なる複数実装をチェーンに含み得る状況を導入する場合、あるいはリトライ可能な失敗の内側に永続エラーをラップ／`Join` するコードを追加する場合は、この判定方針の見直しが必要になる。
 
@@ -161,7 +161,7 @@ func classify(resp *http.Response, doErr error) (retryable bool, retryAfter time
 
 | ファイル | 区分 | 責務・変更内容 | 関連 AC |
 |---|---|---|---|
-| `internal/retry/doer.go` | 変更 | `classify` の `doErr != nil` 分岐で、永続判定をトップレベル型アサーションからチェーン走査（`errors.AsType[permanentError]`）へ変更。あわせて `permanentError`／`Doer`／`classify` の該当コメントを整合。 | F-001 / AC-01〜AC-06 |
+| `internal/retry/doer.go` | 変更 | `classify` の `doErr != nil` 分岐で、永続判定をトップレベル型アサーションからチェーン走査（`errors.As` にインターフェース型 `permanentError` をターゲットとして渡す）へ変更。あわせて `permanentError`／`Doer`／`classify` の該当コメントを整合。 | F-001 / AC-01〜AC-06 |
 | `internal/retry/doer_test.go` | 変更（テスト追加） | ラップされた永続エラーが初回試行のみで中断し `Clock.Sleep` が発生しないことを検証するケースを追加（AC-02）。既存の `TestDoer_Do_PermanentFailures_NotRetried`（トップレベル永続、AC-01）、非永続エラーのリトライ検証（AC-03）、レスポンス分類の検証（AC-04）は現状のまま緑を維持する。 | AC-01〜AC-05 |
 
 既存テストのうち、本変更で**挙動が変わって更新が必要になるものは存在しない**。`TestDoer_Do_PermanentFailures_NotRetried` の `permanent_error` ケースはトップレベル永続エラーであり、変更後も同じく初回1回で中断する（回帰しない）。`internal/atproto` 側の `TestNewRedirectRejectingHTTPClient_RejectsRedirect`（`internal/atproto/http_test.go`）は素の `*http.Client` を直接検証しており `retry.Doer` を介さないため、本変更の影響を受けない。
@@ -338,3 +338,4 @@ SSRF 防御の成立（内部アドレスへ接続しないこと）を検証す
 
 - **判定を `errors.As` ベースのチェーン走査に変更（インターフェース定義は不変）**: 目的（ラップされた永続エラーの即中断）は判定側の走査範囲拡大だけで達成でき、`permanentError` の定義変更や新たな永続エラー型の導入は不要である（YAGNI・要件 2章 Out of Scope）。`*atproto.SSRFError` が `internal/retry` をインポートせず構造的型付けで満たす疎結合を壊さないため、インターフェース側には手を入れない（要件 5章）。
 - **0015 の「リトライ枯渇後に浮上」記述の追随を本タスクの受け入れ基準に含めない**: コード修正（`internal/retry`）とドキュメント整合（0015 設計書）は別レビュー単位であり、本タスクの緑判定をドキュメント更新に依存させないため（要件 5章・6章）。§8 の申し送り事項として扱う。
+- **走査手段の記述を `errors.AsType[permanentError]` から `errors.As` に訂正（2026-07-12、承認後）**: 承認時の本文（§2.1 図・§2.2・§3.1・§3.4）は走査手段をジェネリックな `errors.AsType[permanentError]` と記していたが、これはコンパイルできない。`errors.AsType[E error]` の型パラメータ `E` は `error` 制約を持ち、`Error()` を持たない `permanentError` は制約を満たさないためである。非ジェネリックな `errors.As` は `error` を埋め込まないインターフェース型もターゲットにでき、実装（`internal/retry/doer.go`）もこれを用いる。付録B冒頭の決定履歴が当初から `errors.As` ベースと記していたとおり、意図は一貫しており本訂正は本文表記を意図に合わせたものである。

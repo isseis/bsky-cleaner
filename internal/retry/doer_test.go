@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -282,6 +283,54 @@ func TestDoer_Do_PermanentFailures_NotRetried(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.wantStatus, resp.StatusCode)
 			}
+		})
+	}
+}
+
+// TestDoer_Do_WrappedPermanentError_NotRetried verifies that a permanent
+// error wrapped by another error is still detected via the error-chain
+// walk and aborts on the first attempt without any backoff wait -- the
+// real-world case being an *SSRFError wrapped in *url.Error by
+// http.Client.Do. It covers both a single-Unwrap wrap (fmt.Errorf %w) and
+// the *url.Error shape that occurs in production.
+func TestDoer_Do_WrappedPermanentError_NotRetried(t *testing.T) {
+	perm := &permanentTestError{msg: "ssrf rejected"}
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "fmt_errorf_wrap",
+			err:  fmt.Errorf("resolve DID document: %w", perm),
+		},
+		{
+			name: "url_error_wrap",
+			err:  &url.Error{Op: "Get", URL: "https://example.com/", Err: perm},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			clock := &fakeClock{}
+			doer := NewDoer(mockDoerFunc(func(_ *http.Request) (*http.Response, error) {
+				calls++
+				return nil, tt.err
+			}), defaultPolicy(), clock)
+
+			resp, err := doer.Do(newTestRequest(context.Background(), t, http.MethodGet, nil))
+
+			// First attempt only, no backoff wait.
+			assert.Equal(t, 1, calls)
+			assert.Empty(t, clock.SleepCalls)
+			// Do never returns a response together with an error.
+			assert.Nil(t, resp)
+			require.Error(t, err)
+			// The wrapped permanent error is returned unaltered, so the
+			// caller can still recover it from the chain.
+			permErr, ok := errors.AsType[*permanentTestError](err)
+			require.True(t, ok)
+			assert.Same(t, perm, permErr)
 		})
 	}
 }

@@ -193,9 +193,9 @@ func NewRedirectRejectingHTTPClient() *http.Client
 
 リダイレクトが発生すると `http.Client.Do` は `rejectRedirect` の返す `*SSRFError` を `*url.Error` でラップして返す。既存の `resolveHandleToDID`/`resolveDIDDocument` は `errors.AsType[*SSRFError]` でこれを取り出す経路を既に持つため（`did.go`）、`*atproto.SSRFError` として呼び出し元へ伝播する（AC-05）。`rejectRedirect` が返す段階識別子は既存の `SSRFStageDialRevalidation`（その doc コメントが「CheckRedirect が 3xx を拒否した場合」を既に包含している）をそのまま用いる。
 
-**リトライ層との相互作用（重要な挙動）**: 解決フェーズの HTTPDoer は `NewClient` で `retry.NewDoer(newHostSafetyCheckedDoer(httpDoer), defaultRetryPolicy, ...)` として `retry.Doer` に包まれている（`client.go`）。`retry.classify`（`doer.go`）は永続エラーの判定を `errors.As` ではなく素の型アサーション `doErr.(permanentError)` で行うため、`*url.Error` でラップされた `*SSRFError`（`Permanent() == true`）はこのアサーションに一致せず、**リダイレクト拒否はリトライ可能と分類されて `defaultRetryPolicy`（`MaxRetries: 5`）の回数だけ再試行される**。各試行とも `rejectRedirect` が同じく発火して追従を拒むため、内部アドレスへの接続は一度も行われず、最終的に `*SSRFError` が呼び出し元へ浮上する（セキュリティ上の結果＝AC-05 は満たされる）。ただし外部から観測される挙動は「即中断」ではなく「リトライ予算（1+2+4+8+16 ≒ 31秒）を消費してから中断」であり、ハンドル解決と DID ドキュメント取得の2箇所で発生しうる。この挙動は既存の PDS 側 `restrictedDoer`（同じ `rejectRedirect` を `retry.Doer` 配下で使う）と対称であり、本タスクが新たに導入するものではない。`retry.classify` を `errors.As` ベースにして `*SSRFError` を即座に永続扱いする改善は、`internal/retry` の永続判定契約の変更を伴うため本タスクの最小差分スコープ外とし、ここでは挙動の事実のみを明示する。この待ち時間は全体として `execution_timeout` に上界を持つため、無制限のリソース消費（DoS）にはならない。
+**リトライ層との相互作用（重要な挙動）**: 解決フェーズの HTTPDoer は `NewClient` で `retry.NewDoer(newHostSafetyCheckedDoer(httpDoer), defaultRetryPolicy, ...)` として `retry.Doer` に包まれている（`client.go`）。`retry.classify`（`doer.go`）は永続エラーの判定を `errors.As` によるエラーチェーン全体の走査で行うため、`*url.Error` でラップされた `*SSRFError`（`Permanent() == true`）もチェーン内で検出され、**リダイレクト拒否は初回試行で永続と判定されてリトライされず、バックオフ待機なしに即座に中断する**。この初回1回の試行でも `rejectRedirect` が追従を拒むため、内部アドレスへの接続は一度も行われず、`*SSRFError` が呼び出し元へ浮上する（セキュリティ上の結果＝AC-05 は満たされる）。この挙動は既存の PDS 側 `restrictedDoer`（同じ `rejectRedirect` を `retry.Doer` 配下で使う）と対称である。
 
-> **追記（2026-07-12）**: この積み残しは [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) が個別に是正する。0016 完了後、本節・§5.1・§6.1・付録B の「`MaxRetries` 回リトライされてから浮上する」旨の記述は「初回試行で永続と判定され即中断する」に更新が必要（0016 完了時の申し送り事項、コード修正とは別レビュー単位のため本タスクの受け入れ基準には含めない）。
+> **追記（2026-07-12、0016 完了により更新）**: 0015 の実装時点では `retry.classify` が永続判定をトップレベルの素の型アサーション `doErr.(permanentError)` で行っていたため、`*url.Error` でラップされた `*SSRFError` はアサーションに一致せず、リダイレクト拒否は `defaultRetryPolicy`（`MaxRetries: 5`）の回数だけ再試行されてから浮上していた（各試行とも内部アドレスへは接続せず AC-05 は満たすが、外部から観測される挙動は「リトライ予算 1+2+4+8+16 ≒ 31秒 を消費してから中断」だった）。この積み残しは [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) が `retry.classify` を `errors.As` ベースのチェーン走査へ変更して是正済みであり、本節・§5.1・§6.1・付録B の記述は上記の「初回試行で即中断」へ更新済みである。
 
 #### 共有クライアントとしての位置づけ
 
@@ -339,7 +339,7 @@ flowchart TD
 - 緑（`enhanced`）: 修正後のコンポーネント
 - オレンジ（`process`）: 変更のない前提
 
-矢印は制御・データの流れを、ラベルはその辺で起きる挙動を表す。修正前は 302 を自動追従して未検証の内部アドレスへ到達しうるのに対し、修正後は `rejectRedirect` が追従を拒み `*SSRFError` を返す（6.1 の通り `retry.Doer` によるリトライ枯渇後に呼び出し元へ浮上する。この挙動は [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) で即中断に是正予定 — 3.2 の追記参照）。
+矢印は制御・データの流れを、ラベルはその辺で起きる挙動を表す。修正前は 302 を自動追従して未検証の内部アドレスへ到達しうるのに対し、修正後は `rejectRedirect` が追従を拒み `*SSRFError` を返す（6.1 の通り `retry.Doer` は初回試行で永続と判定して即中断し、`*SSRFError` を呼び出し元へ浮上させる。この即中断挙動は [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) による是正済み — 3.2 の追記参照）。
 
 この修正は [セキュリティ設計](../../design/security.md) の「意図しないホストへの認証情報送信（実質 SSRF）」の対策方針を、既存の `restrictedDoer`（PDS 本通信）から DID 解決フェーズへ拡張するものであり、既存方針の強化にあたる。DNS リバインディングによる TOCTOU 窓（初期のホスト検証と実接続の間で DNS 応答が変わる可能性）について、本タスクで塞ぐのはリダイレクト経路のみである。解決フェーズの1回の GET 内でのアドレス再解決に対する IP ピン留めは PDS 側（`restrictedDoer`）と異なり導入しない — これは [01_requirements.md](01_requirements.md) の Out of Scope（解決フェーズの複数アドレス・ピン留め）に沿い、リダイレクト拒否という本タスクの範囲に絞るためである。
 
@@ -359,7 +359,7 @@ flowchart TD
 
 ### 6.1 F-002: リダイレクト拒否のシーケンス
 
-解決フェーズの HTTPDoer は `retry.Doer` → `hostSafetyCheckedDoer` → `*http.Client` の順で入れ子になっている。下図は 3xx 応答が `rejectRedirect` で拒否され、`retry.Doer` によるリトライを経て最終的に `*SSRFError` が浮上するまでを示す（この図が示す「リトライ枯渇後に浮上」は [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) 完了後に「初回試行で即中断」へ更新予定 — 3.2 の追記参照）。矢印は呼び出し（実線・右向き）と戻り（点線・左向き）の順序を表す。
+解決フェーズの HTTPDoer は `retry.Doer` → `hostSafetyCheckedDoer` → `*http.Client` の順で入れ子になっている。下図は 3xx 応答が `rejectRedirect` で拒否され、`retry.Doer` が初回試行で永続と判定して即中断し、`*SSRFError` が浮上するまでを示す（[0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) による是正後の挙動 — 3.2 の追記参照）。矢印は呼び出し（実線・右向き）と戻り（点線・左向き）の順序を表す。
 
 ```mermaid
 sequenceDiagram
@@ -370,25 +370,23 @@ sequenceDiagram
     participant SRV as ハンドル/DID ドキュメントサーバ
 
     NC->>RD: 解決 GET (well-known / DID doc)
-    loop 各試行（最大 MaxRetries+1 回）
-        RD->>HS: Do(req)
-        HS->>HS: checkRequestHostSafety(初期 URL)
-        HS->>HC: Do(req)
-        HC->>SRV: GET 初期 URL
-        alt サーバが 2xx を返す
-            SRV-->>HC: 200 + body
-            HC-->>HS: response
-            HS-->>RD: response
-            RD-->>NC: response（既存挙動、AC-06）
-        else サーバが 3xx を返す
-            SRV-->>HC: 302 Location
-            HC->>HC: CheckRedirect = rejectRedirect（追従しない）
-            HC-->>HS: *url.Error(*SSRFError)
-            HS-->>RD: *url.Error(*SSRFError)
-            RD->>RD: classify: 永続と判定されずリトライ対象
-        end
+    RD->>HS: Do(req)（初回試行）
+    HS->>HS: checkRequestHostSafety(初期 URL)
+    HS->>HC: Do(req)
+    HC->>SRV: GET 初期 URL
+    alt サーバが 2xx を返す
+        SRV-->>HC: 200 + body
+        HC-->>HS: response
+        HS-->>RD: response
+        RD-->>NC: response（既存挙動、AC-06）
+    else サーバが 3xx を返す
+        SRV-->>HC: 302 Location
+        HC->>HC: CheckRedirect = rejectRedirect（追従しない）
+        HC-->>HS: *url.Error(*SSRFError)
+        HS-->>RD: *url.Error(*SSRFError)
+        RD->>RD: classify: チェーン走査で永続と判定 → リトライしない
+        RD-->>NC: *SSRFError（初回試行で即中断、AC-05）
     end
-    RD-->>NC: *SSRFError（リトライ枯渇後に浮上、AC-05）
 ```
 
 DID ドキュメント取得先が `plc.directory`（did:plc）と did:web ドメインのいずれであっても、同じ `retry.Doer`（`didResolutionDoer`）を経由するため、リダイレクト拒否の適用範囲に漏れはない。
@@ -489,6 +487,6 @@ sequenceDiagram
 - **F-001 のシグネチャ選択**: `DeleteRecord(ctx, rkey, collection string)` ではなく `DeleteRecord(ctx, post Post)` を採る理由は 3.1 の引用ブロックを参照（コレクション lexicon 名を `runner` に漏らさないため）。
 - **F-002 の共有クライアント**: DID 解決用と Slack 通知用でクライアントを分離しない理由は 3.2「共有クライアントとしての位置づけ」を参照（現状の1クライアント共有構成を保つ、リダイレクト拒否は双方で安全側）。
 - **F-002 のリダイレクト検知手法**: `restrictedDoer` と同じ `rejectRedirect`（`CheckRedirect`）を再利用し、レスポンスステータスを事後検査する別機構を新設しない理由は 3.2 を参照（本番の `http.DefaultClient` は 3xx を追従後の最終応答しか返さないため、事後検査だけでは本番の追従を防げない。トランスポート層でのリダイレクト拒否が必須）。
-- **F-002 のリトライ層挙動を「即中断」と記述しない**: レビュー指摘を受け、リダイレクト拒否が `retry.Doer` により永続エラーと即断されず `MaxRetries` 回リトライされてから浮上する事実を 3.2・6.1 に明記した。`retry.classify` を `errors.As` ベースに変える改善は `internal/retry` の契約変更を伴うため本タスクのスコープ外とし、挙動の明示に留める。（2026-07-12 追記: この積み残しは [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) が個別に是正する。0016 完了後、本節・3.2・6.1 の記述更新が必要 — 3.2 の追記参照。）
+- **F-002 のリトライ層挙動を「即中断」と記述しない（0015 実装時点の判断。0016 完了により後述のとおり解消）**: レビュー指摘を受け、0015 実装時点ではリダイレクト拒否が `retry.Doer` により永続エラーと即断されず `MaxRetries` 回リトライされてから浮上する事実を 3.2・6.1 に明記した。`retry.classify` を `errors.As` ベースに変える改善は `internal/retry` の契約変更を伴うため 0015 のスコープ外とし、当時は挙動の明示に留めた。（2026-07-12 追記: この積み残しは [0016_retry_wrapped_permanent_error](../0016_retry_wrapped_permanent_error/01_requirements.md) が `retry.classify` を `errors.As` ベースのチェーン走査へ変更して是正済みであり、これに伴い 3.2・6.1 の記述は「初回試行で即中断」へ更新済み — 3.2 の追記参照。）
 - **F-001 の未知種別を fail-closed 化**: レビュー指摘を受け、`collectionForPostType` の未知種別に対する既定コレクション（`app.bsky.feed.post`）返却を取りやめ、`ErrUnknownPostType` を返す fail-closed 設計に変更した（3.1）。既定コレクションへの削除は本タスクが是正する誤削除を再導入するため。
 - **F-005 のオーバーフロー安全性**: レビュー指摘を受け、`strconv.Atoi` が失う `time.ParseDuration` のレンジ外拒否を、乗算前の秒数クランプで補う設計を 3.5 に追加した。

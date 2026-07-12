@@ -32,8 +32,10 @@ type Policy struct {
 // permanentError is implemented by errors that must never be retried
 // regardless of their transport-level shape (e.g. an SSRF rejection --
 // retrying would not help, since the same verified-address check would
-// reject it again). Doer checks for this via a plain type assertion, so
-// callers do not need to import this package's types to opt out of retry.
+// reject it again). Doer detects this by walking the whole error chain
+// (via errors.As), so a permanent error wrapped by another error is still
+// caught, and callers do not need to import this package's types to opt
+// out of retry.
 type permanentError interface {
 	Permanent() bool
 }
@@ -51,9 +53,10 @@ const maxDrainBytes = 64 * 1024
 const maxRetryAfterSeconds = 24 * 60 * 60
 
 // Doer wraps an HTTPDoer, retrying transient failures (transport errors,
-// HTTP 429, HTTP 5xx) per policy, and never retrying an error satisfying
-// the unexported permanentError interface or an HTTP status outside the
-// retryable set (in particular 401 and other non-429 4xx).
+// HTTP 429, HTTP 5xx) per policy, and never retrying an error whose chain
+// contains one satisfying the unexported permanentError interface (even
+// when wrapped) or an HTTP status outside the retryable set (in particular
+// 401 and other non-429 4xx).
 type Doer struct {
 	inner  HTTPDoer
 	policy Policy
@@ -147,11 +150,17 @@ func cloneForAttempt(req *http.Request, attempt int) (*http.Request, error) {
 // classify determines whether the outcome of one attempt should be
 // retried, and what retryAfter hint (if any, from a 429 response) applies.
 // When retryable is false, outcomeResp/outcomeErr is the exact
-// (response, error) pair Do should return: never retried permanent errors,
-// non-retryable statuses (2xx, 401, or other non-429 4xx), and successes.
+// (response, error) pair Do should return: errors whose chain contains a
+// permanent error (detected via errors.As, even when wrapped), which are
+// never retried, non-retryable statuses (2xx, 401, or other non-429 4xx),
+// and successes.
 func classify(resp *http.Response, doErr error) (retryable bool, retryAfter time.Duration, outcomeResp *http.Response, outcomeErr error) {
 	if doErr != nil {
-		if permErr, ok := doErr.(permanentError); ok && permErr.Permanent() {
+		// Walk the whole error chain, not just the top level, so a permanent
+		// error wrapped by another error (e.g. *url.Error wrapping an SSRF
+		// rejection) is still detected and never retried.
+		var permErr permanentError
+		if errors.As(doErr, &permErr) && permErr.Permanent() {
 			return false, 0, nil, doErr
 		}
 		return true, 0, nil, doErr
