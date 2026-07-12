@@ -196,7 +196,7 @@ bsky-cleaner --version
 > Docker イメージ内蔵の cron（entrypoint スクリプト）が TOML の
 > `schedule` フィールドを crontab へ橋渡しするための隠しコマンドであり、
 > `--help` の一覧にも表示されない。エンドユーザーが通常の運用で直接
-> 実行する必要はない（詳細は [Docker Deployment Design](docs/design/docker_deployment.md)
+> 実行する必要はない（詳細は [Docker Deployment Design](docs/design/docker_deployment.ja.md)
 > を参照）。
 
 ### 終了コード
