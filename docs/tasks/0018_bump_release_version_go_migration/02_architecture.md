@@ -104,10 +104,18 @@ flowchart LR
 
 ### 2.1 コンポーネント配置
 
-> **配置先: `scripts/` 配下**（本タスクで確定）。要件定義書 2章では配置先の決定を Out of Scope と
-> していたが、既存の Bash 実装と既存テスト（`scripts/bump_release_version_test.go`）がいずれも
-> `scripts/` に置かれていることから、同ディレクトリに `package main` の Go ファイルとして実装し、
-> `go run ./scripts vX.Y.Z`（またはローカルビルドしたバイナリ）で実行する。あわせて
+> **配置先: `scripts/bump_release_version/` 配下**（本タスクで確定）。要件定義書 2章では配置先の決定を
+> Out of Scope としていたが、既存の Bash 実装と既存テスト（当時の `scripts/bump_release_version_test.go`）
+> がいずれも `scripts/` に置かれていたことから、実装当初は同ディレクトリに直接 `package main` の Go
+> ファイルとして配置し `go run ./scripts vX.Y.Z` で実行する案とした。その後 PR-1 のレビューで
+> 「`go run ./scripts vX.Y.Z` はツール名が呼び出しに現れず直感的でない」との指摘を受け、Go の慣用的な
+> 「1ツール1ディレクトリ」構成（`cmd/<tool>/main.go` に類する構成）へ変更し、`scripts/bump_release_version/`
+> サブディレクトリ配下の `package main` として実装、`go run ./scripts/bump_release_version vX.Y.Z`
+> （または `make bump-version ARGS=vX.Y.Z`）で実行することとした。ディレクトリベースの `go run` は
+> 対象ディレクトリ内の非テスト `.go` ファイルをすべて含めてビルドするため、単一ファイル指定
+> （`go run ./scripts/bump_release_version.go`）と異なり、将来同ディレクトリに共有ヘルパーファイルが
+> 増えても壊れない。`scripts/check-existing-tag.sh` とその既存テスト（`scripts/check_existing_tag_test.go`）
+> は本タスクの対象外であり、`scripts/` 直下に残る。あわせて
 > [Package Reference](../../dev/developer_guide/package_reference.md) の更新も本タスクの範囲に含める。
 > 下図は論理的なコンポーネント分割を示す。
 
@@ -117,7 +125,7 @@ flowchart TD
     classDef newpkg fill:#ffe8f5,stroke:#d946ef,stroke-width:2px,color:#701a75;
     classDef process fill:#fff1e6,stroke:#ff7f0e,stroke-width:1px,color:#8a3e00;
 
-    subgraph impl ["新規実装（scripts/ 配下・package main）"]
+    subgraph impl ["新規実装（scripts/bump_release_version/ 配下・package main）"]
         ENTRY["エントリポイント<br>(引数個数・案内出力)"]
         VALIDATOR["バージョン検証<br>(semver 全体アンカー)"]
         UPDATER["2段階アップデータ<br>(検証 → 書き込み)"]
@@ -333,19 +341,20 @@ func update(version string, targets []target) error
 
 ### 3.3 コンポーネントの責務（新規・変更ファイル一覧）
 
-> 実装は `scripts/` 配下の単一 `package main`（2.1 節で確定）に配置する。各論理コンポーネントは同一
-> パッケージ内の関数・型として実装するため、下段のパスは同一ファイル群を指す（1ファイルにまとめても、
-> 責務ごとに `.go` を分割してもよい）。
+> 実装は `scripts/bump_release_version/` 配下の単一 `package main`（2.1 節で確定）に配置する。各論理
+> コンポーネントは同一パッケージ内の関数・型として実装するため、下段のパスは同一ファイル群を指す
+> （1ファイルにまとめても、責務ごとに `.go` を分割してもよい）。
 
-| 論理コンポーネント | 変更種別 | 責務 | 配置（`scripts/` 配下・`package main`） |
+| 論理コンポーネント | 変更種別 | 責務 | 配置（`scripts/bump_release_version/` 配下・`package main`） |
 |---|---|---|---|
-| エントリポイント（`run` seam + `main`） | 新規 | 引数個数チェック（AC-05）、`validateVersion`/`update` の呼び出し、案内出力（AC-09）、終了コード制御 | 例: `scripts/bump_release_version.go` |
+| エントリポイント（`run` seam + `main`） | 新規 | 引数個数チェック（AC-05）、`validateVersion`/`update` の呼び出し、案内出力（AC-09）、終了コード制御 | 例: `scripts/bump_release_version/main.go` |
 | バージョン検証 | 新規 | semver 全体アンカー検証（AC-01） | 同上（同一パッケージ） |
 | 2段階アップデータ | 新規 | フェーズ1（全件検証・置換内容構築）とフェーズ2（書き込み）の制御（AC-02, AC-07, AC-08） | 同上（同一パッケージ） |
 | アトミック書き込み | 新規 | 一時ファイル作成・リネーム・mode 復元（AC-03, AC-04） | 同上（同一パッケージ） |
 | `scripts/bump-release-version.sh` | 削除 | Go 実装への移行に伴い削除する | `scripts/bump-release-version.sh` |
-| `scripts/bump_release_version_test.go` | 変更 | 現在は `exec.Command("bash", ...)` で Bash スクリプトを起動して検証している。同一 `package main` 内で Go 実装をインプロセスに直接検証するテストへ書き換える（7.2 節） | `scripts/bump_release_version_test.go` |
-| `docs/design/docker_deployment.md` / `docker_deployment.ja.md` | 変更 | Bash スクリプトへの参照を Go 実装の実行方法（`go run ./scripts vX.Y.Z` 等）へ更新する | 同左 |
+| `scripts/bump_release_version/main_test.go` | 変更 | 現在は `exec.Command("bash", ...)` で Bash スクリプトを起動して検証している。同一 `package main` 内で Go 実装をインプロセスに直接検証するテストへ書き換える（7.2 節） | `scripts/bump_release_version/main_test.go`（移行前は `scripts/bump_release_version_test.go`） |
+| `docs/design/docker_deployment.md` / `docker_deployment.ja.md` | 変更 | Bash スクリプトへの参照を Go 実装の実行方法（`go run ./scripts/bump_release_version vX.Y.Z` / `make bump-version ARGS=vX.Y.Z` 等）へ更新する | 同左 |
+| `Makefile` | 変更 | `bump-version` ターゲット（`go run ./scripts/bump_release_version $(ARGS)`）を追加する | `Makefile` |
 | `docs/dev/developer_guide/package_reference.md` | 変更 | `scripts/` 配下の新規コンポーネントの配置・責務を追記する（本タスク範囲） | 同左 |
 
 ## 4. エラーハンドリング設計
@@ -506,13 +515,14 @@ flowchart TD
 5. エントリポイント（引数個数チェック・案内出力・終了コード, AC-05, AC-06, AC-09）
 
 ### フェーズ 3: 移行と後始末
-6. `scripts/bump_release_version_test.go` を Go 実装のインプロセステストへ書き換え（7.2）
+6. `scripts/bump_release_version_test.go`（後に `scripts/bump_release_version/main_test.go` へ移動）を
+   Go 実装のインプロセステストへ書き換え（7.2）
 7. `scripts/bump-release-version.sh` の削除と、`docs/design/docker_deployment.md`（+ `.ja.md`）の
    参照更新、[Package Reference](../../dev/developer_guide/package_reference.md) の更新
 
 ## 9. 将来拡張性
 
-- **`cmd/` 配下への再配置**: 本タスクでは配置先を `scripts/` 配下に確定した（2.1 節）。将来リリース手順を
+- **`cmd/` 配下への再配置**: 本タスクでは配置先を `scripts/bump_release_version/` 配下に確定した（2.1 節）。将来リリース手順を
   自動化・CI 組み込みする際に、他の CLI サブコマンドと統合しやすい `cmd/` 配下への移設を再検討できる。
   実装が単一 `package main` に閉じているため、移設のコストは小さい。
 - **対象ファイル・パターンの拡張**: 対象ファイルは `target` のスライスとして表現するため、将来
@@ -531,9 +541,14 @@ flowchart TD
 >   先行させ、最頻の失敗ケースでの部分更新を構造的に排除する。これは Bash 実装からの意図的な挙動改善で
 >   あり、要件（AC-08）が明示的に要求している（3.2.4）。ただし書き込み段階での複数ファイル間
 >   ロールバックまでは要求されない（5.3）。
-> - **配置先を `scripts/` に確定**: 要件定義書では配置先の決定を Out of Scope としていたが、レビューを
->   経て `scripts/` 配下の単一 `package main` に確定した（既存の Bash 実装・既存テストと同ディレクトリ）。
->   あわせて Package Reference の更新も本タスクの範囲に含めることとした（2.1, 3.3）。
+> - **配置先を `scripts/` に確定 → `scripts/bump_release_version/` へ変更**: 要件定義書では配置先の決定を
+>   Out of Scope としていたが、レビューを経て当初は `scripts/` 配下の単一 `package main` に確定した
+>   （既存の Bash 実装・既存テストと同ディレクトリ）。その後 PR-1 のレビューで
+>   「`go run ./scripts vX.Y.Z` はツール名が呼び出しに現れず直感的でない」との指摘を受け、Go の慣用的な
+>   「1ツール1ディレクトリ」構成へ変更し、`scripts/bump_release_version/` サブディレクトリ配下の
+>   `package main` として確定し直した（`go run ./scripts/bump_release_version vX.Y.Z` /
+>   `make bump-version ARGS=vX.Y.Z`）。`scripts/check-existing-tag.sh` とその既存テストは対象外のまま
+>   `scripts/` 直下に残る。あわせて Package Reference の更新も本タスクの範囲に含めることとした（2.1, 3.3）。
 > - **エラー型を最小限の型付きエラーで表現**: 現行 Bash は終了コードとメッセージのみだが、Go 版は
 >   テストがメッセージ文字列一致に依存しないよう、センチネル `errInvalidVersion` と型付き
 >   `updateError`（`Kind` で判定）を導入する（CLAUDE.md のテスト方針）。過剰なエラー階層は設けない

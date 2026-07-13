@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build clean deadcode notify-preview notify-preview-send
+.PHONY: fmt test lint build clean deadcode notify-preview notify-preview-send bump-version
 
 BINARY=build/bsky-cleaner
 
@@ -26,3 +26,6 @@ notify-preview:
 
 notify-preview-send:
 	go run -tags test ./internal/notify/notifypreview -send $(ARGS)
+
+bump-version:
+	go run ./scripts/bump_release_version $(ARGS)

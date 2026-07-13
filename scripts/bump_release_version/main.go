@@ -3,7 +3,11 @@
 //
 // Usage:
 //
-//	go run ./scripts vX.Y.Z
+//	go run ./scripts/bump_release_version vX.Y.Z
+//
+// or:
+//
+//	make bump-version ARGS=vX.Y.Z
 //
 // It does not commit, branch, or tag - run it, review the diff, then
 // commit/push/PR/tag yourself (see docs/design/docker_deployment.md).
@@ -224,7 +228,7 @@ func writeFileAtomic(path string, content []byte, mode fs.FileMode) error {
 	return nil
 }
 
-const usageProgName = "go run ./scripts"
+const usageProgName = "go run ./scripts/bump_release_version"
 
 // run is the testable core of the entry point: it takes argv (excluding the
 // program name) and output writers, and returns the process exit code.
