@@ -146,7 +146,7 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 > 害はない）。
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] PR を作成した（[#158](https://github.com/isseis/bsky-cleaner/pull/158)）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
