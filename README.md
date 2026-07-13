@@ -46,6 +46,8 @@ curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/config.exampl
 cp config.example.toml config/config.toml
 ```
 
+Before running the command above, replace `main` in the curl URL with the same release tag as the Docker image version you plan to use in step 3 below — the config loader rejects unknown fields, so if the `config.example.toml` schema has drifted between `main` and the pinned image release, using an untagged template can cause a config-parse failure at startup.
+
 Edit `config/config.toml` as needed for your environment.
 
 ```toml

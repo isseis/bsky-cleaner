@@ -46,6 +46,8 @@ curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/config.exampl
 cp config.example.toml config/config.toml
 ```
 
+上記コマンドを実行する前に、curl の URL 中の `main` を、後述の手順3で使う Docker イメージのバージョンと同じリリースタグに置き換えること。設定ローダーは未知のフィールドを拒否するため、`config.example.toml` のスキーマが `main` とピン留めしたイメージのリリースとの間でずれている場合、タグ指定のないテンプレートを使うと起動時に設定のパースに失敗することがある。
+
 `config/config.toml` を自分の環境に合わせて編集する。
 
 ```toml
