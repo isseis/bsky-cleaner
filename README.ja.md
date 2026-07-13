@@ -42,9 +42,11 @@ BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 
 ```sh
 mkdir -p config
+curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/config.example.toml
+cp config.example.toml config/config.toml
 ```
 
-`config/config.toml` を作成する。
+`config/config.toml` を自分の環境に合わせて編集する。
 
 ```toml
 retention_days = 30

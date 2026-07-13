@@ -42,9 +42,11 @@ See [Environment Variables](#environment-variables) below for details on each va
 
 ```sh
 mkdir -p config
+curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/config.example.toml
+cp config.example.toml config/config.toml
 ```
 
-Create `config/config.toml`.
+Edit `config/config.toml` as needed for your environment.
 
 ```toml
 retention_days = 30
