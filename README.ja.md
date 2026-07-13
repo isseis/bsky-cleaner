@@ -24,7 +24,7 @@ Docker Compose を使うのが標準的な利用方法です。
 テンプレートを使うと起動時に設定のパースに失敗することがある。
 
 ```sh
-VERSION=v1.2.1  # 使いたいリリースバージョンに置き換える
+VERSION=v1.2.2  # 使いたいリリースバージョンに置き換える
 mkdir -p config
 curl -O "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/dot.env.example"
 curl -o config.example.toml "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/config.example.toml"
