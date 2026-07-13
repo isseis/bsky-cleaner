@@ -310,10 +310,10 @@ PR 境界（§3.2）とは別軸である。
 `make test`/`make lint` では検出できない残存参照・整合性のみを対象とする（AC 検証表と重複する項目は
 そちらに集約）。
 
-- [ ] `.sh` 削除後の残存参照: `rg -n "bump-release-version\.sh" --glob '!docs/tasks/**'` の結果が 0 件
+- [x] `.sh` 削除後の残存参照: `rg -n "bump-release-version\.sh" --glob '!docs/tasks/**'` の結果が 0 件
   （実装コード・`.github/`・`docs/design`・`docs/dev`・README 等）。`docs/tasks/0018_*` 配下の要件・設計・
   計画文書は移行の経緯を記録するため旧名を含んでよく、本チェックの対象外とする。
-- [ ] 起動方法の表記統一: `rg -n "bump-release-version" docs/design docs/dev` の結果に旧 `.sh` 名が残らず、
+- [x] 起動方法の表記統一: `rg -n "bump-release-version" docs/design docs/dev` の結果に旧 `.sh` 名が残らず、
   `go run ./scripts/bump_release_version` 形へ移行済みであること（`docker_deployment.md`/`.ja.md`、`package_reference.md`）。
 
 ## 9. 成功基準
