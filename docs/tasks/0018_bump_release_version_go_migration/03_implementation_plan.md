@@ -149,17 +149,17 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 - [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
 - [x] PR を作成した（[#158](https://github.com/isseis/bsky-cleaner/pull/158)）
-- [ ] PR がマージされた
-- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+- [x] PR がマージされた
+- [x] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ### フェーズ 3 後半: 旧スクリプト削除とドキュメント整備
 
-- [ ] **ステップ 3-3**: `scripts/bump-release-version.sh` を削除。
-- [ ] **ステップ 3-4**: `docs/design/docker_deployment.md` の2箇所を更新（§4.3 の置換内容）。
-- [ ] **ステップ 3-5**: `docs/design/docker_deployment.ja.md` の2箇所を更新（§4.3 の置換内容）。
-- [ ] **ステップ 3-6**: `docs/dev/developer_guide/package_reference.md` に `scripts/` の項を追記（bump ツールの
+- [x] **ステップ 3-3**: `scripts/bump-release-version.sh` を削除。
+- [x] **ステップ 3-4**: `docs/design/docker_deployment.md` の2箇所を更新（§4.3 の置換内容）。
+- [x] **ステップ 3-5**: `docs/design/docker_deployment.ja.md` の2箇所を更新（§4.3 の置換内容）。
+- [x] **ステップ 3-6**: `docs/dev/developer_guide/package_reference.md` に `scripts/` の項を追記（bump ツールの
   配置・責務・起動方法 `go run ./scripts/bump_release_version vX.Y.Z`）。
-- [ ] **ステップ 3-7**: `make fmt && make test && make lint` を通す。
+- [x] **ステップ 3-7**: `make fmt && make test && make lint` を通す。
 
 **成功基準**: 全 AC テストが緑。`.sh` 削除後に bump スクリプトへの参照が残っていない（§8 クロスサーチ）。
 
@@ -174,8 +174,8 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 > 依存関係: 本 PR は PR-1（インプロセステスト化）のマージ後に行う。PR-1 でテストが `.sh` を参照しなくなって
 > いるため、本 PR での `.sh` 削除でグリーンゲートは壊れない（`check-existing-tag.sh` は別スクリプトで無関係）。
 
-- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
-- [ ] PR を作成した
+- [x] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [x] PR を作成した（[#159](https://github.com/isseis/bsky-cleaner/pull/159)）
 - [ ] PR がマージされた
 - [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
@@ -310,10 +310,10 @@ PR 境界（§3.2）とは別軸である。
 `make test`/`make lint` では検出できない残存参照・整合性のみを対象とする（AC 検証表と重複する項目は
 そちらに集約）。
 
-- [ ] `.sh` 削除後の残存参照: `rg -n "bump-release-version\.sh" --glob '!docs/tasks/**'` の結果が 0 件
+- [x] `.sh` 削除後の残存参照: `rg -n "bump-release-version\.sh" --glob '!docs/tasks/**'` の結果が 0 件
   （実装コード・`.github/`・`docs/design`・`docs/dev`・README 等）。`docs/tasks/0018_*` 配下の要件・設計・
   計画文書は移行の経緯を記録するため旧名を含んでよく、本チェックの対象外とする。
-- [ ] 起動方法の表記統一: `rg -n "bump-release-version" docs/design docs/dev` の結果に旧 `.sh` 名が残らず、
+- [x] 起動方法の表記統一: `rg -n "bump-release-version" docs/design docs/dev` の結果に旧 `.sh` 名が残らず、
   `go run ./scripts/bump_release_version` 形へ移行済みであること（`docker_deployment.md`/`.ja.md`、`package_reference.md`）。
 
 ## 9. 成功基準
