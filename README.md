@@ -24,7 +24,7 @@ Docker image you will run; the config loader rejects unknown fields, so a templa
 revision than the pinned image can fail to parse at startup.
 
 ```sh
-VERSION=v1.2.1  # replace with the release version you want to use
+VERSION=v1.2.2  # replace with the release version you want to use
 mkdir -p config
 curl -O "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/dot.env.example"
 curl -o config.example.toml "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/config.example.toml"
