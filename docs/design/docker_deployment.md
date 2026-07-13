@@ -39,9 +39,19 @@ Releases are automated by CI (`.github/workflows/release.yml`). The operations p
 
 ### Normal Release
 
+`docker-compose.yml` and `README.md`/`README.ja.md` each embed the release version (the `image:` tag and the
+`VERSION=` line in the Docker Compose setup steps, respectively). Before tagging, bump all of them together with
+`scripts/bump-release-version.sh` rather than editing each file by hand — a manual edit is easy to miss in one of
+the three files, which would leave the README's setup instructions pointing at a different version than the image
+actually built for the tag.
+
 ```sh
+scripts/bump-release-version.sh vX.Y.Z
+# Review the diff, then:
+git add docker-compose.yml README.md README.ja.md
+git commit -m "release(vX.Y.Z): bump embedded version to vX.Y.Z"
 git tag vX.Y.Z
-git push --tags
+git push && git push --tags
 ```
 
 Pushing a tag triggers CI to automatically execute the following:
