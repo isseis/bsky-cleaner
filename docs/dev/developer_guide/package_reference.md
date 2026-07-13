@@ -20,6 +20,9 @@ codebase grows.
   - `cleanup/`: filters an account's post inventory down to deletion targets based on retention days, post type, and pinned status (see docs/tasks/0003_cleanup_engine)
   - `runner/`: wires config/atproto/cleanup together into a single dry-run/apply run, producing a report.Result (see docs/tasks/0004_cli_entrypoint)
   - `report/`: structured run result (Result/Mode/DeleteFailure) and its stdout text rendering (FormatText), independent of how the result was produced (see docs/tasks/0004_cli_entrypoint)
+- `scripts/`: standalone developer tools, each a separate `package main` invoked via `go run`
+  - `bump_release_version/`: rewrites the release version embedded in `docker-compose.yml` and `README.md`/`README.ja.md` ahead of a release, run via `go run ./scripts/bump_release_version vX.Y.Z` (or `make bump-version ARGS=vX.Y.Z`); validates the version argument, verifies all target patterns exist before writing any file (fail-closed), and writes atomically while preserving file mode (see docs/tasks/0018_bump_release_version_go_migration)
+  - `check-existing-tag.sh`: checks whether a release tag already exists (unrelated to `bump_release_version/`)
 - `docs/`: Project documentation with requirements and architecture
 ```
 

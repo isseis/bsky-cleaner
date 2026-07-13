@@ -154,12 +154,12 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 ### フェーズ 3 後半: 旧スクリプト削除とドキュメント整備
 
-- [ ] **ステップ 3-3**: `scripts/bump-release-version.sh` を削除。
-- [ ] **ステップ 3-4**: `docs/design/docker_deployment.md` の2箇所を更新（§4.3 の置換内容）。
-- [ ] **ステップ 3-5**: `docs/design/docker_deployment.ja.md` の2箇所を更新（§4.3 の置換内容）。
-- [ ] **ステップ 3-6**: `docs/dev/developer_guide/package_reference.md` に `scripts/` の項を追記（bump ツールの
+- [x] **ステップ 3-3**: `scripts/bump-release-version.sh` を削除。
+- [x] **ステップ 3-4**: `docs/design/docker_deployment.md` の2箇所を更新（§4.3 の置換内容）。
+- [x] **ステップ 3-5**: `docs/design/docker_deployment.ja.md` の2箇所を更新（§4.3 の置換内容）。
+- [x] **ステップ 3-6**: `docs/dev/developer_guide/package_reference.md` に `scripts/` の項を追記（bump ツールの
   配置・責務・起動方法 `go run ./scripts/bump_release_version vX.Y.Z`）。
-- [ ] **ステップ 3-7**: `make fmt && make test && make lint` を通す。
+- [x] **ステップ 3-7**: `make fmt && make test && make lint` を通す。
 
 **成功基準**: 全 AC テストが緑。`.sh` 削除後に bump スクリプトへの参照が残っていない（§8 クロスサーチ）。
 
