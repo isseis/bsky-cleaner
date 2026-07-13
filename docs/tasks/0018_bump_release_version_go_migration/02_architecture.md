@@ -104,12 +104,12 @@ flowchart LR
 
 ### 2.1 コンポーネント配置
 
-> **配置先は本タスクのスコープ外**（要件定義書 2章 Out of Scope）。`cmd/` 配下のサブコマンドにするか、
-> `scripts/` 配下の単体 Go ファイル（`go run` 対象）にするかは、着手時点のリポジトリ構成と
-> [Package Reference](../../dev/developer_guide/package_reference.md) を踏まえて改めて判断する。
-> 下図は**論理的なコンポーネント分割**を示すものであり、物理的なファイル配置を確定するものではない。
-> 現状の既存テスト（`scripts/bump_release_version_test.go`）が `scripts/` に置かれている事実は、
-> `scripts/` 配下を有力な候補として示唆するが、確定判断は着手時に行う。
+> **配置先: `scripts/` 配下**（本タスクで確定）。要件定義書 2章では配置先の決定を Out of Scope と
+> していたが、既存の Bash 実装と既存テスト（`scripts/bump_release_version_test.go`）がいずれも
+> `scripts/` に置かれていることから、同ディレクトリに `package main` の Go ファイルとして実装し、
+> `go run ./scripts vX.Y.Z`（またはローカルビルドしたバイナリ）で実行する。あわせて
+> [Package Reference](../../dev/developer_guide/package_reference.md) の更新も本タスクの範囲に含める。
+> 下図は論理的なコンポーネント分割を示す。
 
 ```mermaid
 flowchart TD
@@ -117,7 +117,7 @@ flowchart TD
     classDef newpkg fill:#ffe8f5,stroke:#d946ef,stroke-width:2px,color:#701a75;
     classDef process fill:#fff1e6,stroke:#ff7f0e,stroke-width:1px,color:#8a3e00;
 
-    subgraph impl ["新規実装（配置は着手時に決定）"]
+    subgraph impl ["新規実装（scripts/ 配下・package main）"]
         ENTRY["エントリポイント<br>(引数個数・案内出力)"]
         VALIDATOR["バージョン検証<br>(semver 全体アンカー)"]
         UPDATER["2段階アップデータ<br>(検証 → 書き込み)"]
@@ -177,7 +177,7 @@ sequenceDiagram
     end
     Entry->>Val: バージョン文字列を検証
     alt semver 全体アンカー不一致
-        Val-->>Entry: ErrInvalidVersion
+        Val-->>Entry: errInvalidVersion
         Entry-->>Entry: エラー出力・非ゼロ終了（書き込みなし）
     end
 
@@ -186,7 +186,7 @@ sequenceDiagram
         Upd->>FS: ファイル読み込み・mode 取得
         Upd->>Upd: パターン一致を確認し置換後内容を構築
         alt ファイル不在 or パターン不一致
-            Upd-->>Entry: UpdateError（どのファイルへも書き込まず）
+            Upd-->>Entry: updateError（どのファイルへも書き込まず）
             Entry-->>Entry: エラー出力・非ゼロ終了
         end
     end
@@ -195,7 +195,7 @@ sequenceDiagram
     loop 全対象ファイル
         Upd->>FS: 一時ファイルに書き込み → リネーム → mode 復元
         alt I/O エラー
-            Upd-->>Entry: UpdateError（後続ファイルは処理しない）
+            Upd-->>Entry: updateError（後続ファイルは処理しない）
             Entry-->>Entry: エラー出力・非ゼロ終了
         end
     end
@@ -218,17 +218,17 @@ type target struct {
     Pattern *regexp.Regexp // 一致確認・置換に共用する、行アンカー付きの正規表現
 }
 
-// ErrInvalidVersion は、引数が semver 形式 vX.Y.Z に（文字列全体で）一致しないことを表す。
-var ErrInvalidVersion = errors.New("version does not match semver format vX.Y.Z")
+// errInvalidVersion は、引数が semver 形式 vX.Y.Z に（文字列全体で）一致しないことを表す。
+var errInvalidVersion = errors.New("version does not match semver format vX.Y.Z")
 
-// ErrorKind は対象ファイル処理の失敗種別を表す。
-type ErrorKind int // FileNotFound / PatternNotFound / IO
+// errorKind は対象ファイル処理の失敗種別を表す。
+type errorKind int // FileNotFound / PatternNotFound / IO
 
-// UpdateError は、どの対象ファイルがどの理由で失敗したかを表す。
+// updateError は、どの対象ファイルがどの理由で失敗したかを表す。
 // 呼び出し側はメッセージ文字列ではなく Kind（errors.Is / errors.AsType）で判定する。
-type UpdateError struct {
+type updateError struct {
     Path string
-    Kind ErrorKind
+    Kind errorKind
     Err  error // ラップした下位エラー（存在すれば）
 }
 ```
@@ -250,10 +250,9 @@ func validateVersion(arg string) error
 func update(version string, targets []target) error
 ```
 
-> 上記の識別子の公開/非公開（大文字/小文字）は配置先の決定（2.1 節、スコープ外）に依存する。ここでは
-> 最も可能性の高い単一パッケージ（例: `package main`）を想定して非公開で示している。パッケージ境界を
-> またいで再利用する配置を選ぶ場合は、テストから構築できるよう入力型（`target`）と関数の公開範囲を
-> 整合させる（`target` を非公開に保つなら `update` も同一パッケージに閉じる）。
+> 配置先を `scripts/` 配下の単一 `package main` に確定した（2.1 節）ため、上記の識別子はすべて
+> 非公開（小文字始まり）とし、テストも同一パッケージ内に置いて直接呼び出す。パッケージ境界をまたいだ
+> 再利用は想定しないため、入力型 `target` を公開する必要はない。
 
 ### 3.2 各コンポーネントの設計
 
@@ -341,26 +340,26 @@ func update(version string, targets []target) error
 
 ### 3.3 コンポーネントの責務（新規・変更ファイル一覧）
 
-> 物理的なファイルパスは配置先の決定（2.1 節、スコープ外）に依存するため、ここでは論理コンポーネントの
-> 責務を示す。着手時に配置を確定した上で、[Package Reference](../../dev/developer_guide/package_reference.md)
-> を更新する。下段の「候補パス」は例示であり確定ではない。
+> 実装は `scripts/` 配下の単一 `package main`（2.1 節で確定）に配置する。各論理コンポーネントは同一
+> パッケージ内の関数・型として実装するため、下段のパスは同一ファイル群を指す（1ファイルにまとめても、
+> 責務ごとに `.go` を分割してもよい）。
 
-| 論理コンポーネント | 変更種別 | 責務 | 候補パス（例示・非確定） |
+| 論理コンポーネント | 変更種別 | 責務 | 配置（`scripts/` 配下・`package main`） |
 |---|---|---|---|
-| エントリポイント（`run` seam + `main`） | 新規 | 引数個数チェック（AC-05）、`validateVersion`/`update` の呼び出し、案内出力（AC-09）、終了コード制御 | `cmd/` サブコマンド or `scripts/` 単体 `.go` |
-| バージョン検証 | 新規 | semver 全体アンカー検証（AC-01） | 同上 |
-| 2段階アップデータ | 新規 | フェーズ1（全件検証・置換内容構築）とフェーズ2（書き込み）の制御（AC-02, AC-07, AC-08） | 同上 |
-| アトミック書き込み | 新規 | 一時ファイル作成・リネーム・mode 復元（AC-03, AC-04） | 同上 |
-| `scripts/bump-release-version.sh` | 削除 | Go 実装への移行に伴い削除する（配置確定後） | `scripts/bump-release-version.sh` |
-| `scripts/bump_release_version_test.go` | 変更 | 現在は `exec.Command("bash", ...)` で Bash スクリプトを起動して検証している。Go 実装をインプロセスで直接検証するテストへ書き換える（7.2 節） | `scripts/bump_release_version_test.go` |
-| `docs/design/docker_deployment.md` / `docker_deployment.ja.md` | 変更 | Bash スクリプトへの参照を Go 実装の実行方法へ更新する | 同左 |
-| `docs/dev/developer_guide/package_reference.md` | 変更 | 配置確定後、新規コンポーネントの配置・責務を追記する | 同左 |
+| エントリポイント（`run` seam + `main`） | 新規 | 引数個数チェック（AC-05）、`validateVersion`/`update` の呼び出し、案内出力（AC-09）、終了コード制御 | 例: `scripts/bump_release_version.go` |
+| バージョン検証 | 新規 | semver 全体アンカー検証（AC-01） | 同上（同一パッケージ） |
+| 2段階アップデータ | 新規 | フェーズ1（全件検証・置換内容構築）とフェーズ2（書き込み）の制御（AC-02, AC-07, AC-08） | 同上（同一パッケージ） |
+| アトミック書き込み | 新規 | 一時ファイル作成・リネーム・mode 復元（AC-03, AC-04） | 同上（同一パッケージ） |
+| `scripts/bump-release-version.sh` | 削除 | Go 実装への移行に伴い削除する | `scripts/bump-release-version.sh` |
+| `scripts/bump_release_version_test.go` | 変更 | 現在は `exec.Command("bash", ...)` で Bash スクリプトを起動して検証している。同一 `package main` 内で Go 実装をインプロセスに直接検証するテストへ書き換える（7.2 節） | `scripts/bump_release_version_test.go` |
+| `docs/design/docker_deployment.md` / `docker_deployment.ja.md` | 変更 | Bash スクリプトへの参照を Go 実装の実行方法（`go run ./scripts vX.Y.Z` 等）へ更新する | 同左 |
+| `docs/dev/developer_guide/package_reference.md` | 変更 | `scripts/` 配下の新規コンポーネントの配置・責務を追記する（本タスク範囲） | 同左 |
 
 ## 4. エラーハンドリング設計
 
-- **エラー型**: 3.1 節の `ErrInvalidVersion`（センチネル）と `UpdateError`（`Path`/`Kind`/`Err` を保持）を
+- **エラー型**: 3.1 節の `errInvalidVersion`（センチネル）と `updateError`（`Path`/`Kind`/`Err` を保持）を
   用いる。呼び出し側・テストはメッセージ文字列一致ではなく `errors.Is`（センチネル）/
-  `errors.AsType[*UpdateError]`（型付き抽出）で判定する（CLAUDE.md のテスト方針に整合）。
+  `errors.AsType[*updateError]`（型付き抽出）で判定する（CLAUDE.md のテスト方針に整合）。
 - **エラーメッセージ**: 現行 Bash 実装と同趣旨の内容を標準エラー出力へ出す。
   - 引数不正: `Usage: <cmd> vX.Y.Z`
   - semver 不一致: `ERROR: version '<arg>' does not match semver format vX.Y.Z`
@@ -519,9 +518,9 @@ flowchart TD
 
 ## 9. 将来拡張性
 
-- **配置先の確定**: 本タスクでは配置先（`cmd/` サブコマンド or `scripts/` 単体 Go）を確定しない
-  （2.1 節）。将来リリース手順を自動化・CI 組み込みする際、他の CLI サブコマンドと統合しやすい
-  `cmd/` 配下への配置を再検討できる。
+- **`cmd/` 配下への再配置**: 本タスクでは配置先を `scripts/` 配下に確定した（2.1 節）。将来リリース手順を
+  自動化・CI 組み込みする際に、他の CLI サブコマンドと統合しやすい `cmd/` 配下への移設を再検討できる。
+  実装が単一 `package main` に閉じているため、移設のコストは小さい。
 - **対象ファイル・パターンの拡張**: 対象ファイルは `target` のスライスとして表現するため、将来
   バージョン埋め込み箇所が増えた場合も、記述子を追加するだけで2段階検証・書き込みの仕組みに乗る。
 - **リリース手順自動化との接続**: `git commit`/`tag`/`push`/PR 作成の自動化は要件定義書のスコープ外
@@ -538,10 +537,10 @@ flowchart TD
 >   先行させ、最頻の失敗ケースでの部分更新を構造的に排除する。これは Bash 実装からの意図的な挙動改善で
 >   あり、要件（AC-08）が明示的に要求している（3.2.4）。ただし書き込み段階での複数ファイル間
 >   ロールバックまでは要求されない（5.3）。
-> - **配置先を確定しない**: `cmd/` サブコマンドか `scripts/` 単体 Go かは要件定義書で明示的に
->   スコープ外とされているため、本設計は論理コンポーネントの分割のみを定め、物理配置は着手時に
->   決定する（2.1, 3.3）。
+> - **配置先を `scripts/` に確定**: 要件定義書では配置先の決定を Out of Scope としていたが、レビューを
+>   経て `scripts/` 配下の単一 `package main` に確定した（既存の Bash 実装・既存テストと同ディレクトリ）。
+>   あわせて Package Reference の更新も本タスクの範囲に含めることとした（2.1, 3.3）。
 > - **エラー型を最小限の型付きエラーで表現**: 現行 Bash は終了コードとメッセージのみだが、Go 版は
->   テストがメッセージ文字列一致に依存しないよう、センチネル `ErrInvalidVersion` と型付き
->   `UpdateError`（`Kind` で判定）を導入する（CLAUDE.md のテスト方針）。過剰なエラー階層は設けない
+>   テストがメッセージ文字列一致に依存しないよう、センチネル `errInvalidVersion` と型付き
+>   `updateError`（`Kind` で判定）を導入する（CLAUDE.md のテスト方針）。過剰なエラー階層は設けない
 >   （YAGNI, 4章）。
