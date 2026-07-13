@@ -58,7 +58,7 @@ go run ./scripts/bump_release_version $VERSION
 git add docker-compose.yml README.md README.ja.md
 git commit -m "release($VERSION): bump embedded version to $VERSION"
 git push -u origin HEAD
-gh pr create --title "release($VERSION): bump embedded version to $VERSION"
+gh pr create --title "release($VERSION): bump embedded version to $VERSION" --body "See docs/design/docker_deployment.ja.md for the release procedure."
 
 # PR がレビューされ main にマージされた後:
 git checkout main && git pull
