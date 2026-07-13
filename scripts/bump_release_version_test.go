@@ -99,6 +99,28 @@ func TestBumpReleaseVersion_RequiresExactlyOneArgument(t *testing.T) {
 	require.Equal(t, 1, code)
 }
 
+func TestBumpReleaseVersion_DoesNotTouchUnrelatedOccurrencesOfTheOldVersion(t *testing.T) {
+	dir := setupRepo(t)
+
+	// A comment mentioning the old version elsewhere in the file, sharing
+	// the "image: ghcr.io/isseis/bsky-cleaner:vX.Y.Z" substring with the
+	// real image line but on a different, non-image line.
+	compose := "services:\n" +
+		"  bsky-cleaner:\n" +
+		"    # Changelog: previously pinned via image: ghcr.io/isseis/bsky-cleaner:v1.2.1 before an incident.\n" +
+		"    image: ghcr.io/isseis/bsky-cleaner:v1.2.1\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(compose), 0o644))
+
+	code, output := runBumpScript(t, dir, "v1.3.0")
+	require.Equal(t, 0, code, "output: %s", output)
+
+	got, err := os.ReadFile(filepath.Join(dir, "docker-compose.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(got), "image: ghcr.io/isseis/bsky-cleaner:v1.3.0", "the actual image line must be bumped")
+	require.Contains(t, string(got), "previously pinned via image: ghcr.io/isseis/bsky-cleaner:v1.2.1",
+		"an unrelated comment mentioning the old version must be left untouched")
+}
+
 func TestBumpReleaseVersion_FailsIfPatternMissing(t *testing.T) {
 	dir := setupRepo(t)
 	// Break the expected pattern in docker-compose.yml.

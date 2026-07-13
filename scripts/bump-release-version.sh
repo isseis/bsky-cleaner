@@ -31,14 +31,23 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 compose_file="$repo_root/docker-compose.yml"
 readme_files=("$repo_root/README.md" "$repo_root/README.ja.md")
 
-# update_file replaces the version on lines matching $2 (a sed address
-# pattern, e.g. an anchored prefix) in file $1, using replacement pattern
-# $3. Fails if no line in the file matches $2, so a renamed field or moved
-# line is caught instead of silently doing nothing.
+# update_file replaces the version on lines matching $2 (a sed extended
+# regex, anchored to the exact line shape expected) in file $1, using
+# replacement pattern $3. The same anchored $2 is used for both the
+# existence check and the substitution, so a match is never wider (e.g. an
+# unanchored substring match inside an unrelated comment) than what was
+# actually verified to be present. Fails if no line in the file matches
+# $2, so a renamed field, moved line, or missing file is caught instead of
+# silently doing nothing.
 update_file() {
     local file="$1"
     local match_pattern="$2"
     local sed_expr="$3"
+
+    if [ ! -f "$file" ]; then
+        echo "ERROR: file not found: $file" >&2
+        exit 1
+    fi
 
     if ! grep -qE "$match_pattern" "$file"; then
         echo "ERROR: expected pattern '$match_pattern' not found in $file" >&2
@@ -51,13 +60,13 @@ update_file() {
 }
 
 update_file "$compose_file" \
-    '^ *image: ghcr\.io/isseis/bsky-cleaner:v[0-9]+\.[0-9]+\.[0-9]+$' \
-    "s|(image: ghcr\\.io/isseis/bsky-cleaner:)v[0-9]+\\.[0-9]+\\.[0-9]+|\\1${new_version}|"
+    '^( *image: ghcr\.io/isseis/bsky-cleaner:)v[0-9]+\.[0-9]+\.[0-9]+$' \
+    "s|^( *image: ghcr\\.io/isseis/bsky-cleaner:)v[0-9]+\\.[0-9]+\\.[0-9]+\$|\\1${new_version}|"
 
 for f in "${readme_files[@]}"; do
     update_file "$f" \
-        '^VERSION=v[0-9]+\.[0-9]+\.[0-9]+' \
-        "s|^(VERSION=)v[0-9]+\\.[0-9]+\\.[0-9]+|\\1${new_version}|"
+        '^(VERSION=)v[0-9]+\.[0-9]+\.[0-9]+( |$)' \
+        "s#^(VERSION=)v[0-9]+\\.[0-9]+\\.[0-9]+( |\$)#\\1${new_version}\\2#"
 done
 
 echo
