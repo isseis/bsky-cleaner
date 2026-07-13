@@ -264,17 +264,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	for _, tg := range targets {
 		_, _ = fmt.Fprintf(stdout, "Updated %s\n", tg.Path) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 	}
-	_, _ = fmt.Fprintln(stdout)                                                                                                          //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintf(stdout, "Bumped embedded version to %s in docker-compose.yml, README.md, README.ja.md.\n", version)               //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintln(stdout, "This repo requires a PR review before merging to main, so tag only after the bump has landed on main:") //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintln(stdout, "  git add docker-compose.yml README.md README.ja.md")                                                   //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintf(stdout, "  git commit -m \"release(%s): bump embedded version to %s\"\n", version, version)                       //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintln(stdout, "  git push -u origin HEAD")                                                                             //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintf(stdout, "  gh pr create --title \"release(%s): bump embedded version to %s\" --body '...'\n", version, version)   //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintln(stdout, "  # After the PR is reviewed and merged into main:")                                                    //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintln(stdout, "  git checkout main && git pull")                                                                       //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintf(stdout, "  git tag %s\n", version)                                                                                //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
-	_, _ = fmt.Fprintln(stdout, "  git push --tags")                                                                                     //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintln(stdout)                                                                                                                         //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintf(stdout, "Bumped embedded version to %s in docker-compose.yml, README.md, README.ja.md.\n", version)                              //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
+	_, _ = fmt.Fprintf(stdout, "Review the diff, then follow the release procedure in docs/design/docker_deployment.ja.md with VERSION=%s.\n", version) //nolint:gosec // stdout is a CLI stream, not an HTTP response body; G705's XSS concern does not apply
 
 	return 0
 }

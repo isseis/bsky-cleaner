@@ -363,6 +363,6 @@ func TestBumpReleaseVersion_PrintsGuidanceOnSuccess(t *testing.T) {
 	require.Contains(t, stdout, "Updated docker-compose.yml")
 	require.Contains(t, stdout, "Updated README.md")
 	require.Contains(t, stdout, "Updated README.ja.md")
-	require.Contains(t, stdout, "git commit")
-	require.Contains(t, stdout, "git tag v1.3.0")
+	require.Contains(t, stdout, "docs/design/docker_deployment.ja.md")
+	require.Contains(t, stdout, "VERSION=v1.3.0")
 }
