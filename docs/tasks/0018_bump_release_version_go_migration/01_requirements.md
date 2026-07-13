@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-13 |
-| Review date | - |
-| Reviewer | - |
-| Comments | 優先度低・着手時期未定。リリース手順の自動化や CI 組み込みを行うタイミングで再評価する（詳細は「1.1 背景」参照）。当面はこのタスクに着手しない。 |
+| Review date | 2026-07-13 |
+| Reviewer | isseis |
+| Comments | |
 
 ## 1. 背景と目的
 
