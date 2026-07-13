@@ -62,7 +62,7 @@ gh pr create --title "release($VERSION): bump embedded version to $VERSION" --bo
 
 # PR がレビューされ main にマージされた後:
 git checkout main && git pull
-git tag $VERSION
+git tag -a $VERSION -m "$VERSION"
 git push --tags
 ```
 

@@ -69,7 +69,7 @@ gh pr create --title "release($VERSION): bump embedded version to $VERSION" --bo
 
 # After the PR is reviewed and merged into main:
 git checkout main && git pull
-git tag $VERSION
+git tag -a $VERSION -m "$VERSION"
 git push --tags
 ```
 
