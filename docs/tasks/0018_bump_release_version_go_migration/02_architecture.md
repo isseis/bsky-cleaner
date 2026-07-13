@@ -104,18 +104,13 @@ flowchart LR
 
 ### 2.1 コンポーネント配置
 
-> **配置先: `scripts/bump_release_version/` 配下**（本タスクで確定）。要件定義書 2章では配置先の決定を
-> Out of Scope としていたが、既存の Bash 実装と既存テスト（当時の `scripts/bump_release_version_test.go`）
-> がいずれも `scripts/` に置かれていたことから、実装当初は同ディレクトリに直接 `package main` の Go
-> ファイルとして配置し `go run ./scripts vX.Y.Z` で実行する案とした。その後 PR-1 のレビューで
-> 「`go run ./scripts vX.Y.Z` はツール名が呼び出しに現れず直感的でない」との指摘を受け、Go の慣用的な
-> 「1ツール1ディレクトリ」構成（`cmd/<tool>/main.go` に類する構成）へ変更し、`scripts/bump_release_version/`
-> サブディレクトリ配下の `package main` として実装、`go run ./scripts/bump_release_version vX.Y.Z`
-> （または `make bump-version ARGS=vX.Y.Z`）で実行することとした。ディレクトリベースの `go run` は
-> 対象ディレクトリ内の非テスト `.go` ファイルをすべて含めてビルドするため、単一ファイル指定
-> （`go run ./scripts/bump_release_version.go`）と異なり、将来同ディレクトリに共有ヘルパーファイルが
-> 増えても壊れない。`scripts/check-existing-tag.sh` とその既存テスト（`scripts/check_existing_tag_test.go`）
-> は本タスクの対象外であり、`scripts/` 直下に残る。あわせて
+> **配置先: `scripts/bump_release_version/` 配下**（本タスクで確定。決定の経緯は付録A参照）。
+> Go の慣用的な「1ツール1ディレクトリ」構成（`cmd/<tool>/main.go` に類する構成）を踏襲し、
+> `scripts/bump_release_version/` サブディレクトリ配下の `package main` として実装する。
+> 実行方法は `go run ./scripts/bump_release_version vX.Y.Z`（または `make bump-version ARGS=vX.Y.Z`）。
+> ディレクトリベースの `go run` は対象ディレクトリ内の非テスト `.go` ファイルをすべて含めてビルドするため、
+> 将来同ディレクトリに共有ヘルパーファイルが増えても壊れない。`scripts/check-existing-tag.sh` とその既存
+> テスト（`scripts/check_existing_tag_test.go`）は本タスクの対象外であり、`scripts/` 直下に残る。あわせて
 > [Package Reference](../../dev/developer_guide/package_reference.md) の更新も本タスクの範囲に含める。
 > 下図は論理的なコンポーネント分割を示す。
 
@@ -259,9 +254,9 @@ func validateVersion(arg string) error
 func update(version string, targets []target) error
 ```
 
-> 配置先を `scripts/` 配下の単一 `package main` に確定した（2.1 節）ため、上記の識別子はすべて
-> 非公開（小文字始まり）とし、テストも同一パッケージ内に置いて直接呼び出す。パッケージ境界をまたいだ
-> 再利用は想定しないため、入力型 `target` を公開する必要はない。
+> 配置先を `scripts/bump_release_version/` 配下の単一 `package main` に確定した（2.1 節）ため、上記の
+> 識別子はすべて非公開（小文字始まり）とし、テストも同一パッケージ内に置いて直接呼び出す。パッケージ
+> 境界をまたいだ再利用は想定しないため、入力型 `target` を公開する必要はない。
 
 ### 3.2 各コンポーネントの設計
 
@@ -541,14 +536,12 @@ flowchart TD
 >   先行させ、最頻の失敗ケースでの部分更新を構造的に排除する。これは Bash 実装からの意図的な挙動改善で
 >   あり、要件（AC-08）が明示的に要求している（3.2.4）。ただし書き込み段階での複数ファイル間
 >   ロールバックまでは要求されない（5.3）。
-> - **配置先を `scripts/` に確定 → `scripts/bump_release_version/` へ変更**: 要件定義書では配置先の決定を
->   Out of Scope としていたが、レビューを経て当初は `scripts/` 配下の単一 `package main` に確定した
->   （既存の Bash 実装・既存テストと同ディレクトリ）。その後 PR-1 のレビューで
->   「`go run ./scripts vX.Y.Z` はツール名が呼び出しに現れず直感的でない」との指摘を受け、Go の慣用的な
->   「1ツール1ディレクトリ」構成へ変更し、`scripts/bump_release_version/` サブディレクトリ配下の
->   `package main` として確定し直した（`go run ./scripts/bump_release_version vX.Y.Z` /
->   `make bump-version ARGS=vX.Y.Z`）。`scripts/check-existing-tag.sh` とその既存テストは対象外のまま
->   `scripts/` 直下に残る。あわせて Package Reference の更新も本タスクの範囲に含めることとした（2.1, 3.3）。
+> - **配置先を `scripts/bump_release_version/` に確定**: 要件定義書では配置先の決定を Out of Scope として
+>   いたが、レビューを経て `scripts/bump_release_version/` 配下の単一 `package main` に確定した
+>   （`go run ./scripts/bump_release_version vX.Y.Z` / `make bump-version ARGS=vX.Y.Z` で実行し、呼び出し
+>   自体にツール名が現れる、Go の慣用的な「1ツール1ディレクトリ」構成）。`scripts/check-existing-tag.sh`
+>   とその既存テストは対象外のまま `scripts/` 直下に残る。あわせて Package Reference の更新も本タスクの
+>   範囲に含めることとした（2.1, 3.3）。
 > - **エラー型を最小限の型付きエラーで表現**: 現行 Bash は終了コードとメッセージのみだが、Go 版は
 >   テストがメッセージ文字列一致に依存しないよう、センチネル `errInvalidVersion` と型付き
 >   `updateError`（`Kind` で判定）を導入する（CLAUDE.md のテスト方針）。過剰なエラー階層は設けない
