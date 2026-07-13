@@ -4,10 +4,10 @@
 
 | Item | Value |
 |---|---|
-| Status | `draft` |
+| Status | `approved` |
 | Created | 2026-07-13 |
-| Review date | - |
-| Reviewer | - |
+| Review date | 2026-07-13 |
+| Reviewer | isseis |
 | Comments | - |
 
 関連ドキュメント: [要件定義書](01_requirements.md)、[Docker 配布の詳細設計](../../design/docker_deployment.md)
