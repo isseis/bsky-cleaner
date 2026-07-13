@@ -67,10 +67,21 @@ update_file() {
     # A predictable path lets an attacker pre-plant a symlink there that the
     # `>` redirect would follow, overwriting an arbitrary file outside the
     # repo. mktemp creates a fresh non-symlink file, closing that vector.
+    #
+    # mktemp creates the temp file with mode 0600, and `mv` preserves the
+    # source file's permissions rather than adopting the destination's, so
+    # without restoring the original mode this would silently downgrade
+    # tracked files (e.g. README.md, docker-compose.yml) from 0644 to 0600.
+    # Capture the original mode before mktemp/mv and re-apply it afterward,
+    # using whichever of BSD stat (macOS) or GNU stat (Linux) is available.
+    local orig_mode
+    orig_mode="$(stat -f %Lp "$file" 2>/dev/null || stat -c %a "$file")"
+
     local tmp
     tmp="$(mktemp "${file}.XXXXXX")"
     sed -E "$sed_expr" "$file" > "$tmp"
     mv "$tmp" "$file"
+    chmod "$orig_mode" "$file"
     echo "Updated $file"
 }
 

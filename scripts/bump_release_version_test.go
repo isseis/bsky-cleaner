@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// scriptPath returns the absolute path to bump-release-version.sh, resolving
-// from the test file's source directory.
+// bumpScriptPath returns the absolute path to bump-release-version.sh,
+// resolving from the test file's source directory.
 func bumpScriptPath(t *testing.T) string {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
