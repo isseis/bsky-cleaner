@@ -89,6 +89,24 @@ func TestBumpReleaseVersion_RejectsInvalidSemver(t *testing.T) {
 	require.Contains(t, string(compose), "v1.2.1", "file must be left untouched on validation failure")
 }
 
+func TestBumpReleaseVersion_RejectsNewlineInjectedVersion(t *testing.T) {
+	dir := setupRepo(t)
+
+	// The first line is a valid version; the rest is a sed payload. A
+	// line-based grep validator would accept this on its clean first line.
+	// The whole-string [[ =~ ]] validator must reject it, leaving every
+	// file untouched and never running the payload.
+	code, _ := runBumpScript(t, dir, "v9.9.9\n#p;e touch injected-proof")
+	require.Equal(t, 1, code)
+
+	compose, err := os.ReadFile(filepath.Join(dir, "docker-compose.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(compose), "v1.2.1", "file must be left untouched on a rejected version")
+
+	_, err = os.Stat(filepath.Join(dir, "injected-proof"))
+	require.True(t, os.IsNotExist(err), "sed payload must not have executed")
+}
+
 func TestBumpReleaseVersion_RequiresExactlyOneArgument(t *testing.T) {
 	dir := setupRepo(t)
 

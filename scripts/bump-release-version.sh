@@ -22,7 +22,14 @@ if [ "$#" -ne 1 ]; then
 fi
 
 new_version="$1"
-if ! echo "$new_version" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+# Validate with bash's [[ =~ ]] rather than `echo "$1" | grep`: grep matches
+# line by line, so an argument like $'v1.2.3\n<payload>' would pass on its
+# clean first line and smuggle the payload (including a newline) into the sed
+# program below. [[ =~ ]] anchors against the whole string, so a multi-line
+# or otherwise malformed argument is rejected outright — and because the
+# accepted value is then guaranteed to be exactly vN.N.N, it cannot inject
+# sed commands when interpolated into the substitution expressions.
+if [[ ! "$new_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "ERROR: version '$new_version' does not match semver format vX.Y.Z" >&2
     exit 1
 fi
@@ -54,8 +61,15 @@ update_file() {
         exit 1
     fi
 
-    sed -E "$sed_expr" "$file" > "${file}.tmp"
-    mv "${file}.tmp" "$file"
+    # Write to a randomized temp file in the same directory (same filesystem,
+    # so the final mv is atomic) rather than a predictable "${file}.tmp".
+    # A predictable path lets an attacker pre-plant a symlink there that the
+    # `>` redirect would follow, overwriting an arbitrary file outside the
+    # repo. mktemp creates a fresh non-symlink file, closing that vector.
+    local tmp
+    tmp="$(mktemp "${file}.XXXXXX")"
+    sed -E "$sed_expr" "$file" > "$tmp"
+    mv "$tmp" "$file"
     echo "Updated $file"
 }
 
