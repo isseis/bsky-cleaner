@@ -80,17 +80,19 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 **対象ファイル**: `scripts/bump_release_version.go`（新規）
 
-- [ ] **ステップ 1-1**: `validateVersion(arg string) error` を実装（semver 全体アンカー検証、AC-01。設計 §3.2.1）。
+- [x] **ステップ 1-1**: `validateVersion(arg string) error` を実装（semver 全体アンカー検証、AC-01。設計 §3.2.1）。
   不一致時はセンチネル `errInvalidVersion` を返す。
-- [ ] **ステップ 1-2**: エラー型を定義（設計 §3.1）: センチネル `errInvalidVersion`、`errorKind`（`FileNotFound`/
-  `PatternNotFound`/`IO`）、`updateError{Path, Kind, Err}`。各 `errorKind` 定数と `Err` フィールドが
+- [x] **ステップ 1-2**: エラー型を定義（設計 §3.1）: センチネル `errInvalidVersion`、`errorKind`（`errorKindFileNotFound`/
+  `errorKindPatternNotFound`/`errorKindIO`）、`updateError{Path, Kind, Err}`。各 `errorKind` 定数と `Err` フィールドが
   実装内で使われるようにする（`unused` 対策）。
-- [ ] **ステップ 1-3**: `target{Path, Pattern}` 型と、3対象ファイルの記述子を構成する内部関数を実装（設計 §3.2.2）。
+- [x] **ステップ 1-3**: `target{Path, Pattern}` 型と、3対象ファイルの記述子を構成する内部関数を実装（設計 §3.2.2）。
   一致・置換パターンは設計 §3.2.2 の表に従い、一致確認と置換で同一の `*regexp.Regexp` を用いる（AC-02）。
-  置換は `ReplaceAllString` の**波括弧付きグループ参照 `${1}`/`${2}`** を用い、接頭辞・行末残余を保持
+  置換は `ReplaceAll` の**波括弧付きグループ参照 `${1}`/`${2}`** を用い、接頭辞・行末残余を保持
   （設計 §3.2.2「実装上の注意」。素の `$1` の直後にバージョン（例: `v1`）が続くと `${1v1}` と解釈されて
-  壊れるため必須）。
-- [ ] **ステップ 1-4**: アトミック書き込み + mode 保持の内部関数を実装（AC-03/AC-04。設計 §3.2.3）: 元 mode を
+  壊れるため必須）。`target` に `ReplacementTemplate`（`fmt.Sprintf` 用の `%s` テンプレート）フィールドを
+  追加し、ファイルごとに異なるグループ構成（`${1}%s` / `${1}%s${2}`）に対応させた（設計の高レベル
+  スケッチにない追加フィールドだが、設計 §3.1 が「実装コードは記述しない」と明示しており矛盾しない）。
+- [x] **ステップ 1-4**: アトミック書き込み + mode 保持の内部関数を実装（AC-03/AC-04。設計 §3.2.3）: 元 mode を
   `os.Stat(...).Mode().Perm()`（型ビットを除いたパーミッションビット）で退避 → 同一ディレクトリに
   ランダム名一時ファイルを作成 → 置換後内容を書き込み → `os.Rename` → `os.Chmod` で退避した元 mode を
   復元。ファイル I/O 各所に `//nolint:gosec // <理由>` を付す（§1.3 参照）。
@@ -101,15 +103,15 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 **対象ファイル**: `scripts/bump_release_version.go`（続き）
 
-- [ ] **ステップ 2-1**: `update(version string, targets []target) error` を実装（AC-02/AC-07/AC-08。設計 §3.2.4）。
+- [x] **ステップ 2-1**: `update(version string, targets []target) error` を実装（AC-02/AC-07/AC-08。設計 §3.2.4）。
   フェーズ1（全件の存在・パターン一致確認 + 置換後内容と退避 mode をインメモリ構築、1件でも失敗なら
   どのファイルにも書き込まず終了）→ フェーズ2（全件通過時のみ書き込み、I/O エラーで後続を止める）。
   複数検証失敗は `errors.Join` でまとめてよい（設計 §3.2.4）。
-- [ ] **ステップ 2-2**: `run(args []string, stdout, stderr io.Writer) int` を実装（AC-05/AC-06/AC-09。設計 §3.1・§3.2.5）:
+- [x] **ステップ 2-2**: `run(args []string, stdout, stderr io.Writer) int` を実装（AC-05/AC-06/AC-09。設計 §3.1・§3.2.5）:
   引数個数チェック（ちょうど1個、他は Usage を stderr へ出し非ゼロ）→ `validateVersion` →
   カレントディレクトリ基準で `[]target` を構成 → `update` 呼び出し → 成功時に更新通知
   （`Updated <path>`）と後続リリース手順を stdout へ出力。エラーメッセージは設計 §4 の文言に揃える。
-- [ ] **ステップ 2-3**: `main()` を `os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))` の薄いラッパとして実装（設計 §3.1）。
+- [x] **ステップ 2-3**: `main()` を `os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))` の薄いラッパとして実装（設計 §3.1）。
 
 **成功基準**: `go run ./scripts` が引数不足で Usage を出して非ゼロ終了する。`make test`（この時点では既存
 テストは書き換え前だが、コンパイルが通ること）。
@@ -120,10 +122,11 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 `docs/design/docker_deployment.md`・`docs/design/docker_deployment.ja.md`（変更）、
 `docs/dev/developer_guide/package_reference.md`（変更）
 
-- [ ] **ステップ 3-1**: `bump_release_version_test.go` を書き換え: `bumpScriptPath`・`runBumpScript` を削除し、
+- [x] **ステップ 3-1**: `bump_release_version_test.go` を書き換え: `bumpScriptPath`・`runBumpScript` を削除し、
   `setupRepo` を「一時ディレクトリに3ファイルをシードする」用途へ縮小（`.sh` のコピーは削除）。
   `check_existing_tag_test.go` のシンボルには触れない。詳細なテスト内容は §4 を参照。
-- [ ] **ステップ 3-2**: AC ごとのテストを実装/移行（§4 のテスト一覧に対応）。
+  （実装では `setupRepo` を `seedRepo` に、`runBumpScript` を `runInDir`（`run` を直接呼び出す）にリネーム。）
+- [x] **ステップ 3-2**: AC ごとのテストを実装/移行（§4 のテスト一覧に対応）。
 
 ### PR-1 作成ポイント: Go implementation and in-process tests
 
