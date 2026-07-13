@@ -41,13 +41,21 @@
 
 `docker-compose.yml` と `README.md`/`README.ja.md` にはそれぞれリリースバージョンが埋め込まれている（前者は `image:` タグ、後者は Docker Compose セットアップ手順内の `VERSION=` 行）。タグを打つ前に、これらを手で個別に編集するのではなく `scripts/bump-release-version.sh` でまとめて更新すること — 3ファイルのうちどれか一つを手動編集し忘れると、README のセットアップ手順がそのタグでビルドされたイメージと異なるバージョンを指したままになってしまう。
 
+本リポジトリは `main` への直接 push・マージを許可しておらず、すべての変更はレビュー済みの PR を経由する。バージョンの bump も例外ではない — リリース用ブランチ上で commit し、PR がマージされてから、`main` に取り込まれたそのコミットにタグを打つこと。マージ前（リリースブランチ上にしか存在しないコミット）にタグを打つと、レビューを経ていない変更から CI がイメージをビルド・公開してしまう。
+
 ```sh
+git checkout -b release-vX.Y.Z
 scripts/bump-release-version.sh vX.Y.Z
 # diff を確認してから:
 git add docker-compose.yml README.md README.ja.md
 git commit -m "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+git push -u origin HEAD
+gh pr create --title "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+
+# PR がレビューされ main にマージされた後:
+git checkout main && git pull
 git tag vX.Y.Z
-git push && git push --tags
+git push --tags
 ```
 
 タグの push をトリガーに CI が以下を自動実行する。

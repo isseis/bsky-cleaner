@@ -45,16 +45,27 @@ Releases are automated by CI (`.github/workflows/release.yml`). The operations p
 the three files, which would leave the README's setup instructions pointing at a different version than the image
 actually built for the tag.
 
+This repository does not allow direct pushes/merges to `main` — every change lands through a reviewed PR. The
+version bump is no exception: commit it on a release branch, get it merged, and only then tag the commit that is
+now on `main`. Tagging before merge (e.g. tagging a commit that only exists on the release branch) would let CI
+build and publish a release from a change that has not gone through review yet.
+
 ```sh
+git checkout -b release-vX.Y.Z
 scripts/bump-release-version.sh vX.Y.Z
 # Review the diff, then:
 git add docker-compose.yml README.md README.ja.md
 git commit -m "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+git push -u origin HEAD
+gh pr create --title "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+
+# After the PR is reviewed and merged into main:
+git checkout main && git pull
 git tag vX.Y.Z
-git push && git push --tags
+git push --tags
 ```
 
-Pushing a tag triggers CI to automatically execute the following:
+Pushing the tag triggers CI to automatically execute the following:
 
 - Validate the semver format and check for duplicate existing tags
 - Build the Docker image and push it to GHCR (4 tags: `latest`, `vX`, `vX.Y`, `vX.Y.Z`)

@@ -9,7 +9,8 @@
 #   - docker-compose.yml:       image: ghcr.io/isseis/bsky-cleaner:vX.Y.Z
 #   - README.md / README.ja.md: VERSION=vX.Y.Z (Docker Compose setup step)
 #
-# Does not commit or tag — review the diff, then commit, tag, and push
+# Does not commit, branch, or tag — run this on a release branch (main
+# requires a PR before merging), review the diff, then commit/push/PR/tag
 # yourself (see docs/design/docker_deployment.md).
 
 set -o errexit
@@ -85,8 +86,12 @@ done
 
 echo
 echo "Bumped embedded version to ${new_version} in docker-compose.yml, README.md, README.ja.md."
-echo "Review the diff, then:"
+echo "This repo requires a PR review before merging to main, so tag only after the bump has landed on main:"
 echo "  git add docker-compose.yml README.md README.ja.md"
 echo "  git commit -m \"release(${new_version}): bump embedded version to ${new_version}\""
+echo "  git push -u origin HEAD"
+echo "  gh pr create --title \"release(${new_version}): bump embedded version to ${new_version}\" --body '...'"
+echo "  # After the PR is reviewed and merged into main:"
+echo "  git checkout main && git pull"
 echo "  git tag ${new_version}"
-echo "  git push && git push --tags"
+echo "  git push --tags"
