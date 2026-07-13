@@ -43,18 +43,26 @@
 
 本リポジトリは `main` への直接 push・マージを許可しておらず、すべての変更はレビュー済みの PR を経由する。バージョンの bump も例外ではない — リリース用ブランチ上で commit し、PR がマージされてから、`main` に取り込まれたそのコミットにタグを打つこと。マージ前（リリースブランチ上にしか存在しないコミット）にタグを打つと、レビューを経ていない変更から CI がイメージをビルド・公開してしまう。
 
+まず、実際のリリース番号を `VERSION` に設定する。この行のみ内容の書き換えが必要であり、以下のコマンド列とは異なりそのままの実行はできない。
+
 ```sh
-git checkout -b release-vX.Y.Z
-go run ./scripts/bump_release_version vX.Y.Z
+VERSION=vX.Y.Z
+```
+
+以降は、変更を加えずにそのまま実行できる。
+
+```sh
+git checkout -b release-$VERSION
+go run ./scripts/bump_release_version $VERSION
 # diff を確認してから:
 git add docker-compose.yml README.md README.ja.md
-git commit -m "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+git commit -m "release($VERSION): bump embedded version to $VERSION"
 git push -u origin HEAD
-gh pr create --title "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+gh pr create --title "release($VERSION): bump embedded version to $VERSION"
 
 # PR がレビューされ main にマージされた後:
 git checkout main && git pull
-git tag vX.Y.Z
+git tag $VERSION
 git push --tags
 ```
 

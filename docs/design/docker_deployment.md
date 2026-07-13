@@ -50,18 +50,26 @@ version bump is no exception: commit it on a release branch, get it merged, and 
 now on `main`. Tagging before merge (e.g. tagging a commit that only exists on the release branch) would let CI
 build and publish a release from a change that has not gone through review yet.
 
+First, set `VERSION` to the actual release number. Unlike the command sequence below, this line requires editing and cannot be run as written.
+
 ```sh
-git checkout -b release-vX.Y.Z
-go run ./scripts/bump_release_version vX.Y.Z
+VERSION=vX.Y.Z
+```
+
+The commands below can then be run as written, without further changes.
+
+```sh
+git checkout -b release-$VERSION
+go run ./scripts/bump_release_version $VERSION
 # Review the diff, then:
 git add docker-compose.yml README.md README.ja.md
-git commit -m "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+git commit -m "release($VERSION): bump embedded version to $VERSION"
 git push -u origin HEAD
-gh pr create --title "release(vX.Y.Z): bump embedded version to vX.Y.Z"
+gh pr create --title "release($VERSION): bump embedded version to $VERSION"
 
 # After the PR is reviewed and merged into main:
 git checkout main && git pull
-git tag vX.Y.Z
+git tag $VERSION
 git push --tags
 ```
 
