@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -107,6 +109,50 @@ func TestBumpReleaseVersion_FailsIfPatternMissing(t *testing.T) {
 	readmeEN, err := os.ReadFile(filepath.Join(dir, "README.md"))
 	require.NoError(t, err)
 	require.Contains(t, string(readmeEN), "v1.2.1", "README must not be updated when another target fails validation")
+}
+
+func TestValidateVersion(t *testing.T) {
+	require.NoError(t, validateVersion("v1.2.3"))
+
+	err := validateVersion("not-a-version")
+	require.ErrorIs(t, err, errInvalidVersion)
+
+	err = validateVersion("v9.9.9\n#p;e touch injected-proof")
+	require.ErrorIs(t, err, errInvalidVersion)
+}
+
+func TestUpdate_ReturnsTypedErrorForEachFailureKind(t *testing.T) {
+	pattern := regexp.MustCompile(`(?m)^(VERSION=)v[0-9]+\.[0-9]+\.[0-9]+$`)
+	newTarget := func(path string) target {
+		return target{Path: path, Pattern: pattern, ReplacementTemplate: "${1}%s"}
+	}
+
+	t.Run("file_not_found", func(t *testing.T) {
+		dir := t.TempDir()
+		missing := filepath.Join(dir, "VERSION")
+
+		err := update("v1.3.0", []target{newTarget(missing)})
+		require.Error(t, err)
+
+		updErr, ok := errors.AsType[*updateError](err)
+		require.True(t, ok, "update must return a *updateError, got %T: %v", err, err)
+		require.Equal(t, errorKindFileNotFound, updErr.Kind)
+		require.Equal(t, missing, updErr.Path)
+	})
+
+	t.Run("pattern_not_found", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "VERSION")
+		require.NoError(t, os.WriteFile(path, []byte("no version here\n"), 0o644))
+
+		err := update("v1.3.0", []target{newTarget(path)})
+		require.Error(t, err)
+
+		updErr, ok := errors.AsType[*updateError](err)
+		require.True(t, ok, "update must return a *updateError, got %T: %v", err, err)
+		require.Equal(t, errorKindPatternNotFound, updErr.Kind)
+		require.Equal(t, path, updErr.Path)
+	})
 }
 
 func TestBumpReleaseVersion_PreservesTrailingComment(t *testing.T) {
@@ -258,23 +304,54 @@ func TestBumpReleaseVersion_FailClosedOnWriteError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("permission checks are bypassed when running as root")
 	}
-	dir := seedRepo(t)
 
-	// All three targets pass phase 1 (they exist and match). Remove write
-	// permission on the directory so phase 2's temp-file creation fails for
-	// the first target it attempts, without affecting phase 1's read-only
-	// access.
-	require.NoError(t, os.Chmod(dir, 0o555))
+	// Three independent targets, each in its own directory, so a write
+	// failure can be isolated to exactly the second one instead of hitting
+	// all targets alike (which would not distinguish "stops after the
+	// first phase 2 failure" from "fails uniformly for an unrelated
+	// reason"). All three pass phase 1 (same pattern, same old version).
+	seedTarget := func(mode os.FileMode) (dirPath, filePath string) {
+		dirPath = t.TempDir()
+		filePath = filepath.Join(dirPath, "VERSION")
+		require.NoError(t, os.WriteFile(filePath, []byte("VERSION=v1.2.1\n"), mode))
+		return dirPath, filePath
+	}
+	pattern := regexp.MustCompile(`(?m)^(VERSION=)v[0-9]+\.[0-9]+\.[0-9]+$`)
+	newTarget := func(path string) target {
+		return target{Path: path, Pattern: pattern, ReplacementTemplate: "${1}%s"}
+	}
+
+	_, file1 := seedTarget(0o644)
+	dir2, file2 := seedTarget(0o644)
+	_, file3 := seedTarget(0o644)
+
+	// Block writes only into dir2, so file2's phase 2 write fails while
+	// file1 (processed first) succeeds and file3 (processed after file2)
+	// is never reached.
+	require.NoError(t, os.Chmod(dir2, 0o555))
 	t.Cleanup(func() {
-		_ = os.Chmod(dir, 0o755)
+		_ = os.Chmod(dir2, 0o755)
 	})
 
-	code, _, stderr := runInDir(t, dir, "v1.3.0")
-	require.Equal(t, 1, code, "stderr: %s", stderr)
+	err := update("v1.3.0", []target{newTarget(file1), newTarget(file2), newTarget(file3)})
+	require.Error(t, err)
 
-	readmeJA, err := os.ReadFile(filepath.Join(dir, "README.ja.md"))
-	require.NoError(t, err)
-	require.Contains(t, string(readmeJA), "v1.2.1", "a target not yet reached by phase 2 must remain unmodified")
+	updErr, ok := errors.AsType[*updateError](err)
+	require.True(t, ok, "update must return a *updateError, got %T: %v", err, err)
+	require.Equal(t, errorKindIO, updErr.Kind)
+	require.Equal(t, file2, updErr.Path)
+
+	got1, readErr := os.ReadFile(file1)
+	require.NoError(t, readErr)
+	require.Contains(t, string(got1), "v1.3.0", "a target processed before the failing one must have been written")
+
+	got2, readErr := os.ReadFile(file2)
+	require.NoError(t, readErr)
+	require.Contains(t, string(got2), "v1.2.1", "the failing target itself must be left unmodified")
+
+	got3, readErr := os.ReadFile(file3)
+	require.NoError(t, readErr)
+	require.Contains(t, string(got3), "v1.2.1", "a target not yet reached by phase 2 must remain unmodified")
 }
 
 func TestBumpReleaseVersion_PrintsGuidanceOnSuccess(t *testing.T) {
