@@ -80,17 +80,17 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 **対象ファイル**: `scripts/bump_release_version.go`（新規）
 
-- [ ] `validateVersion(arg string) error` を実装（semver 全体アンカー検証、AC-01。設計 §3.2.1）。不一致時は
-  センチネル `errInvalidVersion` を返す。
-- [ ] エラー型を定義（設計 §3.1）: センチネル `errInvalidVersion`、`errorKind`（`FileNotFound`/
+- [ ] **ステップ 1-1**: `validateVersion(arg string) error` を実装（semver 全体アンカー検証、AC-01。設計 §3.2.1）。
+  不一致時はセンチネル `errInvalidVersion` を返す。
+- [ ] **ステップ 1-2**: エラー型を定義（設計 §3.1）: センチネル `errInvalidVersion`、`errorKind`（`FileNotFound`/
   `PatternNotFound`/`IO`）、`updateError{Path, Kind, Err}`。各 `errorKind` 定数と `Err` フィールドが
   実装内で使われるようにする（`unused` 対策）。
-- [ ] `target{Path, Pattern}` 型と、3対象ファイルの記述子を構成する内部関数を実装（設計 §3.2.2）。一致・置換
-  パターンは設計 §3.2.2 の表に従い、一致確認と置換で同一の `*regexp.Regexp` を用いる（AC-02）。
+- [ ] **ステップ 1-3**: `target{Path, Pattern}` 型と、3対象ファイルの記述子を構成する内部関数を実装（設計 §3.2.2）。
+  一致・置換パターンは設計 §3.2.2 の表に従い、一致確認と置換で同一の `*regexp.Regexp` を用いる（AC-02）。
   置換は `ReplaceAllString` の**波括弧付きグループ参照 `${1}`/`${2}`** を用い、接頭辞・行末残余を保持
   （設計 §3.2.2「実装上の注意」。素の `$1` の直後にバージョン（例: `v1`）が続くと `${1v1}` と解釈されて
   壊れるため必須）。
-- [ ] アトミック書き込み + mode 保持の内部関数を実装（AC-03/AC-04。設計 §3.2.3）: 元 mode を
+- [ ] **ステップ 1-4**: アトミック書き込み + mode 保持の内部関数を実装（AC-03/AC-04。設計 §3.2.3）: 元 mode を
   `os.Stat(...).Mode().Perm()`（型ビットを除いたパーミッションビット）で退避 → 同一ディレクトリに
   ランダム名一時ファイルを作成 → 置換後内容を書き込み → `os.Rename` → `os.Chmod` で退避した元 mode を
   復元。ファイル I/O 各所に `//nolint:gosec // <理由>` を付す（§1.3 参照）。
@@ -101,15 +101,15 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 **対象ファイル**: `scripts/bump_release_version.go`（続き）
 
-- [ ] `update(version string, targets []target) error` を実装（AC-02/AC-07/AC-08。設計 §3.2.4）。
+- [ ] **ステップ 2-1**: `update(version string, targets []target) error` を実装（AC-02/AC-07/AC-08。設計 §3.2.4）。
   フェーズ1（全件の存在・パターン一致確認 + 置換後内容と退避 mode をインメモリ構築、1件でも失敗なら
   どのファイルにも書き込まず終了）→ フェーズ2（全件通過時のみ書き込み、I/O エラーで後続を止める）。
   複数検証失敗は `errors.Join` でまとめてよい（設計 §3.2.4）。
-- [ ] `run(args []string, stdout, stderr io.Writer) int` を実装（AC-05/AC-06/AC-09。設計 §3.1・§3.2.5）:
+- [ ] **ステップ 2-2**: `run(args []string, stdout, stderr io.Writer) int` を実装（AC-05/AC-06/AC-09。設計 §3.1・§3.2.5）:
   引数個数チェック（ちょうど1個、他は Usage を stderr へ出し非ゼロ）→ `validateVersion` →
   カレントディレクトリ基準で `[]target` を構成 → `update` 呼び出し → 成功時に更新通知
   （`Updated <path>`）と後続リリース手順を stdout へ出力。エラーメッセージは設計 §4 の文言に揃える。
-- [ ] `main()` を `os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))` の薄いラッパとして実装（設計 §3.1）。
+- [ ] **ステップ 2-3**: `main()` を `os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))` の薄いラッパとして実装（設計 §3.1）。
 
 **成功基準**: `go run ./scripts` が引数不足で Usage を出して非ゼロ終了する。`make test`（この時点では既存
 テストは書き換え前だが、コンパイルが通ること）。
@@ -120,20 +120,63 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 `docs/design/docker_deployment.md`・`docs/design/docker_deployment.ja.md`（変更）、
 `docs/dev/developer_guide/package_reference.md`（変更）
 
-- [ ] `bump_release_version_test.go` を書き換え: `bumpScriptPath`・`runBumpScript` を削除し、`setupRepo` を
-  「一時ディレクトリに3ファイルをシードする」用途へ縮小（`.sh` のコピーは削除）。`check_existing_tag_test.go`
-  のシンボルには触れない。詳細なテスト内容は §4 を参照。
-- [ ] AC ごとのテストを実装/移行（§4 のテスト一覧に対応）。
-- [ ] `scripts/bump-release-version.sh` を削除。
-- [ ] `docs/design/docker_deployment.md` の2箇所を更新（§4.3 の before/after）。
-- [ ] `docs/design/docker_deployment.ja.md` の2箇所を更新（§4.3 の before/after）。
-- [ ] `docs/dev/developer_guide/package_reference.md` に `scripts/` の項を追記（bump ツールの配置・責務・
-  起動方法 `go run ./scripts vX.Y.Z`）。
-- [ ] `make fmt && make test && make lint` を通す。
+- [ ] **ステップ 3-1**: `bump_release_version_test.go` を書き換え: `bumpScriptPath`・`runBumpScript` を削除し、
+  `setupRepo` を「一時ディレクトリに3ファイルをシードする」用途へ縮小（`.sh` のコピーは削除）。
+  `check_existing_tag_test.go` のシンボルには触れない。詳細なテスト内容は §4 を参照。
+- [ ] **ステップ 3-2**: AC ごとのテストを実装/移行（§4 のテスト一覧に対応）。
 
-**成功基準**: 全 AC テストが緑。`.sh` 削除後に bump スクリプトへの参照が残っていない（§6 クロスサーチ）。
+### PR-1 作成ポイント: Go implementation and in-process tests
+
+**対象ステップ**: 1-1 / 1-2 / 1-3 / 1-4 / 2-1 / 2-2 / 2-3 / 3-1 / 3-2
+
+**推奨タイトル**: `feat(0018): implement bump-release-version in Go with in-process tests`
+
+**レビュー観点**: 2段階検証→書き込みのフェイルクローズ（AC-07/AC-08）と `${1}`/`${2}` グループ参照による置換の正しさ / 全 AC を網羅するインプロセステスト（`run`/`update` 直接呼び出し・`t.Chdir`）/ `//nolint:gosec` 抑制の妥当性（理由コメント・対象パスの範囲）
+
+> 本 PR で実装コードと同一パッケージのインプロセステストを同時に投入する。`run` の `io.Writer` 引数は、
+> 呼び出し元が `main`（`os.Stdout`/`os.Stderr` 固定）だけだと `unparam` が「常に同一値」と警告するため、
+> `bytes.Buffer` を注入するテストを同じ PR に入れて2つ目の呼び出し元を与える。厳密に同時投入が必要なのは
+> 「`run` + それを呼ぶ非 `main` のテスト」だけで、実装全体を1 PR にまとめること自体が必須なわけではない
+> （`unused` 警告は最終状態では `main` から全シンボルへ到達するため発生しない）。本タスクは対象が単一の
+> 約200行ファイルで、さらに分割する費用対効果が低いと判断し、実装一式とテストを1 PR にまとめる。旧 `.sh` は
+> ステップ 3-1 のテスト書き換え後は参照されなくなるため、削除は PR-2 に委ねる（本 PR 時点では孤立して残るが
+> 害はない）。
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
+
+### フェーズ 3 後半: 旧スクリプト削除とドキュメント整備
+
+- [ ] **ステップ 3-3**: `scripts/bump-release-version.sh` を削除。
+- [ ] **ステップ 3-4**: `docs/design/docker_deployment.md` の2箇所を更新（§4.3 の置換内容）。
+- [ ] **ステップ 3-5**: `docs/design/docker_deployment.ja.md` の2箇所を更新（§4.3 の置換内容）。
+- [ ] **ステップ 3-6**: `docs/dev/developer_guide/package_reference.md` に `scripts/` の項を追記（bump ツールの
+  配置・責務・起動方法 `go run ./scripts vX.Y.Z`）。
+- [ ] **ステップ 3-7**: `make fmt && make test && make lint` を通す。
+
+**成功基準**: 全 AC テストが緑。`.sh` 削除後に bump スクリプトへの参照が残っていない（§8 クロスサーチ）。
+
+### PR-2 作成ポイント: remove legacy script and update docs
+
+**対象ステップ**: 3-3 / 3-4 / 3-5 / 3-6 / 3-7
+
+**推奨タイトル**: `chore(0018): remove bump-release-version.sh and update docs`
+
+**レビュー観点**: `.sh` 削除後に bump スクリプトへの残存参照がゼロ（`rg` 確認、§8）/ `docker_deployment.md`・`.ja.md` の起動方法が `go run ./scripts` へ一貫更新されているか / `package_reference.md` の `scripts/` 追記内容の正確さ
+
+> 依存関係: 本 PR は PR-1（インプロセステスト化）のマージ後に行う。PR-1 でテストが `.sh` を参照しなくなって
+> いるため、本 PR での `.sh` 削除でグリーンゲートは壊れない（`check-existing-tag.sh` は別スクリプトで無関係）。
+
+- [ ] グリーンゲート（`_context.md` の "Green gate" 参照）がパスしていることを確認した
+- [ ] PR を作成した
+- [ ] PR がマージされた
+- [ ] 次のブランチへ切り替えた（次ステップは新しいブランチで作業する）
 
 ## 3. 実装順序とマイルストーン
+
+### 3.1 マイルストーン
 
 | マイルストーン | 内容 | 完了条件 |
 |---|---|---|
@@ -142,7 +185,15 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 | M3 | フェーズ3（テスト移行・後始末） | 全 AC テスト緑・`make test && make lint` 成功・参照残存なし |
 
 フェーズ間に順序依存がある（M2 は M1 の型・関数に依存、M3 のテストは M1/M2 の実装に依存）。順序は
-アーキテクチャ設計書 §8 と一致する。
+アーキテクチャ設計書 §8 と一致する。マイルストーン（M1〜M3）は PR-1 内での実装の積み上げ順を示すもので、
+PR 境界（§3.2）とは別軸である。
+
+### 3.2 PR 構成
+
+| PR | 対象ステップ | 主な変更内容 |
+|---|---|---|
+| PR-1 | 1-1 / 1-2 / 1-3 / 1-4 / 2-1 / 2-2 / 2-3 / 3-1 / 3-2 | `scripts/bump_release_version.go`（`package main`）の新規実装（引数検証・エラー型・記述子/パターン・アトミック書き込み+mode 保持・2段階アップデータ・`run`/`main`）と、`bump_release_version_test.go` を Go 実装のインプロセステストへ書き換え（全 AC を網羅）。実装コードとテストは同時投入（`run` の `io.Writer` 引数を `unparam` に通すため。PR-1 マーカー参照） |
+| PR-2 | 3-3 / 3-4 / 3-5 / 3-6 / 3-7 | 旧 `scripts/bump-release-version.sh` の削除、`docs/design/docker_deployment.md`・`.ja.md` の起動方法更新、`docs/dev/developer_guide/package_reference.md` への `scripts/` 追記、最終グリーンゲート確認 |
 
 ## 4. テスト戦略
 
@@ -218,11 +269,10 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 
 ## 6. 実装チェックリスト
 
-フェーズごとのタスクは §2 の各チェックボックスを参照。以下は全体の完了トラッキング。
+ステップごとのタスクは §2 の各チェックボックスを、PR 構成は §3.2 を参照。以下は PR 単位の完了トラッキング。
 
-- [ ] フェーズ1（コアロジック）完了: M1（`go build ./scripts` 成功・Lint 警告なし）
-- [ ] フェーズ2（2段階制御・エントリポイント）完了: M2（`go run ./scripts` が Usage・終了コードを返す）
-- [ ] フェーズ3（テスト移行・後始末）完了: M3（全 AC テスト緑・`make test && make lint` 成功・参照残存なし）
+- [ ] PR-1 マージ済み（対象ステップ: 1-1 / 1-2 / 1-3 / 1-4 / 2-1 / 2-2 / 2-3 / 3-1 / 3-2）
+- [ ] PR-2 マージ済み（対象ステップ: 3-3 / 3-4 / 3-5 / 3-6 / 3-7）
 - [ ] §7 の全 AC 行が緑（`test`）または成立（`static`）
 - [ ] §8 クロスサーチの全項目が確認済み
 - [ ] §9 成功基準をすべて満たす
@@ -255,10 +305,11 @@ Go 実装（`package main`）へ移行する。CLI 契約と安全特性（引�
 `make test`/`make lint` では検出できない残存参照・整合性のみを対象とする（AC 検証表と重複する項目は
 そちらに集約）。
 
-- [ ] `.sh` 削除後の残存参照: `rg -n "bump-release-version\.sh" .` の結果が 0 件（コード・ドキュメント・
-  コメントすべて）。CI（`.github/`）にも残っていないこと。
-- [ ] 起動方法の表記統一: `rg -n "bump-release-version" docs/` の結果が、更新後は `go run ./scripts` 形へ
-  移行済みで、旧 `.sh` 名が残っていないこと（`.md` と `.ja.md` の両方）。
+- [ ] `.sh` 削除後の残存参照: `rg -n "bump-release-version\.sh" --glob '!docs/tasks/**'` の結果が 0 件
+  （実装コード・`.github/`・`docs/design`・`docs/dev`・README 等）。`docs/tasks/0018_*` 配下の要件・設計・
+  計画文書は移行の経緯を記録するため旧名を含んでよく、本チェックの対象外とする。
+- [ ] 起動方法の表記統一: `rg -n "bump-release-version" docs/design docs/dev` の結果に旧 `.sh` 名が残らず、
+  `go run ./scripts` 形へ移行済みであること（`docker_deployment.md`/`.ja.md`、`package_reference.md`）。
 
 ## 9. 成功基準
 
