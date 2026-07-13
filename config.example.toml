@@ -1,0 +1,9 @@
+# Copy this file to config/config.toml and adjust values for your environment:
+#   mkdir -p config
+#   cp config.example.toml config/config.toml
+
+retention_days = 30
+schedule = "0 3 * * *"  # Runs daily at 3:00 (order: minute hour day month weekday; * means "every")
+execution_timeout_seconds = 3600
+slack_allowed_host = "hooks.slack.com"  # Only needed if you use Slack notifications
+hostname = "worker-1"  # Optional. Identifier used in the Host field of Slack notifications (falls back to os.Hostname() if omitted)
