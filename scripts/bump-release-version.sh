@@ -73,9 +73,14 @@ update_file() {
     # without restoring the original mode this would silently downgrade
     # tracked files (e.g. README.md, docker-compose.yml) from 0644 to 0600.
     # Capture the original mode before mktemp/mv and re-apply it afterward,
-    # using whichever of BSD stat (macOS) or GNU stat (Linux) is available.
+    # using whichever of GNU stat (Linux) or BSD stat (macOS) is available.
+    # Try GNU's -c first: BSD stat rejects -c outright (nonzero exit), so the
+    # fallback to -f fires correctly. The reverse order is unsafe — GNU stat
+    # also accepts -f, but with the unrelated meaning "show filesystem status
+    # instead of file status", so it exits 0 while printing the wrong thing
+    # and the fallback never fires.
     local orig_mode
-    orig_mode="$(stat -f %Lp "$file" 2>/dev/null || stat -c %a "$file")"
+    orig_mode="$(stat -c %a "$file" 2>/dev/null || stat -f %Lp "$file")"
 
     local tmp
     tmp="$(mktemp "${file}.XXXXXX")"
