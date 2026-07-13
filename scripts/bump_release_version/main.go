@@ -159,10 +159,17 @@ func update(version string, targets []target) error {
 func prepareTarget(version string, tg target) (preparedUpdate, error) {
 	info, err := os.Stat(tg.Path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return preparedUpdate{}, &updateError{
+				Path: tg.Path,
+				Kind: errorKindFileNotFound,
+				Err:  fmt.Errorf("file not found: %s", tg.Path),
+			}
+		}
 		return preparedUpdate{}, &updateError{
 			Path: tg.Path,
-			Kind: errorKindFileNotFound,
-			Err:  fmt.Errorf("file not found: %s", tg.Path),
+			Kind: errorKindIO,
+			Err:  fmt.Errorf("stat %s: %w", tg.Path, err),
 		}
 	}
 
@@ -187,11 +194,13 @@ func prepareTarget(version string, tg target) (preparedUpdate, error) {
 
 // writeFileAtomic writes content to path by creating a randomly named
 // temporary file in the same directory (so the final rename is atomic and
-// on the same filesystem), renaming it over path, then restoring path's
-// original permission bits. The temp file's name is unpredictable and
-// freshly created, so a pre-planted symlink at a guessed path is never
-// followed. Restoring mode afterward prevents the tracked file from
-// silently downgrading to the temp file's default permissions.
+// on the same filesystem), restoring the original permission bits on that
+// temp file, then renaming it over path. The temp file's name is
+// unpredictable and freshly created, so a pre-planted symlink at a guessed
+// path is never followed. Restoring mode before the rename (rather than
+// after) means a chmod failure aborts without ever mutating path, and
+// prevents the tracked file from silently downgrading to the temp file's
+// default permissions.
 func writeFileAtomic(path string, content []byte, mode fs.FileMode) error {
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
@@ -213,14 +222,15 @@ func writeFileAtomic(path string, content []byte, mode fs.FileMode) error {
 		_ = tmp.Close()
 		return err
 	}
+	if err := tmp.Chmod(mode); err != nil { //nolint:gosec // tmpPath is freshly created for one of a fixed set of target files, not external input
+		_ = tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil { //nolint:gosec // tmpPath/path are derived from a fixed set of target files, not external input
-		return err
-	}
-	if err := os.Chmod(path, mode); err != nil { //nolint:gosec // path is one of a fixed set of target files, not external input
 		return err
 	}
 
