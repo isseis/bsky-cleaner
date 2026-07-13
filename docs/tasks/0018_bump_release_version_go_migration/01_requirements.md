@@ -111,8 +111,8 @@ AC の採番ルールは [requirements_process.md](../../dev/developer_guide/req
   エラーメッセージを出力して非ゼロ終了すること。既存の一致確認と置換に使用するパターンは同一のものを
   用い、確認範囲より広い範囲を置換しないこと。
 - **AC-02a**: 置換は一致行内のバージョン文字列のみを対象とし、行頭の接頭辞（`VERSION=`、
-  `image: ghcr.io/...:` 等）および**バージョン以降の行末残余（後続の空白・コメント等）を原文のまま保持する
-  こと**。特に `README.md`/`README.ja.md` の `VERSION=vX.Y.Z  # ...` のような末尾コメントを破壊しないこと。
+  `image: ghcr.io/...:` 等）および**バージョン以降の行末残余（後続の空白・コメント等）を原文のまま保持すること**。
+  特に `README.md`/`README.ja.md` の `VERSION=vX.Y.Z  # ...` のような末尾コメントを破壊しないこと。
   一致行以外の行、およびファイルのその他の内容は一切変更しないこと。
 - **AC-02b**: `docker-compose.yml` に併存する、コメントアウトされた digest 固定行
   （例: `# image: ghcr.io/isseis/bsky-cleaner@sha256:<digest>`）は書き換え対象とせず、原文のまま保持すること。

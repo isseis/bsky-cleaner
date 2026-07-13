@@ -96,7 +96,7 @@ flowchart LR
 | AC-08（検証の全書き込み先行） | フェーズ1/フェーズ2分離（3.2.4） |
 | AC-09（正常終了時の案内出力） | 案内出力（3.2.5） |
 | NF-001 | `make fmt`/`make test`/`make lint` で検証（7章） |
-| NF-002 | Go 1.26.2 でビルド（`go.mod` に整合） |
+| NF-002 | Go 1.26.2 以上でビルド（`go.mod` に整合） |
 | NF-003 | `os.Stat`/`os.Chmod` による OS 差異吸収（1.1, 3.2.3） |
 | NF-004 | 標準ライブラリのみ利用（1.1, 3.1） |
 
@@ -225,7 +225,8 @@ var errInvalidVersion = errors.New("version does not match semver format vX.Y.Z"
 type errorKind int // FileNotFound / PatternNotFound / IO
 
 // updateError は、どの対象ファイルがどの理由で失敗したかを表す。
-// 呼び出し側はメッセージ文字列ではなく Kind（errors.Is / errors.AsType）で判定する。
+// 呼び出し側はメッセージ文字列ではなく、errors.AsType[*updateError] で型を取り出した上で
+// Kind フィールドを比較して判定する（errors.Is はセンチネルエラー errInvalidVersion 用）。
 type updateError struct {
     Path string
     Kind errorKind
