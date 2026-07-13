@@ -15,10 +15,25 @@
 Docker イメージが [GHCR](https://ghcr.io/isseis/bsky-cleaner) で配布されており、
 Docker Compose を使うのが標準的な利用方法です。
 
-### 1. 環境変数ファイルを準備する
+### 1. バージョンを選び、セットアップファイルをダウンロードする
+
+[GitHub Releases](https://github.com/isseis/bsky-cleaner/releases) から使いたいリリースバージョンを選び、
+`dot.env.example`・`config.example.toml`・`docker-compose.yml` を同じタグからまとめてダウンロードする。
+`main` ではなく同じタグから3ファイルをまとめて取得することで、ファイル同士および実行する Docker イメージとの
+整合性が保たれる。設定ローダーは未知のフィールドを拒否するため、ピン留めしたイメージと異なるリビジョンの
+テンプレートを使うと起動時に設定のパースに失敗することがある。
 
 ```sh
-curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.example
+VERSION=v1.2.1  # 使いたいリリースバージョンに置き換える
+mkdir -p config
+curl -O "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/dot.env.example"
+curl -o config.example.toml "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/config.example.toml"
+curl -O "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/docker-compose.yml"
+```
+
+### 2. 環境変数ファイルを準備する
+
+```sh
 cp dot.env.example .env
 ```
 
@@ -38,15 +53,11 @@ BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 
 各変数の詳細は後述の[環境変数](#環境変数)を参照。
 
-### 2. 設定ファイル（TOML）を用意する
+### 3. 設定ファイル（TOML）を用意する
 
 ```sh
-mkdir -p config
-curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/config.example.toml
 cp config.example.toml config/config.toml
 ```
-
-上記コマンドを実行する前に、curl の URL 中の `main` を、後述の手順3で使う Docker イメージのバージョンと同じリリースタグに置き換えること。設定ローダーは未知のフィールドを拒否するため、`config.example.toml` のスキーマが `main` とピン留めしたイメージのリリースとの間でずれている場合、タグ指定のないテンプレートを使うと起動時に設定のパースに失敗することがある。
 
 `config/config.toml` を自分の環境に合わせて編集する。
 
@@ -60,15 +71,12 @@ hostname = "worker-1"  # 省略可。Slack 通知の Host 欄に使う識別名�
 
 各フィールドの詳細は後述の[TOML 設定ファイル](#toml-設定ファイル)を参照。
 
-### 3. docker-compose.yml を用意する
+### 4. docker-compose.yml を確認する
 
-```sh
-curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/docker-compose.yml
-```
+`docker-compose.yml` は手順1で `$VERSION` タグから取得しているため、`image:` の行はすでに一致している。
+内容を確認し、必要であれば調整する（例: `hostname` やボリュームのパスを変更する場合）。
 
-`image:` のバージョンタグを、使いたいリリースバージョンに合わせて確認・修正する。
-
-### 4. コンテナを起動する
+### 5. コンテナを起動する
 
 ```sh
 docker compose pull
@@ -83,7 +91,7 @@ docker compose ps
 docker compose logs
 ```
 
-### 5. 設定を確認する（試験実行）
+### 6. 設定を確認する（試験実行）
 
 `schedule` による定期実行を待つと、設定ミスに気づくのが早くても翌日以降になってしまう。
 コンテナ内のバイナリを直接呼び出すことで、`schedule` を待たずにその場で試験実行できる。

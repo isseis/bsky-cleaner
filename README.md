@@ -15,10 +15,25 @@ It deletes posts older than the configured retention period.
 Docker images are distributed via [GHCR](https://ghcr.io/isseis/bsky-cleaner),
 and using Docker Compose is the standard usage method.
 
-### 1. Prepare an environment variable file
+### 1. Choose a version and download the setup files
+
+Pick the release version you want to use from [GitHub Releases](https://github.com/isseis/bsky-cleaner/releases),
+then download `dot.env.example`, `config.example.toml`, and `docker-compose.yml` from that same tag in one go.
+Downloading all three from the same tag — instead of `main` — keeps them consistent with each other and with the
+Docker image you will run; the config loader rejects unknown fields, so a template fetched from a different
+revision than the pinned image can fail to parse at startup.
 
 ```sh
-curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/dot.env.example
+VERSION=v1.2.1  # replace with the release version you want to use
+mkdir -p config
+curl -O "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/dot.env.example"
+curl -o config.example.toml "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/config.example.toml"
+curl -O "https://raw.githubusercontent.com/isseis/bsky-cleaner/$VERSION/docker-compose.yml"
+```
+
+### 2. Prepare an environment variable file
+
+```sh
 cp dot.env.example .env
 ```
 
@@ -38,15 +53,11 @@ BSKY_SLACK_WEBHOOK_URL_FAILURE=https://hooks.slack.com/services/...
 
 See [Environment Variables](#environment-variables) below for details on each variable.
 
-### 2. Prepare a configuration file (TOML)
+### 3. Prepare a configuration file (TOML)
 
 ```sh
-mkdir -p config
-curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/config.example.toml
 cp config.example.toml config/config.toml
 ```
-
-Before running the command above, replace `main` in the curl URL with the same release tag as the Docker image version you plan to use in step 3 below — the config loader rejects unknown fields, so if the `config.example.toml` schema has drifted between `main` and the pinned image release, using an untagged template can cause a config-parse failure at startup.
 
 Edit `config/config.toml` as needed for your environment.
 
@@ -60,15 +71,12 @@ hostname = "worker-1"  # Optional. Identifier used in the Host field of Slack no
 
 See [TOML Configuration File](#toml-configuration-file) below for details on each field.
 
-### 3. Prepare docker-compose.yml
+### 4. Review docker-compose.yml
 
-```sh
-curl -O https://raw.githubusercontent.com/isseis/bsky-cleaner/main/docker-compose.yml
-```
+Since `docker-compose.yml` was downloaded from the same `$VERSION` tag in step 1, its `image:` line already
+matches. Review the file and adjust it if needed (e.g. a different `hostname` or volume path).
 
-Check and adjust the version tag in `image:` to match the release version you want to use.
-
-### 4. Start the container
+### 5. Start the container
 
 ```sh
 docker compose pull
@@ -83,7 +91,7 @@ docker compose ps
 docker compose logs
 ```
 
-### 5. Verify the configuration (dry run)
+### 6. Verify the configuration (dry run)
 
 Waiting for periodic execution via `schedule` means a configuration mistake might not be noticed
 until the next day at the earliest. By invoking the binary inside the container directly, you can
